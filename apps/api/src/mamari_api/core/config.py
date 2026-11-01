@@ -1,8 +1,10 @@
+import json
 from functools import lru_cache
 from pathlib import Path
+from typing import Annotated
 
-from pydantic import Field, SecretStr, model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import Field, SecretStr, field_validator, model_validator
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 PROJECT_ROOT = Path(__file__).resolve().parents[5]
 
@@ -10,7 +12,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[5]
 class Settings(BaseSettings):
     app_env: str = "development"
     database_url: str = "postgresql+asyncpg://mamari:mamari@localhost:5432/mamari"
-    cors_origins: list[str] = Field(
+    cors_origins: Annotated[list[str], NoDecode] = Field(
         default_factory=lambda: ["http://localhost:3000", "http://127.0.0.1:3000"]
     )
     jwt_secret_key: SecretStr = SecretStr("development-only-change-before-production")
@@ -18,6 +20,33 @@ class Settings(BaseSettings):
     bootstrap_admin_password: SecretStr = SecretStr("passer123m")
     access_token_minutes: int = Field(default=15, ge=5, le=60)
     upload_directory: Path = PROJECT_ROOT / "storage" / "uploads"
+
+    @field_validator("cors_origins", mode="before")
+    @classmethod
+    def parse_cors_origins(cls, value: str | list[str]) -> list[str]:
+        if isinstance(value, list):
+            return value
+
+        raw_value = value.strip()
+        if raw_value.startswith("["):
+            try:
+                origins = json.loads(raw_value)
+            except json.JSONDecodeError as error:
+                if not raw_value.endswith("]"):
+                    raise ValueError(
+                        "CORS_ORIGINS doit être une liste JSON ou séparée par des virgules."
+                    ) from error
+                raw_value = raw_value[1:-1]
+            else:
+                if not isinstance(origins, list):
+                    raise ValueError("CORS_ORIGINS doit être une liste.")
+                return origins
+
+        return [
+            origin.strip().strip("\"'")
+            for origin in raw_value.strip("[]").split(",")
+            if origin.strip().strip("\"'")
+        ]
 
     @model_validator(mode="after")
     def validate_production_secrets(self) -> "Settings":
