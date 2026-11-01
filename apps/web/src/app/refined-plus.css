@@ -514,3 +514,153 @@ details[open] > summary > svg:last-child { transform: rotate(90deg); }
   .report-month-row > strong,
   .report-month-row > small { font-size: 10px; }
 }
+
+/* ---------- Élevage ---------- */
+.livestock-workspace { display: grid; gap: 24px; }
+
+.livestock-hero {
+  position: relative;
+  display: grid;
+  min-height: 238px;
+  align-content: center;
+  overflow: hidden;
+  border-radius: 28px;
+  padding: 38px 48px;
+  background:
+    radial-gradient(ellipse at 82% 0%, rgb(181 207 164 / 22%), transparent 36%),
+    linear-gradient(115deg, #263d2c, #345d43);
+  color: #f7faf6;
+}
+
+.livestock-hero .eyebrow { color: #b6cbb8; }
+.livestock-hero h1 { margin-top: 6px; font-family: var(--serif); font-size: clamp(36px, 4vw, 52px); font-weight: 500; }
+.livestock-hero > div:first-child > p:last-child { max-width: 520px; margin-top: 8px; color: #d3ded2; font-size: 14px; }
+.livestock-hero-mark { position: absolute; top: 28px; right: 56px; display: grid; width: 118px; height: 118px; place-items: center; border: 1px solid rgb(255 255 255 / 14%); border-radius: 50%; color: #c4d6c3; }
+.livestock-hero-stats { display: flex; flex-wrap: wrap; gap: 28px; margin-top: 25px; color: #c3d4c4; font-size: 12px; }
+.livestock-hero-stats strong { margin-right: 5px; color: white; font-family: var(--serif); font-size: 25px; font-weight: 500; }
+
+.livestock-kpi-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+.livestock-kpi-card { display: grid; min-width: 0; gap: 8px; padding: 18px; }
+.livestock-kpi-icon,
+.livestock-group-icon { display: grid; width: 38px; height: 38px; place-items: center; border-radius: 13px; background: var(--green-pale); color: var(--green); }
+.livestock-kpi-card > span:nth-child(2) { color: var(--muted); font-size: 12px; }
+.livestock-kpi-card > strong { overflow: hidden; font-family: var(--serif); font-size: 28px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.livestock-kpi-card > strong.livestock-production-value { font-family: "DM Sans", system-ui, sans-serif; font-size: clamp(13px, 1.2vw, 17px); font-weight: 600; line-height: 1.4; overflow-wrap: anywhere; white-space: normal; }
+.livestock-kpi-card > strong small { font-family: "DM Sans", system-ui, sans-serif; font-size: 12px; font-weight: 500; }
+.livestock-kpi-card > small { color: var(--muted); font-size: 10px; line-height: 1.5; }
+
+.livestock-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.livestock-tabs { display: flex; max-width: 100%; gap: 5px; overflow-x: auto; border: 1px solid var(--hair); border-radius: 14px; background: white; padding: 5px; }
+.livestock-tab { display: inline-flex; min-height: 40px; flex: 0 0 auto; align-items: center; justify-content: center; gap: 8px; border: 0; border-radius: 10px; background: transparent; padding: 0 14px; color: #66736a; cursor: pointer; font-size: 12px; }
+.livestock-tab[aria-selected="true"] { background: var(--green-pale); color: var(--green-dark); font-weight: 600; }
+.livestock-panel-content { min-width: 0; }
+.livestock-create-card { margin-bottom: 20px; padding: 7px 22px; }
+.livestock-create-card > summary { display: flex; min-height: 64px; align-items: center; gap: 12px; cursor: pointer; list-style: none; }
+.livestock-create-card > summary::-webkit-details-marker { display: none; }
+.livestock-create-card > summary > span:nth-child(2) { display: grid; flex: 1; gap: 4px; }
+.livestock-create-card > summary strong { font-size: 13px; }
+.livestock-create-card > summary small { color: var(--muted); font-size: 11px; }
+.livestock-create-card > summary > svg:last-child { color: #9da89f; transition: transform 160ms ease; }
+.livestock-create-card[open] > summary > svg:last-child { transform: rotate(90deg); }
+
+.livestock-form-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: end; gap: 14px; border-top: 1px solid var(--hair); padding: 18px 0 12px; }
+.livestock-form-grid .auth-field input,
+.livestock-form-grid .auth-field select { min-width: 0; min-height: 42px; }
+.livestock-form-grid > .button-primary { min-height: 42px; }
+.livestock-photo-upload { display: grid; min-height: 88px; grid-template-columns: auto 1fr; align-content: center; align-items: center; column-gap: 10px; border: 1px dashed #cbd9cc; border-radius: 13px; padding: 10px 12px; color: var(--green); cursor: pointer; }
+.livestock-photo-upload > span { font-size: 12px; font-weight: 600; }
+.livestock-photo-upload > small { grid-column: 2; color: var(--muted); font-size: 10px; }
+.livestock-photo-upload > input { grid-column: 1 / -1; max-width: 100%; margin-top: 7px; color: var(--muted); font-size: 10px; }
+
+.livestock-animal-grid,
+.livestock-facility-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); gap: 18px; }
+.livestock-animal-card,
+.livestock-facility-card { min-width: 0; overflow: hidden; padding: 0; }
+.livestock-animal-image { width: 100%; height: 220px; object-fit: cover; }
+.livestock-photo-placeholder { display: flex; align-items: center; justify-content: center; gap: 10px; background: linear-gradient(145deg, #edf2eb, #f8f8f5); color: #90aa91; }
+.livestock-photo-placeholder span { color: #768a78; font-size: 12px; }
+.livestock-animal-body { padding: 18px; }
+.livestock-animal-title { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.livestock-animal-title h2 { margin-top: 3px; font-family: var(--serif); font-size: 24px; font-weight: 500; overflow-wrap: anywhere; }
+.livestock-animal-title p { color: var(--muted); font-size: 11px; }
+.livestock-sex-pill { flex: 0 0 auto; border-radius: 999px; background: #f2f4f1; padding: 5px 9px; color: #647367; font-size: 10px; }
+.livestock-sex-female { background: #f8eef0; color: #925b68; }
+.livestock-animal-meta { display: grid; gap: 5px; margin-top: 14px; color: var(--muted); font-size: 11px; }
+.livestock-animal-group { margin-top: 8px; color: var(--green-dark); font-size: 11px; }
+.livestock-animal-actions { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-top: 14px; border-top: 1px solid var(--hair); padding-top: 8px; }
+
+.livestock-management-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 16px; }
+.livestock-subsection-heading { margin: 22px 0 14px; }
+.livestock-subsection-heading h2 { font-family: var(--serif); font-size: 25px; font-weight: 500; }
+.livestock-subsection-heading p { margin-top: 4px; color: var(--muted); font-size: 12px; }
+.livestock-group-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 275px), 1fr)); gap: 12px; }
+.livestock-group-card { display: flex; min-width: 0; align-items: center; gap: 13px; padding: 16px; }
+.livestock-group-card > div { min-width: 0; flex: 1; }
+.livestock-group-card h3 { overflow: hidden; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
+.livestock-group-card p { margin-top: 4px; color: var(--muted); font-size: 11px; }
+.livestock-group-card > div > small { display: block; margin-top: 7px; color: var(--muted); font-size: 10px; }
+.livestock-group-card > strong { flex: 0 0 auto; font-family: var(--serif); font-size: 25px; font-weight: 500; }
+.livestock-group-card > strong small { font-family: "DM Sans", system-ui, sans-serif; font-size: 10px; }
+.livestock-facility-card > div { padding: 16px; }
+.livestock-facility-image { width: 100%; height: 155px; object-fit: cover; }
+.livestock-facility-card > div > span { color: var(--green); font-size: 10px; font-weight: 600; text-transform: uppercase; }
+.livestock-facility-card h3 { margin-top: 5px; font-family: var(--serif); font-size: 21px; font-weight: 500; }
+.livestock-facility-card p,
+.livestock-facility-card small { display: block; margin-top: 5px; color: var(--muted); font-size: 11px; }
+
+.livestock-record-layout { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(250px, .75fr); align-items: start; gap: 22px; }
+.livestock-record-layout > div { min-width: 0; }
+.livestock-record-layout .livestock-subsection-heading { margin-top: 0; }
+.livestock-record-list { display: grid; gap: 10px; margin-top: 16px; }
+.livestock-record-card { display: flex; align-items: flex-start; gap: 13px; padding: 16px; }
+.livestock-record-icon { display: grid; width: 38px; height: 38px; flex: 0 0 auto; place-items: center; border-radius: 13px; background: #eef4ed; color: var(--green); }
+.livestock-record-health { background: #fbf0ef; color: #a45b50; }
+.livestock-record-reproduction { background: #f8f2e7; color: #92733b; }
+.livestock-record-feed { background: #edf2e8; color: #617c45; }
+.livestock-record-copy { min-width: 0; flex: 1; }
+.livestock-record-copy > div { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 12px; color: var(--muted); font-size: 10px; }
+.livestock-record-copy h3 { margin-top: 6px; font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+.livestock-record-copy p { margin-top: 5px; color: var(--muted); font-size: 11px; }
+.livestock-record-copy > small { display: flex; align-items: center; gap: 5px; margin-top: 7px; color: var(--muted); font-size: 10px; }
+.livestock-record-copy > small.livestock-overdue { color: #a14e43; }
+.livestock-reminders { position: sticky; top: 20px; padding: 20px; }
+.livestock-reminders .livestock-subsection-heading { margin: 0 0 16px; }
+.livestock-reminder { display: flex; gap: 10px; border-top: 1px solid var(--hair); padding: 13px 0; }
+.livestock-reminder > span { flex: 0 0 auto; color: var(--green); }
+.livestock-reminder.is-overdue > span { color: #a14e43; }
+.livestock-reminder > div { display: grid; min-width: 0; gap: 4px; }
+.livestock-reminder strong { font-size: 12px; overflow-wrap: anywhere; }
+.livestock-reminder small,
+.livestock-reminder-empty { color: var(--muted); font-size: 10px; line-height: 1.5; }
+.livestock-reminder-done { display: inline-flex; width: fit-content; align-items: center; gap: 5px; margin-top: 5px; border: 0; background: transparent; padding: 2px 0; color: var(--green); cursor: pointer; font-size: 10px; font-weight: 600; }
+.livestock-reminder-done:disabled { cursor: wait; opacity: .6; }
+.livestock-stock-note { margin: 0 0 14px; border-left: 3px solid #d5e0d1; padding: 8px 12px; color: var(--muted); font-size: 11px; line-height: 1.5; }
+.livestock-empty { display: grid; min-height: 200px; place-content: center; justify-items: center; gap: 8px; color: #829584; text-align: center; }
+.livestock-empty h2 { color: var(--ink); font-family: var(--serif); font-size: 22px; font-weight: 500; }
+.livestock-empty p { max-width: 460px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.livestock-empty.compact { min-height: 100px; padding: 20px; }
+
+@media (max-width: 1000px) {
+  .livestock-kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .livestock-record-layout { grid-template-columns: minmax(0, 1fr); }
+  .livestock-reminders { position: static; }
+}
+
+@media (max-width: 760px) {
+  .livestock-hero { min-height: 205px; padding: 30px 28px; border-radius: 22px; }
+  .livestock-hero-mark { top: 18px; right: 20px; width: 76px; height: 76px; }
+  .livestock-hero-mark svg { width: 36px; }
+  .livestock-toolbar { align-items: flex-start; flex-direction: column; }
+  .livestock-tabs { width: 100%; justify-content: flex-start; }
+  .livestock-form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .livestock-management-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (max-width: 480px) {
+  .livestock-kpi-grid { gap: 9px; }
+  .livestock-kpi-card { padding: 13px; }
+  .livestock-kpi-card > strong { font-size: 24px; }
+  .livestock-form-grid { grid-template-columns: minmax(0, 1fr); }
+  .livestock-create-card { padding: 5px 15px; }
+  .livestock-animal-image { height: 195px; }
+}

@@ -111,6 +111,11 @@ n’a été enregistrée.
   responsable, recherche, filtres et états à faire/en cours/terminé/archivé.
   Les tâches et leurs statistiques sont isolées par organisation via
   `/api/v1/operations`.
+- Le module Élevage suit les animaux individuels et les lots, leurs bâtiments,
+  photos, soins et échéances, événements de reproduction, productions et
+  alimentation. Les bâtiments rattachés à une ferme ajoutent automatiquement
+  les coûts aux Finances et les recettes de production aux revenus. Les médias
+  privés sont stockés sous `UPLOAD_DIRECTORY` et limités à 5 Mo.
 - Avant d’exposer le serveur sur Internet, remplacer `BOOTSTRAP_ADMIN_PASSWORD`
   par un secret propre à l’instance dans `.env`, et définir une clé
   `JWT_SECRET_KEY` unique d’au moins 32 caractères ainsi que les origines de
@@ -167,7 +172,8 @@ curl -fsS https://mamari.fisafigroupe.com/api/v1/health
   `0006_parcel_photos` ajoute la métadonnée photo des parcelles ;
   `0007_operations_tasks` ajoute le planning des tâches ;
   `0008_seed_crop_catalog` initialise le catalogue des cultures des organisations
-  qui n’en possèdent pas encore.
+  qui n’en possèdent pas encore ;
+  `0009_livestock` ajoute les bâtiments, lots, animaux et événements d’élevage.
 
 ## Principes de conception
 

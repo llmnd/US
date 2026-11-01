@@ -5,6 +5,7 @@ import { UserManagement } from "@/features/administration/user-management";
 import { AgriculturePage } from "@/features/agriculture/agriculture-page";
 import { OperationsPage } from "@/features/operations/operations-page";
 import { SalesPage } from "@/features/sales/sales-page";
+import { LivestockPage } from "@/features/livestock/livestock-page";
 
 const modules: Record<string, { title: string; description: string }> = {
   operations: {
@@ -72,6 +73,7 @@ export default async function ModulePage({
   if (module === "operations") return <OperationsPage />;
   if (module === "ventes") return <SalesPage />;
   if (module === "agriculture") return <AgriculturePage />;
+  if (module === "elevage") return <LivestockPage />;
 
   return (
     <div className="dashboard-content">

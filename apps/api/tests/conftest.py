@@ -8,6 +8,7 @@ from mamari_api.core.database import get_session
 from mamari_api.main import api_app, app
 from mamari_api.modules.agriculture import models as agriculture_models  # noqa: F401
 from mamari_api.modules.identity import models as identity_models  # noqa: F401
+from mamari_api.modules.livestock import models as livestock_models  # noqa: F401
 from mamari_api.modules.operations import models as operations_models  # noqa: F401
 from mamari_api.modules.sales import models as sales_models  # noqa: F401
 
