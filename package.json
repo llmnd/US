@@ -1,0 +1,13 @@
+{
+  "name": "mamari",
+  "private": true,
+  "workspaces": [
+    "apps/web"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace @mamari/web",
+    "build": "npm run build --workspace @mamari/web",
+    "lint": "npm run lint --workspace @mamari/web",
+    "typecheck": "npm run typecheck --workspace @mamari/web"
+  }
+}

@@ -1,0 +1,27 @@
+# JavaScript
+node_modules/
+.next/
+out/
+coverage/
+npm-debug.log*
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Environment and local data
+.env
+.env.*
+!.env.example
+*.sqlite3
+
+# Editors and operating systems
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
