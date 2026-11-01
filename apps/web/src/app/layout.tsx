@@ -3,6 +3,8 @@ import type { ReactNode } from "react";
 import { AppShell } from "@/components/app-shell";
 import { Providers } from "@/components/providers";
 import "./globals.css";
+import "./refined.css";
+import "./refined-plus.css";
 
 export const metadata: Metadata = {
   title: {

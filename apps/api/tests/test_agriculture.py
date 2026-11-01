@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 from uuid import uuid4
 
@@ -287,6 +287,30 @@ async def test_farm_photo_is_validated_private_and_archiveable(
     assert photo.status_code == 200
     assert photo.content == png
 
+    replacement_png = b"\x89PNG\r\n\x1a\n" + b"\x01" * 24
+    replaced = await client.patch(
+        f"/api/v1/agriculture/farms/{farm['id']}",
+        headers=headers,
+        data={"name": "Ferme photo modifiée", "location": "Thiès"},
+        files={"photo": ("new-farm.png", replacement_png, "image/png")},
+    )
+    assert replaced.status_code == 200, replaced.text
+    updated_photo = await client.get(f"/api/v1{replaced.json()['photo_url']}", headers=headers)
+    assert updated_photo.status_code == 200
+    assert updated_photo.content == replacement_png
+
+    removed = await client.patch(
+        f"/api/v1/agriculture/farms/{farm['id']}",
+        headers=headers,
+        data={
+            "name": "Ferme photo modifiée",
+            "location": "Thiès",
+            "remove_photo": "true",
+        },
+    )
+    assert removed.status_code == 200
+    assert removed.json()["photo_url"] is None
+
     bad_photo = await client.post(
         "/api/v1/agriculture/farms",
         headers=headers,
@@ -394,3 +418,144 @@ async def test_duplicate_parcel_name_and_reader_permissions(
         },
     )
     assert forbidden.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_farms_and_parcels_can_be_edited_archived_and_restored(
+    client: AsyncClient,
+) -> None:
+    organization_id, farm, crop = await setup_farm(client)
+    headers = {"X-Organization-ID": organization_id}
+    parcel = await create_parcel(client, organization_id, farm["id"], crop["id"])
+    planned_campaign = await client.post(
+        "/api/v1/agriculture/campaigns",
+        headers=headers,
+        json={
+            "parcel_id": parcel["id"],
+            "crop_id": crop["id"],
+            "name": "Campagne de contrôle",
+            "season": "Saison de contrôle",
+            "start_date": date.today().isoformat(),
+            "expected_harvest_date": (date.today() + timedelta(days=180)).isoformat(),
+            "area_hectares": 2,
+            "expected_yield_kg_per_hectare": 1000,
+            "expected_price_fcfa_per_kg": 500,
+            "estimated_input_cost_fcfa": 100000,
+            "estimated_other_cost_fcfa": 50000,
+        },
+    )
+    assert planned_campaign.status_code == 201, planned_campaign.text
+
+    updated_farm = await client.patch(
+        f"/api/v1/agriculture/farms/{farm['id']}",
+        headers=headers,
+        data={"name": "Ferme des Collines rénovée", "location": "Thiès centre"},
+    )
+    assert updated_farm.status_code == 200, updated_farm.text
+    assert updated_farm.json()["name"] == "Ferme des Collines rénovée"
+    assert updated_farm.json()["location"] == "Thiès centre"
+
+    updated_parcel = await client.patch(
+        f"/api/v1/agriculture/parcels/{parcel['id']}",
+        headers=headers,
+        json={"name": "Parcelle Sud", "area_hectares": 3},
+    )
+    assert updated_parcel.status_code == 200, updated_parcel.text
+    assert updated_parcel.json()["name"] == "Parcelle Sud"
+    assert Decimal(updated_parcel.json()["area_hectares"]) == Decimal("3.00")
+
+    too_small = await client.patch(
+        f"/api/v1/agriculture/parcels/{parcel['id']}",
+        headers=headers,
+        json={"name": "Parcelle Sud", "area_hectares": 0.5},
+    )
+    assert too_small.status_code == 409
+
+    archived_parcel = await client.patch(
+        f"/api/v1/agriculture/parcels/{parcel['id']}/archive",
+        headers=headers,
+    )
+    assert archived_parcel.status_code == 200
+    assert archived_parcel.json()["is_active"] is False
+    restored_parcel = await client.patch(
+        f"/api/v1/agriculture/parcels/{parcel['id']}/restore",
+        headers=headers,
+    )
+    assert restored_parcel.status_code == 200
+    assert restored_parcel.json()["is_active"] is True
+
+    archived_farm = await client.patch(
+        f"/api/v1/agriculture/farms/{farm['id']}/archive",
+        headers=headers,
+    )
+    assert archived_farm.status_code == 200
+    blocked_restore = await client.patch(
+        f"/api/v1/agriculture/parcels/{parcel['id']}/restore",
+        headers=headers,
+    )
+    assert blocked_restore.status_code == 409
+    restored_farm = await client.patch(
+        f"/api/v1/agriculture/farms/{farm['id']}/restore",
+        headers=headers,
+    )
+    assert restored_farm.status_code == 200
+    restored_parcel = await client.patch(
+        f"/api/v1/agriculture/parcels/{parcel['id']}/restore",
+        headers=headers,
+    )
+    assert restored_parcel.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_parcel_photos_are_private_validated_replaceable_and_removable(
+    client: AsyncClient,
+) -> None:
+    organization_id, farm, crop = await setup_farm(client)
+    headers = {"X-Organization-ID": organization_id}
+    parcel = await create_parcel(client, organization_id, farm["id"], crop["id"])
+    png = b"\x89PNG\r\n\x1a\n" + b"\x00" * 24
+    photo_path = f"/api/v1/agriculture/parcels/{parcel['id']}/photo"
+
+    uploaded = await client.post(
+        photo_path,
+        headers=headers,
+        files={"photo": ("parcel.png", png, "image/png")},
+    )
+    assert uploaded.status_code == 200, uploaded.text
+    assert uploaded.json()["photo_url"] == f"/agriculture/parcels/{parcel['id']}/photo"
+    photo = await client.get(photo_path, headers=headers)
+    assert photo.status_code == 200
+    assert photo.content == png
+
+    replacement_png = b"\x89PNG\r\n\x1a\n" + b"\x02" * 24
+    replaced = await client.post(
+        photo_path,
+        headers=headers,
+        files={"photo": ("parcel-new.png", replacement_png, "image/png")},
+    )
+    assert replaced.status_code == 200, replaced.text
+    replaced_photo = await client.get(photo_path, headers=headers)
+    assert replaced_photo.status_code == 200
+    assert replaced_photo.content == replacement_png
+
+    invalid_upload = await client.post(
+        photo_path,
+        headers=headers,
+        files={"photo": ("parcel.svg", b"<svg/>", "image/svg+xml")},
+    )
+    assert invalid_upload.status_code == 415
+    retained_photo = await client.get(photo_path, headers=headers)
+    assert retained_photo.status_code == 200
+    assert retained_photo.content == replacement_png
+
+    client.cookies.clear()
+    private_photo = await client.get(photo_path, headers=headers)
+    assert private_photo.status_code == 401
+    organization_id = await admin_organization(client)
+    headers = {"X-Organization-ID": organization_id}
+
+    removed = await client.delete(photo_path, headers=headers)
+    assert removed.status_code == 200, removed.text
+    assert removed.json()["photo_url"] is None
+    missing_photo = await client.get(photo_path, headers=headers)
+    assert missing_photo.status_code == 404

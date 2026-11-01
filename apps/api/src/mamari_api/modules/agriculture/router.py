@@ -8,7 +8,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
 from fastapi.responses import FileResponse
 from sqlalchemy import case, func, or_, select
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from mamari_api.core.config import get_settings
@@ -43,6 +43,7 @@ from mamari_api.modules.agriculture.schemas import (
     MonthlyFinanceResponse,
     ParcelPageResponse,
     ParcelResponse,
+    UpdateParcelRequest,
 )
 from mamari_api.modules.identity.dependencies import (
     CurrentMembership,
@@ -88,6 +89,27 @@ def _photo_path(organization_id: uuid.UUID, filename: str) -> Path:
     return get_settings().upload_directory / str(organization_id) / filename
 
 
+async def _store_photo(
+    organization_id: uuid.UUID,
+    photo_data: tuple[bytes, str],
+) -> tuple[str, Path]:
+    content, extension = photo_data
+    filename = f"{uuid.uuid4().hex}{extension}"
+    path = _photo_path(organization_id, filename)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    await asyncio.to_thread(path.write_bytes, content)
+    return filename, path
+
+
+def _is_duplicate_name_error(
+    error: IntegrityError,
+    constraint_name: str,
+    sqlite_message: str,
+) -> bool:
+    actual_constraint = getattr(getattr(error.orig, "diag", None), "constraint_name", None)
+    return actual_constraint == constraint_name or str(error.orig) == sqlite_message
+
+
 async def _read_photo(photo: UploadFile) -> tuple[bytes, str]:
     content = await photo.read(MAX_PHOTO_BYTES + 1)
     if not content:
@@ -101,6 +123,53 @@ async def _read_photo(photo: UploadFile) -> tuple[bytes, str]:
             detail="Format photo invalide. Utilisez une image JPEG, PNG ou WebP.",
         )
     return content, photo_type[0]
+
+
+async def _farm_response(session: AsyncSession, farm: Farm) -> FarmResponse:
+    totals = await session.execute(
+        select(
+            func.count(Parcel.id),
+            func.coalesce(func.sum(Parcel.area_hectares), 0),
+        ).where(
+            Parcel.organization_id == farm.organization_id,
+            Parcel.farm_id == farm.id,
+            Parcel.is_active.is_(True),
+        )
+    )
+    parcel_count, area = totals.one()
+    return FarmResponse(
+        id=farm.id,
+        name=farm.name,
+        location=farm.location,
+        is_active=farm.is_active,
+        photo_url=f"/agriculture/farms/{farm.id}/photo" if farm.photo_filename else None,
+        parcel_count=parcel_count,
+        area_hectares=area,
+        created_at=farm.created_at,
+    )
+
+
+async def _parcel_response(session: AsyncSession, parcel: Parcel) -> ParcelResponse:
+    farm = await session.scalar(
+        select(Farm).where(
+            Farm.id == parcel.farm_id,
+            Farm.organization_id == parcel.organization_id,
+        )
+    )
+    if farm is None:
+        raise HTTPException(status_code=404, detail="Ferme de la parcelle introuvable.")
+    return ParcelResponse(
+        id=parcel.id,
+        farm_id=parcel.farm_id,
+        farm_name=farm.name,
+        name=parcel.name,
+        crop=parcel.crop,
+        crop_id=parcel.crop_id,
+        area_hectares=parcel.area_hectares,
+        is_active=parcel.is_active,
+        photo_url=f"/agriculture/parcels/{parcel.id}/photo" if parcel.photo_filename else None,
+        created_at=parcel.created_at,
+    )
 
 
 def _expected_values(campaign: Campaign) -> tuple[Decimal, int, int, int]:
@@ -358,11 +427,7 @@ async def create_farm(
     )
     photo_path = None
     if photo_data is not None:
-        content, extension = photo_data
-        farm.photo_filename = f"{farm.id}{extension}"
-        photo_path = _photo_path(context.organization.id, farm.photo_filename)
-        photo_path.parent.mkdir(parents=True, exist_ok=True)
-        await asyncio.to_thread(photo_path.write_bytes, content)
+        farm.photo_filename, photo_path = await _store_photo(context.organization.id, photo_data)
     session.add(farm)
     try:
         await session.commit()
@@ -370,20 +435,22 @@ async def create_farm(
         await session.rollback()
         if photo_path is not None:
             photo_path.unlink(missing_ok=True)
+        if not _is_duplicate_name_error(
+            error,
+            "uq_agriculture_farms_org_name",
+            "UNIQUE constraint failed: agriculture_farms.organization_id, agriculture_farms.name",
+        ):
+            raise
         raise HTTPException(
             status_code=409,
             detail="Une ferme porte déjà ce nom dans l'organisation.",
         ) from error
-    return FarmResponse(
-        id=farm.id,
-        name=farm.name,
-        location=farm.location,
-        is_active=farm.is_active,
-        photo_url=f"/agriculture/farms/{farm.id}/photo" if farm.photo_filename else None,
-        parcel_count=0,
-        area_hectares=Decimal(0),
-        created_at=farm.created_at,
-    )
+    except SQLAlchemyError:
+        await session.rollback()
+        if photo_path is not None:
+            photo_path.unlink(missing_ok=True)
+        raise
+    return await _farm_response(session, farm)
 
 
 @router.get("/farms/{farm_id}/photo", response_class=FileResponse, include_in_schema=False)
@@ -404,6 +471,72 @@ async def read_farm_photo(
     if not path.is_file():
         raise HTTPException(status_code=404, detail="Fichier photo introuvable sur le serveur.")
     return FileResponse(path, headers={"Cache-Control": "private, max-age=3600"})
+
+
+@router.patch("/farms/{farm_id}", response_model=FarmResponse, summary="Modifier une ferme")
+async def update_farm(
+    farm_id: uuid.UUID,
+    session: SessionDep,
+    context: CanManageAgricultureDep,
+    name: Annotated[str, Form(min_length=2, max_length=120)],
+    location: Annotated[str | None, Form(max_length=180)] = None,
+    photo: Annotated[UploadFile | None, File()] = None,
+    remove_photo: Annotated[bool, Form()] = False,
+) -> FarmResponse:
+    farm = await session.scalar(
+        select(Farm).where(
+            Farm.id == farm_id,
+            Farm.organization_id == context.organization.id,
+        )
+    )
+    if farm is None:
+        raise HTTPException(status_code=404, detail="Ferme introuvable.")
+    farm_name = name.strip()
+    if len(farm_name) < 2:
+        raise HTTPException(status_code=422, detail="Le nom de la ferme est trop court.")
+    if photo is not None and remove_photo:
+        raise HTTPException(
+            status_code=422,
+            detail="Choisissez une nouvelle photo ou la suppression, pas les deux.",
+        )
+
+    photo_data = await _read_photo(photo) if photo is not None else None
+    previous_filename = farm.photo_filename
+    new_photo_path = None
+    if photo_data is not None:
+        farm.photo_filename, new_photo_path = await _store_photo(
+            context.organization.id,
+            photo_data,
+        )
+    elif remove_photo:
+        farm.photo_filename = None
+    farm.name = farm_name
+    farm.location = location.strip() if location and location.strip() else None
+    try:
+        await session.commit()
+    except IntegrityError as error:
+        await session.rollback()
+        if new_photo_path is not None:
+            new_photo_path.unlink(missing_ok=True)
+        if not _is_duplicate_name_error(
+            error,
+            "uq_agriculture_farms_org_name",
+            "UNIQUE constraint failed: agriculture_farms.organization_id, agriculture_farms.name",
+        ):
+            raise
+        raise HTTPException(
+            status_code=409,
+            detail="Une ferme porte déjà ce nom dans l'organisation.",
+        ) from error
+    except SQLAlchemyError:
+        await session.rollback()
+        if new_photo_path is not None:
+            new_photo_path.unlink(missing_ok=True)
+        raise
+
+    if previous_filename and farm.photo_filename != previous_filename:
+        _photo_path(context.organization.id, previous_filename).unlink(missing_ok=True)
+    return await _farm_response(session, farm)
 
 
 @router.patch("/farms/{farm_id}/archive", response_model=FarmResponse)
@@ -437,24 +570,7 @@ async def archive_farm(
         )
     farm.is_active = False
     await session.commit()
-    totals = await session.execute(
-        select(func.count(Parcel.id), func.coalesce(func.sum(Parcel.area_hectares), 0)).where(
-            Parcel.organization_id == farm.organization_id,
-            Parcel.farm_id == farm.id,
-            Parcel.is_active.is_(True),
-        )
-    )
-    parcel_count, area = totals.one()
-    return FarmResponse(
-        id=farm.id,
-        name=farm.name,
-        location=farm.location,
-        is_active=farm.is_active,
-        photo_url=f"/agriculture/farms/{farm.id}/photo" if farm.photo_filename else None,
-        parcel_count=parcel_count,
-        area_hectares=area,
-        created_at=farm.created_at,
-    )
+    return await _farm_response(session, farm)
 
 
 @router.patch("/farms/{farm_id}/restore", response_model=FarmResponse)
@@ -470,24 +586,7 @@ async def restore_farm(
         raise HTTPException(status_code=404, detail="Ferme introuvable.")
     farm.is_active = True
     await session.commit()
-    totals = await session.execute(
-        select(func.count(Parcel.id), func.coalesce(func.sum(Parcel.area_hectares), 0)).where(
-            Parcel.organization_id == farm.organization_id,
-            Parcel.farm_id == farm.id,
-            Parcel.is_active.is_(True),
-        )
-    )
-    parcel_count, area = totals.one()
-    return FarmResponse(
-        id=farm.id,
-        name=farm.name,
-        location=farm.location,
-        is_active=farm.is_active,
-        photo_url=f"/agriculture/farms/{farm.id}/photo" if farm.photo_filename else None,
-        parcel_count=parcel_count,
-        area_hectares=area,
-        created_at=farm.created_at,
-    )
+    return await _farm_response(session, farm)
 
 
 @router.get("/crops", response_model=list[CropResponse], summary="Catalogue des cultures")
@@ -539,23 +638,46 @@ async def list_parcels(
     page_size: Annotated[int, Query(ge=1, le=100)] = 50,
     search: Annotated[str | None, Query(min_length=1, max_length=100)] = None,
     farm_id: uuid.UUID | None = None,
+    active: bool | None = True,
 ) -> ParcelPageResponse:
     filters = [Parcel.organization_id == context.organization.id]
+    if active is not None:
+        filters.append(Parcel.is_active.is_(active))
     if farm_id is not None:
         filters.append(Parcel.farm_id == farm_id)
     if search is not None and search.strip():
         pattern = f"%{search.strip()}%"
         filters.append(or_(Parcel.name.ilike(pattern), Parcel.crop.ilike(pattern)))
     total = await session.scalar(select(func.count()).select_from(Parcel).where(*filters))
-    parcels = await session.scalars(
-        select(Parcel)
+    rows = await session.execute(
+        select(Parcel, Farm)
+        .join(
+            Farm,
+            (Farm.organization_id == Parcel.organization_id) & (Farm.id == Parcel.farm_id),
+        )
         .where(*filters)
         .order_by(Parcel.name)
         .offset((page - 1) * page_size)
         .limit(page_size)
     )
     return ParcelPageResponse(
-        items=list(parcels.all()),
+        items=[
+            ParcelResponse(
+                id=parcel.id,
+                farm_id=parcel.farm_id,
+                farm_name=farm.name,
+                name=parcel.name,
+                crop=parcel.crop,
+                crop_id=parcel.crop_id,
+                area_hectares=parcel.area_hectares,
+                is_active=parcel.is_active,
+                photo_url=(
+                    f"/agriculture/parcels/{parcel.id}/photo" if parcel.photo_filename else None
+                ),
+                created_at=parcel.created_at,
+            )
+            for parcel, farm in rows.all()
+        ],
         total=total or 0,
         page=page,
         page_size=page_size,
@@ -572,7 +694,7 @@ async def create_parcel(
     data: CreateParcelRequest,
     session: SessionDep,
     context: CanManageAgricultureDep,
-) -> Parcel:
+) -> ParcelResponse:
     farm = await session.scalar(
         select(Farm).where(
             Farm.id == data.farm_id,
@@ -606,19 +728,209 @@ async def create_parcel(
         await session.commit()
     except IntegrityError as error:
         await session.rollback()
-        constraint_name = getattr(getattr(error.orig, "diag", None), "constraint_name", None)
-        sqlite_duplicate = str(error.orig) == (
-            "UNIQUE constraint failed: "
-            "agriculture_parcels.organization_id, agriculture_parcels.name"
-        )
-        if constraint_name != "uq_agriculture_parcels_org_name" and not sqlite_duplicate:
+        if not _is_duplicate_name_error(
+            error,
+            "uq_agriculture_parcels_org_name",
+            (
+                "UNIQUE constraint failed: agriculture_parcels.organization_id, "
+                "agriculture_parcels.name"
+            ),
+        ):
             raise
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Une parcelle porte déjà ce nom dans l'organisation.",
         ) from error
     await session.refresh(parcel)
-    return parcel
+    return await _parcel_response(session, parcel)
+
+
+@router.patch(
+    "/parcels/{parcel_id}",
+    response_model=ParcelResponse,
+    summary="Modifier une parcelle",
+)
+async def update_parcel(
+    parcel_id: uuid.UUID,
+    data: UpdateParcelRequest,
+    session: SessionDep,
+    context: CanManageAgricultureDep,
+) -> ParcelResponse:
+    parcel = await session.scalar(
+        select(Parcel).where(
+            Parcel.id == parcel_id,
+            Parcel.organization_id == context.organization.id,
+        )
+    )
+    if parcel is None:
+        raise HTTPException(status_code=404, detail="Parcelle introuvable.")
+    largest_campaign_area = await session.scalar(
+        select(func.max(Campaign.area_hectares)).where(
+            Campaign.organization_id == context.organization.id,
+            Campaign.parcel_id == parcel.id,
+        )
+    )
+    if largest_campaign_area is not None and data.area_hectares < largest_campaign_area:
+        raise HTTPException(
+            status_code=409,
+            detail="La superficie ne peut pas être inférieure à celle d'une campagne existante.",
+        )
+    parcel.name = data.name
+    parcel.area_hectares = data.area_hectares
+    try:
+        await session.commit()
+    except IntegrityError as error:
+        await session.rollback()
+        if not _is_duplicate_name_error(
+            error,
+            "uq_agriculture_parcels_org_name",
+            (
+                "UNIQUE constraint failed: agriculture_parcels.organization_id, "
+                "agriculture_parcels.name"
+            ),
+        ):
+            raise
+        raise HTTPException(
+            status_code=409,
+            detail="Une parcelle porte déjà ce nom dans l'organisation.",
+        ) from error
+    return await _parcel_response(session, parcel)
+
+
+@router.post("/parcels/{parcel_id}/photo", response_model=ParcelResponse)
+async def update_parcel_photo(
+    parcel_id: uuid.UUID,
+    session: SessionDep,
+    context: CanManageAgricultureDep,
+    photo: Annotated[UploadFile, File()],
+) -> ParcelResponse:
+    parcel = await session.scalar(
+        select(Parcel).where(
+            Parcel.id == parcel_id,
+            Parcel.organization_id == context.organization.id,
+        )
+    )
+    if parcel is None:
+        raise HTTPException(status_code=404, detail="Parcelle introuvable.")
+    photo_data = await _read_photo(photo)
+    previous_filename = parcel.photo_filename
+    parcel.photo_filename, new_photo_path = await _store_photo(
+        context.organization.id,
+        photo_data,
+    )
+    try:
+        await session.commit()
+    except SQLAlchemyError:
+        await session.rollback()
+        new_photo_path.unlink(missing_ok=True)
+        raise
+    if previous_filename:
+        _photo_path(context.organization.id, previous_filename).unlink(missing_ok=True)
+    return await _parcel_response(session, parcel)
+
+
+@router.delete("/parcels/{parcel_id}/photo", response_model=ParcelResponse)
+async def remove_parcel_photo(
+    parcel_id: uuid.UUID,
+    session: SessionDep,
+    context: CanManageAgricultureDep,
+) -> ParcelResponse:
+    parcel = await session.scalar(
+        select(Parcel).where(
+            Parcel.id == parcel_id,
+            Parcel.organization_id == context.organization.id,
+        )
+    )
+    if parcel is None:
+        raise HTTPException(status_code=404, detail="Parcelle introuvable.")
+    previous_filename = parcel.photo_filename
+    parcel.photo_filename = None
+    await session.commit()
+    if previous_filename:
+        _photo_path(context.organization.id, previous_filename).unlink(missing_ok=True)
+    return await _parcel_response(session, parcel)
+
+
+@router.get("/parcels/{parcel_id}/photo", response_class=FileResponse, include_in_schema=False)
+async def read_parcel_photo(
+    parcel_id: uuid.UUID,
+    session: SessionDep,
+    context: CurrentOrganizationDep,
+) -> FileResponse:
+    parcel = await session.scalar(
+        select(Parcel).where(
+            Parcel.id == parcel_id,
+            Parcel.organization_id == context.organization.id,
+        )
+    )
+    if parcel is None or parcel.photo_filename is None:
+        raise HTTPException(status_code=404, detail="Photo de la parcelle introuvable.")
+    path = _photo_path(context.organization.id, parcel.photo_filename)
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="Fichier photo introuvable sur le serveur.")
+    return FileResponse(path, headers={"Cache-Control": "private, max-age=3600"})
+
+
+@router.patch("/parcels/{parcel_id}/archive", response_model=ParcelResponse)
+async def archive_parcel(
+    parcel_id: uuid.UUID,
+    session: SessionDep,
+    context: CanManageAgricultureDep,
+) -> ParcelResponse:
+    parcel = await session.scalar(
+        select(Parcel).where(
+            Parcel.id == parcel_id,
+            Parcel.organization_id == context.organization.id,
+        )
+    )
+    if parcel is None:
+        raise HTTPException(status_code=404, detail="Parcelle introuvable.")
+    active_campaign = await session.scalar(
+        select(Campaign.id).where(
+            Campaign.organization_id == context.organization.id,
+            Campaign.parcel_id == parcel.id,
+            Campaign.status == CampaignStatus.ACTIVE.value,
+        ).limit(1)
+    )
+    if active_campaign is not None:
+        raise HTTPException(
+            status_code=409,
+            detail="Clôturez les campagnes actives avant d'archiver cette parcelle.",
+        )
+    parcel.is_active = False
+    await session.commit()
+    return await _parcel_response(session, parcel)
+
+
+@router.patch("/parcels/{parcel_id}/restore", response_model=ParcelResponse)
+async def restore_parcel(
+    parcel_id: uuid.UUID,
+    session: SessionDep,
+    context: CanManageAgricultureDep,
+) -> ParcelResponse:
+    parcel = await session.scalar(
+        select(Parcel).where(
+            Parcel.id == parcel_id,
+            Parcel.organization_id == context.organization.id,
+        )
+    )
+    if parcel is None:
+        raise HTTPException(status_code=404, detail="Parcelle introuvable.")
+    farm = await session.scalar(
+        select(Farm).where(
+            Farm.id == parcel.farm_id,
+            Farm.organization_id == context.organization.id,
+            Farm.is_active.is_(True),
+        )
+    )
+    if farm is None:
+        raise HTTPException(
+            status_code=409,
+            detail="Restaurez d'abord la ferme de cette parcelle.",
+        )
+    parcel.is_active = True
+    await session.commit()
+    return await _parcel_response(session, parcel)
 
 
 @router.get("/campaigns", response_model=CampaignPageResponse, summary="Lister les campagnes")

@@ -3,7 +3,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
+from pydantic import BaseModel, Field, StringConstraints, model_validator
 
 Name = Annotated[str, StringConstraints(strip_whitespace=True, min_length=2, max_length=120)]
 AreaHectares = Annotated[Decimal, Field(gt=0, max_digits=8, decimal_places=2)]
@@ -63,16 +63,21 @@ class CreateParcelRequest(BaseModel):
 
 
 class ParcelResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
     id: uuid.UUID
     farm_id: uuid.UUID
+    farm_name: str
     name: str
     crop: str
     crop_id: uuid.UUID
     area_hectares: Decimal
     is_active: bool
+    photo_url: str | None
     created_at: datetime
+
+
+class UpdateParcelRequest(BaseModel):
+    name: Name
+    area_hectares: AreaHectares
 
 
 class ParcelPageResponse(BaseModel):

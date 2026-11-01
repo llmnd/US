@@ -1,11 +1,13 @@
 export interface Parcel {
   id: string;
   farm_id: string;
+  farm_name: string;
   crop_id: string;
   name: string;
   crop: string;
   area_hectares: string;
   is_active: boolean;
+  photo_url: string | null;
   created_at: string;
 }
 

@@ -53,6 +53,16 @@ const statusClassNames = {
   cancelled: "cancelled",
 } as const;
 
+function MetricValue({ text }: { text: string }) {
+  const match = text.match(/^(.+?)\s*(FCFA|kg)$/);
+
+  return (
+    <div className="metric-value metric-value-live">
+      {match ? <>{match[1]}<small>{match[2]}</small></> : text}
+    </div>
+  );
+}
+
 function ActivityChart({
   data,
   style,
@@ -238,13 +248,13 @@ export function DashboardPage() {
           icon: CircleDollarSign,
         },
         {
-          label: "Commandes enregistrées",
+          label: "Commandes",
           value: value.order_count.toLocaleString("fr-FR"),
           detail: `${value.pending_order_count} à traiter · ${value.customer_count} client(s)`,
           icon: ShoppingBasket,
         },
         {
-          label: "Production récoltée",
+          label: "Production",
           value: `${new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 2 }).format(value.production_kg)} kg`,
           detail: `${value.harvest_count} récolte(s) cette année`,
           icon: Sprout,
@@ -272,8 +282,7 @@ export function DashboardPage() {
             }).format(new Date())}
           </p>
           <h1 className="page-title" id="dashboard-title">
-            Bonjour {profile.data?.full_name.split(/\s+/)[0] ?? ""}{" "}
-            <span aria-hidden="true">👋</span>
+            Bonjour{profile.data ? `, ${profile.data.full_name.split(/\s+/)[0]}` : ""}
           </h1>
           <p className="page-description">
             Les indicateurs ci-dessous sont calculés à partir des activités enregistrées.
@@ -311,9 +320,9 @@ export function DashboardPage() {
                 <article className="metric-card" key={metric.label}>
                   <div className="metric-heading">
                     <span>{metric.label}</span>
-                    <span className="metric-icon"><Icon size={16} /></span>
+                    <span className="metric-icon"><Icon size={18} /></span>
                   </div>
-                  <div className="metric-value metric-value-live">{metric.value}</div>
+                  <MetricValue text={metric.value} />
                   <div className="metric-foot">{metric.detail}</div>
                 </article>
               );

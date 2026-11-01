@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ArrowRight, Construction } from "lucide-react";
 import { UserManagement } from "@/features/administration/user-management";
 import { AgriculturePage } from "@/features/agriculture/agriculture-page";
+import { OperationsPage } from "@/features/operations/operations-page";
 import { SalesPage } from "@/features/sales/sales-page";
 
 const modules: Record<string, { title: string; description: string }> = {
@@ -68,6 +69,7 @@ export default async function ModulePage({
   const { module } = await params;
   const page = modules[module];
   if (!page) notFound();
+  if (module === "operations") return <OperationsPage />;
   if (module === "ventes") return <SalesPage />;
   if (module === "agriculture") return <AgriculturePage />;
 

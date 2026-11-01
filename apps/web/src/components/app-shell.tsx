@@ -32,7 +32,7 @@ import {
 
 const navigation = [
   { label: "Vue d'ensemble", href: "/", icon: LayoutDashboard },
-  { label: "Opérations", href: "/operations", icon: ClipboardList, badge: "4" },
+  { label: "Opérations", href: "/operations", icon: ClipboardList },
   { label: "Agriculture", href: "/agriculture", icon: Leaf },
   { label: "Élevage", href: "/elevage", icon: Activity },
   { label: "Stocks", href: "/stocks", icon: Package },
@@ -59,6 +59,7 @@ export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
   const queryClient = useQueryClient();
   const isPublicRoute = pathname === "/login";
   const [logoutError, setLogoutError] = useState<string | null>(null);
+  const [logoutPending, setLogoutPending] = useState(false);
   const profile = useQuery({
     queryKey: ["auth", "me"],
     queryFn: () => apiRequest<UserProfile>("/auth/me"),
@@ -116,13 +117,17 @@ export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
     navigation.find((item) => item.href === pathname)?.label ?? "Vue d'ensemble";
 
   async function handleLogout() {
+    if (logoutPending) return;
     setLogoutError(null);
+    setLogoutPending(true);
     try {
       await apiRequest<{ message: string }>("/auth/logout", { method: "POST" });
       queryClient.clear();
       router.replace("/login");
     } catch (error) {
       setLogoutError(getApiErrorMessage(error));
+    } finally {
+      setLogoutPending(false);
     }
   }
 
@@ -139,20 +144,10 @@ export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
           </span>
         </Link>
 
-        <div className="workspace-switcher" aria-label="Organisation active">
-          <span className="workspace-avatar">
-            {membership.organization_name.slice(0, 2).toLocaleUpperCase("fr")}
-          </span>
-          <span className="workspace-copy">
-            <strong>{membership.organization_name}</strong>
-            <span>Votre organisation</span>
-          </span>
-        </div>
-
         <nav aria-label="Modules">
           <div className="nav-label">Espace de travail</div>
           <div className="nav-list">
-            {navigation.map(({ label, href, icon: Icon, badge }) => {
+            {navigation.map(({ label, href, icon: Icon }) => {
               const active =
                 pathname === href ||
                 (href !== "/" && pathname.startsWith(`${href}/`));
@@ -166,7 +161,6 @@ export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
                 >
                   <Icon size={17} strokeWidth={1.8} />
                   <span>{label}</span>
-                  {badge ? <span className="nav-badge">{badge}</span> : null}
                 </Link>
               );
             })}
@@ -198,10 +192,13 @@ export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
               className="profile-logout"
               type="button"
               onClick={() => void handleLogout()}
-              aria-label="Se déconnecter"
+              disabled={logoutPending}
+              aria-label={logoutPending ? "Déconnexion en cours" : "Se déconnecter"}
+              aria-busy={logoutPending}
               title="Se déconnecter"
             >
-              <LogOut size={15} />
+              <LogOut size={15} aria-hidden="true" />
+              <span>{logoutPending ? "Déconnexion…" : "Se déconnecter"}</span>
             </button>
           </div>
           {logoutError ? <p className="logout-error" role="alert">{logoutError}</p> : null}

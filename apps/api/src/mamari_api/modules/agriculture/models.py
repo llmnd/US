@@ -111,6 +111,7 @@ class Parcel(Base):
     )
     name: Mapped[str] = mapped_column(String(120), nullable=False)
     crop: Mapped[str] = mapped_column(String(120), nullable=False)
+    photo_filename: Mapped[str | None] = mapped_column(String(80), nullable=True)
     area_hectares: Mapped[Decimal] = mapped_column(Numeric(8, 2), nullable=False)
     is_active: Mapped[bool] = mapped_column(default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(

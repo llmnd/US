@@ -18,7 +18,9 @@ import {
   FlaskConical,
   ImagePlus,
   MapPin,
+  Pencil,
   Plus,
+  RotateCcw,
   Search,
   Sprout,
   Wheat,
@@ -27,6 +29,7 @@ import {
   useDeferredValue,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type FormEvent,
   type ReactNode,
@@ -117,11 +120,15 @@ function FeedbackMessage({ feedback }: { feedback: Feedback }) {
   );
 }
 
-function FarmPhoto({
-  farm,
+function PrivatePhoto({
+  photoUrl,
+  alt,
+  className = "farm-card-image",
   organizationId,
 }: {
-  farm: Farm;
+  photoUrl: string | null;
+  alt: string;
+  className?: string;
   organizationId: string;
 }) {
   const [loadedPhoto, setLoadedPhoto] = useState<{ url: string; objectUrl: string } | null>(null);
@@ -129,13 +136,14 @@ function FarmPhoto({
   useEffect(() => {
     let active = true;
     let objectUrl: string | null = null;
-    const photoUrl = farm.photo_url;
     if (!photoUrl) return;
     void apiBlobRequest(photoUrl, {
       headers: { "X-Organization-ID": organizationId },
     }).then((blob) => {
-      objectUrl = URL.createObjectURL(blob);
-      if (active) setLoadedPhoto({ url: photoUrl, objectUrl });
+      if (active) {
+        objectUrl = URL.createObjectURL(blob);
+        setLoadedPhoto({ url: photoUrl, objectUrl });
+      }
     }).catch(() => {
       if (active) setFailedPhotoUrl(photoUrl);
     });
@@ -143,14 +151,14 @@ function FarmPhoto({
       active = false;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [farm.photo_url, organizationId]);
+  }, [photoUrl, organizationId]);
 
-  if (farm.photo_url && loadedPhoto?.url === farm.photo_url) {
+  if (photoUrl && loadedPhoto?.url === photoUrl) {
     return (
       <Image
-        className="farm-card-image"
+        className={className}
         src={loadedPhoto.objectUrl}
-        alt={`Vue de ${farm.name}`}
+        alt={alt}
         width={640}
         height={320}
         unoptimized
@@ -158,10 +166,82 @@ function FarmPhoto({
     );
   }
   return (
-    <div className="farm-card-image farm-card-image-placeholder" role={failedPhotoUrl === farm.photo_url ? "img" : undefined} aria-label={failedPhotoUrl === farm.photo_url ? `Photo de ${farm.name} indisponible` : undefined}>
+    <div className={`${className} farm-card-image-placeholder`} role={failedPhotoUrl === photoUrl ? "img" : undefined} aria-label={failedPhotoUrl === photoUrl ? `${alt} indisponible` : undefined}>
       <Sprout size={38} strokeWidth={1.2} />
-      <span>{failedPhotoUrl === farm.photo_url ? "Photo indisponible" : farm.photo_url ? "Chargement de la photo…" : "Votre ferme, en images"}</span>
+      <span>{failedPhotoUrl === photoUrl ? "Photo indisponible" : photoUrl ? "Chargement de la photo…" : "Ajouter une photo"}</span>
     </div>
+  );
+}
+
+function PhotoPreviewField({
+  name,
+  label,
+  organizationId,
+  currentPhotoUrl = null,
+}: {
+  name: string;
+  label: string;
+  organizationId: string;
+  currentPhotoUrl?: string | null;
+}) {
+  const [selectedPhoto, setSelectedPhoto] = useState<{ url: string } | null>(null);
+  const [existingPhoto, setExistingPhoto] = useState<{ path: string; url: string } | null>(null);
+  const localUrlRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    let objectUrl: string | null = null;
+    if (!currentPhotoUrl) return;
+    void apiBlobRequest(currentPhotoUrl, {
+      headers: { "X-Organization-ID": organizationId },
+    }).then((blob) => {
+      if (active) {
+        objectUrl = URL.createObjectURL(blob);
+        setExistingPhoto({ path: currentPhotoUrl, url: objectUrl });
+      }
+    }).catch(() => {
+      if (active) setExistingPhoto(null);
+    });
+    return () => {
+      active = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [currentPhotoUrl, organizationId]);
+
+  useEffect(() => () => {
+    if (localUrlRef.current) URL.revokeObjectURL(localUrlRef.current);
+  }, []);
+
+  const preview = selectedPhoto?.url
+    ?? (existingPhoto?.path === currentPhotoUrl ? existingPhoto.url : null);
+
+  return (
+    <label className="farm-photo-upload photo-preview-field">
+      {preview ? (
+        <Image className="photo-input-preview" src={preview} alt={`Aperçu : ${label}`} width={240} height={120} unoptimized />
+      ) : (
+        <span className="photo-input-placeholder"><ImagePlus size={19} />{currentPhotoUrl ? "Chargement de la photo…" : "Aucune photo sélectionnée"}</span>
+      )}
+      <span className="photo-input-label">{label}</span>
+      <small>JPG, PNG ou WebP · 5 Mo max.</small>
+      <input
+        accept="image/jpeg,image/png,image/webp"
+        name={name}
+        type="file"
+        onChange={(event) => {
+          if (localUrlRef.current) URL.revokeObjectURL(localUrlRef.current);
+          const file = event.currentTarget.files?.[0];
+          if (!file) {
+            localUrlRef.current = null;
+            setSelectedPhoto(null);
+            return;
+          }
+          const url = URL.createObjectURL(file);
+          localUrlRef.current = url;
+          setSelectedPhoto({ url });
+        }}
+      />
+    </label>
   );
 }
 
@@ -195,6 +275,7 @@ export function AgriculturePage() {
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<AgricultureTab>("farms");
   const [farmFilter, setFarmFilter] = useState<"active" | "archived">("active");
+  const [parcelFilter, setParcelFilter] = useState<"active" | "archived">("active");
   const [selectedFarmId, setSelectedFarmId] = useState("");
   const [parcelSearch, setParcelSearch] = useState("");
   const [campaignFilter, setCampaignFilter] = useState<"active" | "archived">("active");
@@ -207,6 +288,8 @@ export function AgriculturePage() {
   const [campaignFeedback, setCampaignFeedback] = useState<Feedback>(null);
   const [financeFeedback, setFinanceFeedback] = useState<Feedback>(null);
   const [farmSubmitting, setFarmSubmitting] = useState(false);
+  const [farmPhotoReset, setFarmPhotoReset] = useState(0);
+  const [parcelPhotoReset, setParcelPhotoReset] = useState(0);
   const [parcelSubmitting, setParcelSubmitting] = useState(false);
   const [campaignSubmitting, setCampaignSubmitting] = useState(false);
   const [harvestSubmitting, setHarvestSubmitting] = useState(false);
@@ -251,10 +334,11 @@ export function AgriculturePage() {
     retry: false,
   });
   const parcels = useQuery({
-    queryKey: ["agriculture", "parcels", organizationId, selectedFarmId, deferredParcelSearch, parcelPage],
+    queryKey: ["agriculture", "parcels", organizationId, selectedFarmId, parcelFilter, deferredParcelSearch, parcelPage],
     queryFn: () => {
       const params = new URLSearchParams({ page: String(parcelPage), page_size: "20" });
       if (selectedFarmId) params.set("farm_id", selectedFarmId);
+      params.set("active", String(parcelFilter === "active"));
       if (deferredParcelSearch) params.set("search", deferredParcelSearch);
       return apiRequest<ParcelPage>(`/agriculture/parcels?${params}`, {
         headers: organizationHeaders,
@@ -318,7 +402,8 @@ export function AgriculturePage() {
   const activeCampaignOptions = (campaignOptions.data?.items ?? []).filter(
     (campaign) => campaign.status === "active",
   );
-  const selectedFarm = activeFarmOptions.data?.items.find((farm) => farm.id === selectedFarmId);
+  const selectedFarm = [...(farms.data?.items ?? []), ...(activeFarmOptions.data?.items ?? [])]
+    .find((farm) => farm.id === selectedFarmId);
   const report = financeSummary.data;
 
   async function refreshAgriculture() {
@@ -340,6 +425,7 @@ export function AgriculturePage() {
       setFarmSubmitting(false);
       return;
     }
+    if (!(photo instanceof File) || photo.size === 0) formData.delete("photo");
     try {
       if (!organizationId) throw new Error("Aucune organisation active n’est associée au compte.");
       const farm = await apiRequest<Farm>("/agriculture/farms", {
@@ -348,6 +434,7 @@ export function AgriculturePage() {
         body: formData,
       });
       form.reset();
+      setFarmPhotoReset((value) => value + 1);
       setFarmFilter("active");
       setSelectedFarmId(farm.id);
       await refreshAgriculture();
@@ -366,6 +453,11 @@ export function AgriculturePage() {
     const form = event.currentTarget;
     const data = new FormData(form);
     try {
+      if (!organizationId) throw new Error("Aucune organisation active n’est associée au compte.");
+      const photo = data.get("photo");
+      if (photo instanceof File && photo.size > 5 * 1024 * 1024) {
+        throw new Error("La photo ne doit pas dépasser 5 Mo.");
+      }
       const parcel = await apiRequest<Parcel>("/agriculture/parcels", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...organizationHeaders },
@@ -376,10 +468,28 @@ export function AgriculturePage() {
           area_hectares: Number(data.get("area_hectares")),
         }),
       });
+      let photoWarning = "";
+      if (photo instanceof File && photo.size > 0) {
+        try {
+          const photoData = new FormData();
+          photoData.set("photo", photo);
+          await apiRequest<Parcel>(`/agriculture/parcels/${parcel.id}/photo`, {
+            method: "POST",
+            headers: organizationHeaders,
+            body: photoData,
+          });
+        } catch (error) {
+          photoWarning = ` La parcelle est créée, mais la photo n’a pas pu être enregistrée : ${getApiErrorMessage(error)}`;
+        }
+      }
       form.reset();
+      setParcelPhotoReset((value) => value + 1);
       setParcelPage(1);
       await refreshAgriculture();
-      setParcelFeedback({ kind: "success", message: `Parcelle « ${parcel.name} » ajoutée à la ferme.` });
+      setParcelFeedback({
+        kind: photoWarning ? "error" : "success",
+        message: `Parcelle « ${parcel.name} » ajoutée à la ferme.${photoWarning}`,
+      });
     } catch (error) {
       setParcelFeedback({ kind: "error", message: getApiErrorMessage(error) });
     } finally {
@@ -578,12 +688,15 @@ export function AgriculturePage() {
 
   async function farmAction(farm: Farm, action: "archive" | "restore") {
     setFarmFeedback(null);
+    setActionPending(`${farm.id}:${action}`);
     try {
       if (!organizationId) throw new Error("Aucune organisation active n’est associée au compte.");
-      await apiRequest<Farm>(`/agriculture/farms/${farm.id}/${action}`, {
+      const updated = await apiRequest<Farm>(`/agriculture/farms/${farm.id}/${action}`, {
         method: "PATCH",
         headers: { "X-Organization-ID": organizationId },
       });
+      if (action === "archive" && selectedFarmId === farm.id) setSelectedFarmId("");
+      if (action === "restore") setSelectedFarmId(updated.id);
       await refreshAgriculture();
       setFarmFeedback({
         kind: "success",
@@ -591,6 +704,126 @@ export function AgriculturePage() {
       });
     } catch (error) {
       setFarmFeedback({ kind: "error", message: getApiErrorMessage(error) });
+    } finally {
+      setActionPending(null);
+    }
+  }
+
+  async function handleFarmUpdateSubmit(
+    event: FormEvent<HTMLFormElement>,
+    farm: Farm,
+  ) {
+    event.preventDefault();
+    setFarmFeedback(null);
+    setActionPending(`${farm.id}:edit`);
+    const form = event.currentTarget;
+    const data = new FormData(form);
+    const photo = data.get("photo");
+    if (photo instanceof File && photo.size > 5 * 1024 * 1024) {
+      setFarmFeedback({ kind: "error", message: "La photo ne doit pas dépasser 5 Mo." });
+      setActionPending(null);
+      return;
+    }
+    if (!(photo instanceof File) || photo.size === 0) data.delete("photo");
+    try {
+      if (!organizationId) throw new Error("Aucune organisation active n’est associée au compte.");
+      const updated = await apiRequest<Farm>(`/agriculture/farms/${farm.id}`, {
+        method: "PATCH",
+        headers: organizationHeaders,
+        body: data,
+      });
+      form.reset();
+      setFarmPhotoReset((value) => value + 1);
+      await refreshAgriculture();
+      setFarmFeedback({ kind: "success", message: `Ferme « ${updated.name} » mise à jour.` });
+      form.closest("details")?.removeAttribute("open");
+    } catch (error) {
+      setFarmFeedback({ kind: "error", message: getApiErrorMessage(error) });
+    } finally {
+      setActionPending(null);
+    }
+  }
+
+  async function handleParcelUpdateSubmit(
+    event: FormEvent<HTMLFormElement>,
+    parcel: Parcel,
+  ) {
+    event.preventDefault();
+    setParcelFeedback(null);
+    setActionPending(`${parcel.id}:edit`);
+    const form = event.currentTarget;
+    const data = new FormData(form);
+    const photo = data.get("photo");
+    if (photo instanceof File && photo.size > 5 * 1024 * 1024) {
+      setParcelFeedback({ kind: "error", message: "La photo ne doit pas dépasser 5 Mo." });
+      setActionPending(null);
+      return;
+    }
+    try {
+      if (!organizationId) throw new Error("Aucune organisation active n’est associée au compte.");
+      const updated = await apiRequest<Parcel>(`/agriculture/parcels/${parcel.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...organizationHeaders },
+        body: JSON.stringify({
+          name: data.get("name"),
+          area_hectares: Number(data.get("area_hectares")),
+        }),
+      });
+      try {
+        if (photo instanceof File && photo.size > 0) {
+          const photoData = new FormData();
+          photoData.set("photo", photo);
+          await apiRequest<Parcel>(`/agriculture/parcels/${parcel.id}/photo`, {
+            method: "POST",
+            headers: organizationHeaders,
+            body: photoData,
+          });
+        } else if (data.get("remove_photo") === "on") {
+          await apiRequest<Parcel>(`/agriculture/parcels/${parcel.id}/photo`, {
+            method: "DELETE",
+            headers: organizationHeaders,
+          });
+        }
+      } catch (error) {
+        setParcelPhotoReset((value) => value + 1);
+        await refreshAgriculture();
+        setParcelFeedback({
+          kind: "error",
+          message: `Les informations de « ${updated.name} » sont enregistrées, mais la photo n’a pas été modifiée : ${getApiErrorMessage(error)}`,
+        });
+        return;
+      }
+      setParcelPhotoReset((value) => value + 1);
+      await refreshAgriculture();
+      setParcelFeedback({ kind: "success", message: `Parcelle « ${updated.name} » mise à jour.` });
+      form.closest("details")?.removeAttribute("open");
+    } catch (error) {
+      setParcelFeedback({ kind: "error", message: getApiErrorMessage(error) });
+    } finally {
+      setActionPending(null);
+    }
+  }
+
+  async function parcelAction(parcel: Parcel, action: "archive" | "restore") {
+    setParcelFeedback(null);
+    setActionPending(`${parcel.id}:${action}`);
+    try {
+      if (!organizationId) throw new Error("Aucune organisation active n’est associée au compte.");
+      await apiRequest<Parcel>(`/agriculture/parcels/${parcel.id}/${action}`, {
+        method: "PATCH",
+        headers: organizationHeaders,
+      });
+      await refreshAgriculture();
+      setParcelFeedback({
+        kind: "success",
+        message: action === "archive"
+          ? `Parcelle « ${parcel.name} » archivée.`
+          : `Parcelle « ${parcel.name} » restaurée.`,
+      });
+    } catch (error) {
+      setParcelFeedback({ kind: "error", message: getApiErrorMessage(error) });
+    } finally {
+      setActionPending(null);
     }
   }
 
@@ -687,12 +920,7 @@ export function AgriculturePage() {
                 <Field label="Localisation">
                   <input autoComplete="address-level2" maxLength={180} name="location" placeholder="Région, commune…" />
                 </Field>
-                <label className="farm-photo-upload">
-                  <ImagePlus size={19} />
-                  <span>Ajouter une belle photo</span>
-                  <small>JPG, PNG ou WebP · 5 Mo max.</small>
-                  <input accept="image/jpeg,image/png,image/webp" name="photo" type="file" />
-                </label>
+                <PhotoPreviewField key={`farm-create-photo-${farmPhotoReset}`} name="photo" label="Ajouter une belle photo" organizationId={organizationId!} />
                 <button className="button-primary" disabled={farmSubmitting} type="submit">
                   {farmSubmitting ? "Création…" : "Créer la ferme"}
                 </button>
@@ -705,7 +933,7 @@ export function AgriculturePage() {
             <div className="farm-card-grid">
               {farms.data.items.map((farm) => (
                 <article className="farm-card panel" key={farm.id}>
-                  <FarmPhoto farm={farm} organizationId={organizationId!} />
+                  <PrivatePhoto photoUrl={farm.photo_url} alt={`Vue de ${farm.name}`} organizationId={organizationId!} />
                   <div className="farm-card-body">
                     <div className="farm-card-title-row">
                       <div><h3>{farm.name}</h3>{farm.location ? <p><MapPin size={13} />{farm.location}</p> : null}</div>
@@ -722,9 +950,24 @@ export function AgriculturePage() {
                         document.getElementById("parcel-section")?.scrollIntoView({ behavior: "smooth" });
                       }}>Voir les parcelles</button>
                       {canManage ? (
-                        <button className="text-action" type="button" onClick={() => void farmAction(farm, farm.is_active ? "archive" : "restore")}>
-                          <Archive size={14} />{farm.is_active ? "Archiver" : "Restaurer"}
-                        </button>
+                        <>
+                          {farm.is_active ? (
+                            <details className="agriculture-edit-details">
+                              <summary aria-label={`Modifier ${farm.name}`}><Pencil size={14} />Modifier</summary>
+                              <form className="agriculture-form-grid" onSubmit={(event) => void handleFarmUpdateSubmit(event, farm)}>
+                                <Field label="Nom de la ferme"><input defaultValue={farm.name} maxLength={120} minLength={2} name="name" required /></Field>
+                                <Field label="Localisation"><input defaultValue={farm.location ?? ""} maxLength={180} name="location" /></Field>
+                                <PhotoPreviewField key={`farm-edit-photo-${farm.id}-${farmPhotoReset}`} name="photo" label="Remplacer la photo" organizationId={organizationId!} currentPhotoUrl={farm.photo_url} />
+                                {farm.photo_url ? <label className="photo-remove-option"><input name="remove_photo" type="checkbox" value="true" />Supprimer la photo actuelle</label> : null}
+                                <button className="button-primary" disabled={actionPending === `${farm.id}:edit`} type="submit">{actionPending === `${farm.id}:edit` ? "Enregistrement…" : "Enregistrer"}</button>
+                              </form>
+                            </details>
+                          ) : null}
+                          <button className="text-action" type="button" disabled={actionPending === `${farm.id}:${farm.is_active ? "archive" : "restore"}`} onClick={() => void farmAction(farm, farm.is_active ? "archive" : "restore")}>
+                            {farm.is_active ? <Archive size={14} /> : <RotateCcw size={14} />}
+                            {actionPending === `${farm.id}:${farm.is_active ? "archive" : "restore"}` ? "…" : farm.is_active ? "Archiver" : "Restaurer"}
+                          </button>
+                        </>
                       ) : null}
                     </div>
                   </div>
@@ -742,7 +985,13 @@ export function AgriculturePage() {
           <section className="panel agriculture-data-panel" id="parcel-section">
             <div className="agriculture-section-heading">
               <div><h2>Parcelles</h2><p>{selectedFarm ? `Parcelles de ${selectedFarm.name}` : "Parcelles de toutes les fermes actives"}</p></div>
-              <label className="sales-search"><Search size={15} /><span className="visually-hidden">Rechercher une parcelle</span><input type="search" value={parcelSearch} placeholder="Nom ou culture" onChange={(event) => { setParcelSearch(event.target.value); setParcelPage(1); }} /></label>
+              <div className="parcel-toolbar">
+                <div className="segmented-control" role="group" aria-label="Filtrer les parcelles">
+                  <button type="button" aria-pressed={parcelFilter === "active"} onClick={() => { setParcelFilter("active"); setParcelPage(1); }}>Actives</button>
+                  <button type="button" aria-pressed={parcelFilter === "archived"} onClick={() => { setParcelFilter("archived"); setParcelPage(1); }}>Archives</button>
+                </div>
+                <label className="sales-search"><Search size={15} /><span className="visually-hidden">Rechercher une parcelle</span><input type="search" value={parcelSearch} placeholder="Nom ou culture" onChange={(event) => { setParcelSearch(event.target.value); setParcelPage(1); }} /></label>
+              </div>
             </div>
             {canManage && activeFarms.length ? (
               <form className="agriculture-inline-form" onSubmit={handleParcelSubmit}>
@@ -750,7 +999,8 @@ export function AgriculturePage() {
                 <Field label="Nom de la parcelle"><input maxLength={120} minLength={2} name="name" placeholder="Ex. Parcelle Nord" required /></Field>
                 <Field label="Culture"><select defaultValue="" name="crop_id" required><option disabled value="">Choisir une culture</option>{(crops.data ?? []).map((crop) => <option key={crop.id} value={crop.id}>{crop.name}</option>)}</select></Field>
                 <Field label="Superficie (ha)"><input min="0.01" name="area_hectares" placeholder="2.5" required step="0.01" type="number" /></Field>
-                <button className="button-primary" disabled={parcelSubmitting} type="submit">{parcelSubmitting ? "…" : "Ajouter"}</button>
+                <PhotoPreviewField key={`parcel-photo-${parcelPhotoReset}`} name="photo" label="Photo de la parcelle" organizationId={organizationId!} />
+                <button className="button-primary" disabled={parcelSubmitting} type="submit">{parcelSubmitting ? "Ajout…" : "Ajouter"}</button>
               </form>
             ) : null}
             <FeedbackMessage feedback={parcelFeedback} />
@@ -768,8 +1018,39 @@ export function AgriculturePage() {
               <>
                 <div className="table-wrap">
                   <table className="data-table agriculture-table">
-                    <thead><tr><th scope="col">PARCELLE</th><th scope="col">FERME</th><th scope="col">CULTURE</th><th scope="col">SUPERFICIE</th><th scope="col">ÉTAT</th></tr></thead>
-                    <tbody>{parcels.data.items.map((parcel) => <tr key={parcel.id}><td className="table-primary">{parcel.name}</td><td>{activeFarms.find((farm) => farm.id === parcel.farm_id)?.name ?? "Ferme archivée"}</td><td><span className="crop-cell"><Sprout size={13} />{parcel.crop}</span></td><td>{formattedNumber(parcel.area_hectares)} ha</td><td><span className={`status-pill ${parcel.is_active ? "delivered" : "cancelled"}`}>{parcel.is_active ? "Active" : "Inactive"}</span></td></tr>)}</tbody>
+                    <thead><tr><th scope="col">PARCELLE</th><th scope="col">FERME</th><th scope="col">CULTURE</th><th scope="col">SUPERFICIE</th><th scope="col">ÉTAT</th>{canManage ? <th scope="col">ACTIONS</th> : null}</tr></thead>
+                    <tbody>{parcels.data.items.map((parcel) => <tr key={parcel.id}>
+                      <td className="table-primary">
+                        <div className="parcel-name-cell">
+                          <PrivatePhoto photoUrl={parcel.photo_url} alt={`Photo de ${parcel.name}`} className="parcel-thumbnail" organizationId={organizationId!} />
+                          <span>{parcel.name}</span>
+                        </div>
+                      </td>
+                      <td>{parcel.farm_name}</td>
+                      <td><span className="crop-cell"><Sprout size={13} />{parcel.crop}</span></td>
+                      <td>{formattedNumber(parcel.area_hectares)} ha</td>
+                      <td><span className={`status-pill ${parcel.is_active ? "delivered" : "cancelled"}`}>{parcel.is_active ? "Active" : "Archivée"}</span></td>
+                      {canManage ? <td>
+                        <div className="parcel-actions">
+                          {parcel.is_active ? (
+                            <details className="agriculture-edit-details">
+                              <summary aria-label={`Modifier ${parcel.name}`}><Pencil size={14} />Modifier</summary>
+                              <form className="agriculture-form-grid" onSubmit={(event) => void handleParcelUpdateSubmit(event, parcel)}>
+                                <Field label="Nom de la parcelle"><input defaultValue={parcel.name} maxLength={120} minLength={2} name="name" required /></Field>
+                                <Field label="Superficie (ha)"><input defaultValue={parcel.area_hectares} min="0.01" name="area_hectares" required step="0.01" type="number" /></Field>
+                                <PhotoPreviewField key={`parcel-edit-photo-${parcel.id}-${parcelPhotoReset}`} name="photo" label="Remplacer la photo" organizationId={organizationId!} currentPhotoUrl={parcel.photo_url} />
+                                {parcel.photo_url ? <label className="photo-remove-option"><input name="remove_photo" type="checkbox" value="on" />Supprimer la photo actuelle</label> : null}
+                                <button className="button-primary" disabled={actionPending === `${parcel.id}:edit`} type="submit">{actionPending === `${parcel.id}:edit` ? "Enregistrement…" : "Enregistrer"}</button>
+                              </form>
+                            </details>
+                          ) : null}
+                          <button className="text-action" type="button" disabled={actionPending === `${parcel.id}:${parcel.is_active ? "archive" : "restore"}`} onClick={() => void parcelAction(parcel, parcel.is_active ? "archive" : "restore")}>
+                            {parcel.is_active ? <Archive size={14} /> : <RotateCcw size={14} />}
+                            {actionPending === `${parcel.id}:${parcel.is_active ? "archive" : "restore"}` ? "…" : parcel.is_active ? "Archiver" : "Restaurer"}
+                          </button>
+                        </div>
+                      </td> : null}
+                    </tr>)}</tbody>
                   </table>
                 </div>
                 <Pagination page={parcelPage} total={parcels.data.total} onChange={setParcelPage} />

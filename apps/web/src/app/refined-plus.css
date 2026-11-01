@@ -1,0 +1,363 @@
+/* Finitions du tableau de bord et de l’espace Agriculture. */
+
+/* ---------- Sidebar (conserve la teinte terracotta) ---------- */
+.brand > div {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.brand-name,
+.brand-caption {
+  display: block;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+.brand-name {
+  font-family: var(--serif);
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+}
+
+.nav-list {
+  scrollbar-width: none;
+  padding-bottom: 28px;
+  -webkit-mask-image: linear-gradient(#000 calc(100% - 28px), transparent);
+  mask-image: linear-gradient(#000 calc(100% - 28px), transparent);
+}
+
+.nav-list::-webkit-scrollbar { display: none; }
+
+.profile { flex-wrap: wrap; row-gap: 12px; padding: 12px 6px 0; }
+.profile-logout { min-height: 38px; flex: 1 0 100%; }
+
+/* ---------- Dashboard ---------- */
+.metric-heading span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.metric-value { font-size: clamp(26px, 2.3vw, 36px); }
+
+.metric-value small {
+  margin-left: 7px;
+  font-family: "DM Sans", system-ui, sans-serif;
+  font-size: 0.36em;
+  font-weight: 500;
+  letter-spacing: 0;
+  opacity: 0.65;
+  white-space: nowrap;
+}
+
+.metric-card:first-child {
+  background: var(--green-dark);
+  color: #f4f7f3;
+}
+
+.metric-card:first-child .metric-heading { color: #a9c4b3; }
+.metric-card:first-child .metric-icon { color: #7fa68f; }
+.metric-card:first-child .metric-foot { color: #b4cbbb; }
+
+.page-heading { align-items: center; }
+
+/* ---------- Agriculture : en-tête ---------- */
+.agriculture-workspace { gap: 28px; }
+
+.agriculture-hero {
+  min-height: 240px;
+  border: 0;
+  border-radius: 28px;
+  padding: 52px 56px;
+  background:
+    radial-gradient(ellipse at 100% 0%, rgb(255 255 255 / 9%), transparent 55%),
+    var(--green-dark);
+}
+
+.agriculture-hero-art { display: none; }
+.agriculture-hero-copy { max-width: 560px; }
+
+.agriculture-hero .eyebrow { color: #9dbfab; }
+
+.agriculture-hero .page-title {
+  margin-top: 6px;
+  color: #f6f8f4;
+  font-size: clamp(34px, 4vw, 50px);
+}
+
+.agriculture-hero .page-description {
+  max-width: 480px;
+  color: #b4cbbb;
+  font-size: 15px;
+}
+
+.agriculture-hero-stats {
+  gap: 36px;
+  margin-top: 28px;
+  color: #a3c0af;
+  font-size: 13px;
+}
+
+.agriculture-hero-stats strong {
+  margin-right: 6px;
+  color: #fff;
+  font-family: var(--serif);
+  font-size: 30px;
+  font-weight: 500;
+}
+
+/* ---------- Agriculture : navigation et sections ---------- */
+.agriculture-tab { min-height: 40px; padding: 0 18px; font-size: 13px; font-weight: 500; }
+.agriculture-tab[aria-selected="true"] { background: var(--green-pale); font-weight: 600; }
+.agriculture-farm-filter { gap: 10px; font-size: 12px; }
+
+.agriculture-section-heading { margin: 8px 0 22px; }
+
+.agriculture-section-heading h2 {
+  font-family: var(--serif);
+  font-size: 30px;
+  font-weight: 500;
+  letter-spacing: -0.4px;
+}
+
+.agriculture-section-heading p { margin-top: 6px; font-size: 13px; color: var(--muted); }
+
+/* ---------- Agriculture : formulaires repliables ---------- */
+.agriculture-create-card,
+.campaign-planner,
+.harvest-entry-card,
+.finance-entry-panel { margin-bottom: 20px; padding: 8px 28px; }
+
+.agriculture-create-card > summary,
+.campaign-planner > summary,
+.harvest-entry-card > summary,
+.finance-entry-panel > summary { min-height: 68px; gap: 14px; }
+
+.agriculture-create-card > summary strong,
+.campaign-planner > summary strong,
+.finance-entry-panel > summary strong,
+.harvest-entry-card > summary strong { font-size: 14px; }
+
+.agriculture-create-card > summary small,
+.campaign-planner > summary small,
+.finance-entry-panel > summary small,
+.harvest-entry-card > summary small { font-size: 12px; }
+
+.agriculture-create-card > summary > svg:last-child,
+.campaign-planner > summary > svg:last-child,
+.harvest-entry-card > summary > svg:last-child,
+.finance-entry-panel > summary > svg:last-child {
+  color: #a3aca5;
+  transition: transform 160ms ease;
+}
+
+details[open] > summary > svg:last-child { transform: rotate(90deg); }
+
+.agriculture-add-icon,
+.campaign-icon,
+.agriculture-empty-icon { border-radius: 50%; background: var(--green-pale); }
+
+.agriculture-form-grid,
+.campaign-form-grid,
+.agriculture-inline-form { gap: 18px; padding: 8px 0 20px; }
+
+.campaign-form-grid,
+.agriculture-inline-form { border-top-color: var(--hair); }
+
+.farm-photo-upload {
+  border: 0;
+  border-radius: 16px;
+  background: #f3f4f1;
+  padding: 12px;
+  font-size: 12px;
+}
+
+.farm-photo-upload small { font-size: 11px; }
+.photo-input-preview,
+.photo-input-placeholder { height: 110px; border-radius: 12px; }
+.photo-input-placeholder { background: #e9eee8; font-size: 12px; }
+
+/* ---------- Agriculture : fermes et parcelles ---------- */
+.farm-card-grid { gap: 22px; }
+.farm-card { padding: 10px; }
+
+.farm-card-image {
+  height: 210px;
+  border-radius: 18px;
+  background-color: #f3f4f1;
+  object-fit: cover;
+}
+
+.farm-card-image-placeholder {
+  background: linear-gradient(150deg, #eef3ee, #f6f6f3);
+  color: #8fae9a;
+}
+
+.farm-card-image-placeholder span { color: #8fa596; font-size: 12px; }
+.farm-card-body { padding: 20px 12px 10px; }
+
+.farm-card-title-row h3 {
+  font-family: var(--serif);
+  font-size: 26px;
+  font-weight: 500;
+  letter-spacing: -0.3px;
+  line-height: 1.05;
+}
+
+.farm-card-title-row p { margin-top: 8px; font-size: 12px; }
+.farm-card-stats { gap: 28px; margin-top: 20px; border-top-color: var(--hair); padding-top: 16px; font-size: 12px; }
+.farm-card-stats strong { margin-right: 4px; font-family: var(--serif); font-size: 22px; font-weight: 500; }
+.farm-card-actions { flex-wrap: wrap; gap: 6px 14px; margin-top: 18px; }
+
+.farm-card-actions .button-secondary {
+  min-height: 38px;
+  padding: 0 16px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.panel .button-secondary,
+.campaign-card .button-secondary { background: #f3f4f1; box-shadow: none; }
+
+.panel .button-secondary:hover { background: #eceee9; }
+
+.agriculture-edit-details > summary,
+.text-action { min-height: 38px; gap: 6px; font-size: 12px; white-space: nowrap; }
+
+.farm-card-actions .agriculture-edit-details[open] > form {
+  width: min(440px, calc(100vw - 48px));
+  border: 0;
+  border-radius: 22px;
+  padding: 22px;
+  box-shadow: 0 4px 10px rgb(20 30 22 / 5%), 0 28px 70px rgb(20 30 22 / 16%);
+}
+
+.parcel-actions .agriculture-edit-details[open] > form {
+  border: 0;
+  border-radius: 18px;
+  background: #f7f8f5;
+  box-shadow: none;
+}
+
+.agriculture-empty { min-height: 220px; }
+
+.agriculture-empty h3 {
+  font-family: var(--serif);
+  font-size: 24px;
+  font-weight: 500;
+}
+
+.agriculture-empty p { font-size: 13px; }
+.agriculture-data-panel { margin-top: 24px; }
+.parcel-thumbnail { width: 52px; height: 42px; border-radius: 10px; }
+.crop-catalog { border-top-color: var(--hair); margin-top: 18px; padding-top: 16px; }
+.crop-catalog > summary { font-size: 12px; }
+.crop-chip-list span { border: 0; background: #f3f4f1; padding: 7px 13px; font-size: 12px; }
+.crop-add-form input { border: 0; border-radius: 999px; background: #f3f4f1; padding: 0 14px; font-size: 12px; }
+.crop-cell { color: var(--green); }
+.table-subtext { font-size: 11px; }
+
+.agriculture-table th { text-transform: lowercase; }
+.agriculture-table th::first-letter { text-transform: uppercase; }
+
+/* ---------- Agriculture : campagnes ---------- */
+.campaign-list { gap: 18px; }
+.campaign-card { padding: 28px; }
+.campaign-title h3 { font-size: 17px; font-weight: 600; letter-spacing: -0.2px; }
+.campaign-title p { font-size: 12px; }
+.campaign-dates { margin: 20px 0 14px; font-size: 12px; }
+.campaign-metrics { padding: 18px 8px; }
+.campaign-metrics > div { gap: 8px; padding: 0 18px; }
+.campaign-metrics span { font-size: 12px; }
+.campaign-metrics strong { font-size: 15px; font-weight: 600; }
+.campaign-actuals { gap: 10px 26px; margin-top: 18px; font-size: 12px; }
+.campaign-actions { gap: 10px; }
+
+.campaign-actions .button-primary,
+.campaign-actions .button-secondary { min-height: 38px; font-size: 12px; }
+
+.campaign-sale-form { border-top-color: var(--hair); margin-top: 16px; padding-top: 14px; }
+.campaign-sale-form > summary { font-size: 12px; }
+
+/* ---------- Agriculture : finances et rapports ---------- */
+.finance-summary-grid { gap: 20px; margin-bottom: 22px; }
+.finance-summary-card { min-height: 150px; gap: 10px; padding: 24px 26px; border-radius: 24px; }
+.finance-summary-card > span:first-child { font-size: 13px; font-weight: 500; }
+
+.finance-summary-card > strong {
+  font-family: var(--serif);
+  font-size: clamp(24px, 2.4vw, 32px);
+  font-weight: 500;
+  letter-spacing: -0.5px;
+}
+
+.finance-summary-card > small { font-size: 12px; }
+.finance-icon { top: 22px; right: 22px; width: 32px; height: 32px; border-radius: 50%; }
+.report-title-row h3 { font-size: 16px; font-weight: 600; }
+.report-title-row p { font-size: 12px; }
+.report-kpis { border-top-color: var(--hair); margin-top: 24px; padding-top: 22px; gap: 20px; }
+.report-kpis span { font-size: 12px; }
+.report-kpis strong { font-family: var(--serif); font-size: 26px; font-weight: 500; }
+.report-month-list { gap: 14px; padding: 12px 0 18px; }
+.report-month-row { font-size: 12px; gap: 14px; }
+.report-month-row > strong,
+.report-month-row > small { font-size: 12px; }
+.report-month-bars { gap: 3px; }
+.report-month-bars > span { height: 6px; }
+.report-legend { border-top-color: var(--hair); padding-top: 16px; font-size: 12px; }
+
+/* ---------- Pagination ---------- */
+.sales-pagination { border-top-color: var(--hair); font-size: 12px; }
+.pagination-button { width: 34px; height: 34px; border: 0; border-radius: 50%; background: #f3f4f1; }
+
+@media (max-width: 1100px) {
+  .agriculture-hero { padding: 40px; }
+}
+
+@media (max-width: 760px) {
+  .agriculture-hero { min-height: 200px; padding: 32px 26px; border-radius: 24px; }
+  .agriculture-hero-stats { gap: 18px; }
+  .agriculture-section-heading h2 { font-size: 26px; }
+  .agriculture-create-card,
+  .campaign-planner,
+  .harvest-entry-card,
+  .finance-entry-panel { padding: 4px 20px; }
+  .campaign-card { padding: 22px; }
+  .farm-card-image { height: 190px; }
+}
+
+@media (max-width: 480px) {
+  .agriculture-hero { min-height: 192px; padding: 24px 20px; }
+  .agriculture-hero .page-title { font-size: 34px; }
+  .agriculture-hero-stats { gap: 10px 16px; }
+  .agriculture-section-heading { align-items: flex-start; flex-direction: column; }
+  .agriculture-toolbar { align-items: flex-start; flex-direction: column; }
+  .agriculture-tabs { max-width: 100%; }
+  .agriculture-farm-filter { align-self: flex-end; }
+  .agriculture-create-card,
+  .campaign-planner,
+  .harvest-entry-card,
+  .finance-entry-panel { padding: 4px 16px; }
+  .agriculture-form-grid,
+  .campaign-form-grid,
+  .agriculture-inline-form { grid-template-columns: 1fr; }
+  .farm-card { padding: 8px; }
+  .farm-card-image { height: 170px; }
+  .farm-card-body { padding: 16px 10px 10px; }
+  .farm-card-title-row h3 { font-size: 24px; }
+  .farm-card-actions { gap: 6px 10px; }
+  .farm-card-actions .agriculture-edit-details[open] > form { right: auto; left: 0; }
+  .campaign-card { padding: 18px; }
+  .campaign-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 0; }
+  .campaign-metrics > div:nth-child(3) { border-left: 0; }
+  .campaign-metrics > div { padding: 0 12px; }
+  .finance-summary-grid,
+  .report-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .finance-summary-card { min-height: 138px; padding: 20px; }
+  .finance-summary-card > strong { font-size: clamp(20px, 6vw, 28px); }
+  .report-month-row { grid-template-columns: 30px minmax(40px, 1fr) minmax(60px, auto) minmax(60px, auto); gap: 7px; }
+  .report-month-row > strong,
+  .report-month-row > small { font-size: 10px; }
+}

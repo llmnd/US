@@ -48,14 +48,24 @@ appliquées côté API, jamais uniquement dans l’interface.
    ```powershell
    py -3.13 -m venv apps\api\.venv
    apps\api\.venv\Scripts\python -m pip install -e "apps\api[dev]"
-   apps\api\.venv\Scripts\uvicorn mamari_api.main:app --app-dir apps\api\src --reload
    ```
 
-6. Initialiser les tables versionnées de l’API :
+6. Depuis la racine du dépôt, appliquer les migrations avant le premier
+   démarrage de l’API et après chaque mise à jour qui modifie le schéma :
 
    ```powershell
    Set-Location apps\api
-   .venv\Scripts\alembic.exe upgrade head
+   .\.venv\Scripts\python.exe -m alembic upgrade head
+   ```
+
+   Utiliser le Python du venv est indispensable : la commande globale
+   `alembic` peut lancer Conda ou un autre environnement sans les dépendances
+   du projet.
+
+7. Démarrer l’API avec ce même environnement :
+
+   ```powershell
+   .\.venv\Scripts\python.exe -m uvicorn mamari_api.main:app --app-dir src --reload
    ```
 
 L’interface est disponible sur `http://localhost:3000`, l’API sur
@@ -97,6 +107,10 @@ n’a été enregistrée.
   `/harvests` et `/finance/transactions`. Les photos JPEG, PNG et WebP sont
   limitées à 5 Mo et stockées hors de la base ; en production, configurer
   `UPLOAD_DIRECTORY` vers un stockage persistant partagé avec l’API.
+- Le module Opérations suit les tâches de l’équipe, avec échéance, priorité,
+  responsable, recherche, filtres et états à faire/en cours/terminé/archivé.
+  Les tâches et leurs statistiques sont isolées par organisation via
+  `/api/v1/operations`.
 - Avant d’exposer le serveur sur Internet, remplacer `BOOTSTRAP_ADMIN_PASSWORD`
   par un secret propre à l’instance dans `.env`, et définir une clé
   `JWT_SECRET_KEY` unique d’au moins 32 caractères ainsi que les origines de
@@ -149,7 +163,9 @@ curl -fsS https://mamari.fisafigroupe.com/api/v1/health
   partir des modèles automatiquement au démarrage. La migration
   `0004_agriculture` crée les tables historiques des parcelles et récoltes ;
   `0005_farm_campaign_finance` les rattache aux fermes et cultures, puis ajoute
-  les campagnes et mouvements financiers en conservant les données existantes.
+  les campagnes et mouvements financiers en conservant les données existantes ;
+  `0006_parcel_photos` ajoute la métadonnée photo des parcelles ;
+  `0007_operations_tasks` ajoute le planning des tâches.
 
 ## Principes de conception
 
