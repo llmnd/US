@@ -857,4 +857,12 @@ button {
   .chart-legend {
     gap: 8px;
   }
+
+  .chart-bars {
+    gap: 4px;
+  }
+
+  .chart-bar {
+    width: 6px;
+  }
 }

@@ -88,9 +88,9 @@ const activities = [
 ];
 
 const orders = [
-  { reference: "CMD-2025-084", customer: "Marché Central", date: "12 juin 2025", amount: "485 000 FCFA", status: "Confirmée" },
-  { reference: "CMD-2025-083", customer: "Saveurs du Sahel", date: "11 juin 2025", amount: "275 500 FCFA", status: "En préparation" },
-  { reference: "CMD-2025-082", customer: "Awa Distribution", date: "10 juin 2025", amount: "192 000 FCFA", status: "Confirmée" },
+  { reference: "CMD-2026-084", customer: "Marché Central", date: "12 juin 2026", amount: "485 000 FCFA", status: "Confirmée" },
+  { reference: "CMD-2026-083", customer: "Saveurs du Sahel", date: "11 juin 2026", amount: "275 500 FCFA", status: "En préparation" },
+  { reference: "CMD-2026-082", customer: "Awa Distribution", date: "10 juin 2026", amount: "192 000 FCFA", status: "Confirmée" },
 ];
 
 const quickActions = [
@@ -158,7 +158,7 @@ export function DashboardPage() {
             <div>
               <h2 className="panel-title">Revenus et production</h2>
               <p className="panel-subtitle">
-                Évolution mensuelle de votre activité
+                Évolution mensuelle · données de démonstration
               </p>
             </div>
             <select className="select-compact" aria-label="Période du graphique" defaultValue="2025">
