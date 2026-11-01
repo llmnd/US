@@ -562,7 +562,7 @@ export function LivestockPage() {
               <form className="livestock-form-grid" onSubmit={(event) => void handleAnimalSubmit(event)}>
                 <Field label="Nom"><input maxLength={120} name="name" placeholder="Ex. Nala" /></Field>
                 <Field label="N° d’identification"><input maxLength={80} name="tag_number" placeholder="Ex. BOV-001" /></Field>
-                <Field label="Espèce"><input list="livestock-species" maxLength={60} minLength={2} name="species" placeholder="Ex. Bovin, caprin, volaille…" required /><datalist id="livestock-species"><option value="Bovin" /><option value="Caprin" /><option value="Ovin" /><option value="Volaille" /><option value="Porcin" /><option value="Lapin" /></datalist></Field>
+                <Field label="Espèce"><input list="livestock-species" maxLength={60} minLength={2} name="species" placeholder="Ex. Bovin, caprin, volaille…" required /><datalist id="livestock-species"><option value="Bovin" /><option value="Caprin" /><option value="Ovin" /><option value="Volaille" /><option value="Lapin" /></datalist></Field>
                 <Field label="Race"><input maxLength={100} name="breed" placeholder="Race ou croisement" /></Field>
                 <Field label="Sexe"><select name="sex" defaultValue="unknown"><option value="unknown">Non renseigné</option><option value="female">Femelle</option><option value="male">Mâle</option></select></Field>
                 <Field label="Bâtiment / pâturage"><select name="facility_id" defaultValue=""><option value="">Non renseigné</option>{activeFacilities.map((facility) => <option key={facility.id} value={facility.id}>{facility.name}</option>)}</select></Field>
@@ -601,7 +601,7 @@ export function LivestockPage() {
                 <summary><span className="agriculture-add-icon"><Plus size={17} /></span><span><strong>Créer un lot</strong><small>Pour les poussins, poulets, chèvres ou animaux similaires</small></span><ChevronRight size={16} /></summary>
                 <form className="livestock-form-grid" onSubmit={(event) => void handleGroupSubmit(event)}>
                   <Field label="Nom du lot"><input maxLength={120} minLength={2} name="name" placeholder="Ex. Poulets de chair · lot 1" required /></Field>
-                  <Field label="Espèce"><input list="livestock-species" maxLength={60} minLength={2} name="species" placeholder="Ex. Volaille" required /><datalist id="livestock-species"><option value="Bovin" /><option value="Caprin" /><option value="Ovin" /><option value="Volaille" /><option value="Porcin" /><option value="Lapin" /></datalist></Field>
+                  <Field label="Espèce"><input list="livestock-species" maxLength={60} minLength={2} name="species" placeholder="Ex. Volaille" required /><datalist id="livestock-species"><option value="Bovin" /><option value="Caprin" /><option value="Ovin" /><option value="Volaille" /><option value="Lapin" /></datalist></Field>
                   <Field label="Race"><input maxLength={100} name="breed" placeholder="Race ou souche" /></Field>
                   <Field label="Effectif"><input min="1" name="head_count" placeholder="50" required type="number" /></Field>
                   <Field label="Bâtiment"><select name="facility_id" defaultValue=""><option value="">Non renseigné</option>{activeFacilities.map((facility) => <option key={facility.id} value={facility.id}>{facility.name}</option>)}</select></Field>
