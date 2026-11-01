@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowRight, Construction } from "lucide-react";
+import { UserManagement } from "@/features/administration/user-management";
+import { AgriculturePage } from "@/features/agriculture/agriculture-page";
+import { SalesPage } from "@/features/sales/sales-page";
 
 const modules: Record<string, { title: string; description: string }> = {
   operations: {
@@ -65,6 +68,8 @@ export default async function ModulePage({
   const { module } = await params;
   const page = modules[module];
   if (!page) notFound();
+  if (module === "ventes") return <SalesPage />;
+  if (module === "agriculture") return <AgriculturePage />;
 
   return (
     <div className="dashboard-content">
@@ -75,6 +80,9 @@ export default async function ModulePage({
           <p className="page-description">{page.description}</p>
         </div>
       </section>
+      {module === "administration" ? (
+        <UserManagement />
+      ) : (
       <section className="panel module-placeholder">
         <span className="module-placeholder-icon">
           <Construction size={21} />
@@ -89,6 +97,7 @@ export default async function ModulePage({
           Retour au tableau de bord <ArrowRight size={14} />
         </Link>
       </section>
+      )}
     </div>
   );
 }

@@ -218,12 +218,16 @@ button {
 }
 
 .profile-copy {
+  min-width: 0;
   flex: 1;
 }
 
 .profile-copy strong,
 .profile-copy span {
   display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .profile-copy strong {
@@ -234,6 +238,30 @@ button {
   margin-top: 3px;
   color: var(--muted);
   font-size: 11px;
+}
+
+.profile-logout {
+  display: grid;
+  width: 31px;
+  height: 31px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #78827b;
+  cursor: pointer;
+}
+
+.profile-logout:hover {
+  background: #f5f7f5;
+  color: var(--ink);
+}
+
+.logout-error {
+  margin: 8px 8px 0;
+  color: #a14136;
+  font-size: 10px;
 }
 
 .main-area {
@@ -397,6 +425,12 @@ button {
   letter-spacing: -0.8px;
 }
 
+.metric-value-live {
+  overflow-wrap: anywhere;
+  font-size: clamp(17px, 1.65vw, 23px);
+  letter-spacing: -0.6px;
+}
+
 .metric-foot {
   display: flex;
   align-items: center;
@@ -413,7 +447,7 @@ button {
 
 .dashboard-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.65fr) minmax(270px, 1fr);
+  grid-template-columns: minmax(0, 1.7fr) minmax(290px, 0.9fr);
   gap: 16px;
   margin-top: 17px;
 }
@@ -453,7 +487,8 @@ button {
 
 .chart-legend {
   display: flex;
-  gap: 15px;
+  align-items: center;
+  gap: 8px;
   color: #758078;
   font-size: 10px;
 }
@@ -475,70 +510,192 @@ button {
   background: #c6d9ca;
 }
 
-.chart {
-  position: relative;
-  height: 205px;
-  margin-top: 22px;
-  padding: 0 4px 24px 34px;
+.revenue-panel {
+  overflow: hidden;
 }
 
-.chart-grid {
-  position: absolute;
-  inset: 3px 4px 27px 34px;
+.revenue-panel-header {
+  align-items: center;
+}
+
+.year-select-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #879189;
+  font-size: 10px;
+}
+
+.chart-toolbar {
   display: flex;
-  flex-direction: column;
+  min-height: 38px;
+  align-items: center;
   justify-content: space-between;
+  gap: 12px;
+  margin-top: 19px;
 }
 
-.chart-grid span {
-  border-top: 1px dashed #edf0ed;
+.chart-controls {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 12px;
+}
+
+.chart-style-control {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 3px;
+  border: 1px solid #edf0ed;
+  border-radius: 9px;
+  background: #fafbfa;
+  padding: 3px;
+}
+
+.chart-style-button {
+  display: inline-flex;
+  min-height: 29px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  padding: 0 9px;
+  color: #727d75;
+  cursor: pointer;
+  font-size: 10px;
+  transition: background 140ms ease, color 140ms ease, box-shadow 140ms ease;
+}
+
+.chart-style-button:hover {
+  color: var(--green-dark);
+}
+
+.chart-style-button[data-active="true"] {
+  background: white;
+  color: var(--green-dark);
+  box-shadow: 0 1px 3px rgb(26 47 33 / 11%);
+  font-weight: 650;
+}
+
+.revenue-chart {
+  position: relative;
+  min-width: 0;
+  height: 265px;
+  margin-top: 7px;
+  overflow: hidden;
+}
+
+.revenue-chart-svg {
+  position: absolute;
+  inset: 3px 0 auto 47px;
+  display: block;
+  width: calc(100% - 47px);
+  height: 196px;
+  overflow: visible;
+}
+
+.chart-grid-line {
+  stroke: #edf0ed;
+  stroke-dasharray: 3 5;
+  stroke-width: 1;
 }
 
 .chart-y-labels {
   position: absolute;
-  inset: 0 auto 27px 0;
+  inset: 3px auto auto 0;
   display: flex;
+  width: 40px;
+  height: 196px;
   flex-direction: column;
   justify-content: space-between;
-  color: #9aa39c;
-  font-size: 9px;
+  color: #929d95;
+  font-size: 10px;
+  text-align: right;
 }
 
-.chart-bars {
+.chart-month-labels {
   position: absolute;
-  inset: 7px 5px 27px 41px;
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-around;
-  gap: 10px;
-}
-
-.chart-group {
-  z-index: 1;
-  display: flex;
-  height: 100%;
-  align-items: flex-end;
-  gap: 4px;
-}
-
-.chart-bar {
-  width: clamp(8px, 1.35vw, 16px);
-  min-height: 4px;
-  border-radius: 4px 4px 1px 1px;
-  background: #37815b;
-}
-
-.chart-bar.secondary {
-  background: #c6d9ca;
-}
-
-.chart-x-labels {
-  position: absolute;
-  inset: auto 5px 0 41px;
-  display: flex;
-  justify-content: space-around;
-  color: #9aa39c;
+  inset: 207px 0 auto 47px;
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  color: #929d95;
   font-size: 9px;
+  text-align: center;
+}
+
+.revenue-chart-line {
+  fill: none;
+  stroke: #318158;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 3;
+}
+
+.revenue-chart-area {
+  fill: url("#activity-area-fill");
+}
+
+.revenue-chart-point {
+  fill: white;
+  stroke: #318158;
+  stroke-width: 2.5;
+}
+
+.revenue-chart-bar {
+  fill: #38835c;
+  transition: opacity 140ms ease;
+}
+
+.revenue-chart-bar:hover {
+  fill: #1d6845;
+}
+
+.chart-empty-message {
+  position: absolute;
+  inset: 30px 20px 34px 62px;
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  justify-content: center;
+  border: 1px dashed #dfe8e0;
+  border-radius: 12px;
+  background: rgb(255 255 255 / 90%);
+  color: #78827b;
+  gap: 8px;
+  text-align: center;
+}
+
+.chart-empty-message strong {
+  color: #435047;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.chart-empty-message > span:not(.chart-empty-icon) {
+  font-size: 10px;
+}
+
+.chart-empty-message a,
+.recent-orders-empty a,
+.dashboard-next-module a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--green);
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.chart-empty-icon {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border-radius: 11px;
+  background: #f0f6f1;
+  color: var(--green);
 }
 
 .activity-list {
@@ -589,6 +746,1206 @@ button {
 .activity-copy time {
   color: #98a19b;
   font-size: 9px;
+}
+
+.activity-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 7px;
+}
+
+.activity-meta .status-pill {
+  flex: 0 0 auto;
+}
+
+.recent-orders-panel .activity-item {
+  padding: 12px 0;
+}
+
+.recent-orders-empty {
+  display: flex;
+  min-height: 210px;
+  align-items: center;
+  flex-direction: column;
+  justify-content: center;
+  gap: 10px;
+  color: #9aa39c;
+  text-align: center;
+}
+
+.recent-orders-empty p {
+  margin: 0;
+  color: #77827a;
+  font-size: 11px;
+}
+
+.dashboard-next-module {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: 15px;
+  border: 1px solid #e8eee8;
+  border-radius: 10px;
+  background: #fbfcfb;
+  padding: 12px 15px;
+  color: #7a857d;
+  font-size: 10px;
+}
+
+.dashboard-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+  border: 1px solid #f1d5d1;
+  border-radius: 9px;
+  background: #fff8f7;
+  padding: 12px 14px;
+  color: #a14136;
+  font-size: 12px;
+}
+
+.dashboard-error p {
+  margin: 0;
+}
+
+.dashboard-loading {
+  padding: 28px 16px;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+.sales-create-panel {
+  margin-bottom: 16px;
+}
+
+.sales-order-form {
+  display: grid;
+  grid-template-columns: minmax(160px, 1.4fr) minmax(130px, 1fr) minmax(130px, 1fr) auto;
+  align-items: end;
+  gap: 12px;
+  margin-top: 17px;
+}
+
+.sales-order-form .auth-field input {
+  min-width: 0;
+}
+
+.sales-order-form .auth-field select {
+  min-width: 0;
+  min-height: 43px;
+}
+
+.sales-order-form .button-primary {
+  min-height: 43px;
+  white-space: nowrap;
+}
+
+.sales-order-form .auth-error,
+.sales-order-form .admin-success {
+  grid-column: 1 / -1;
+}
+
+.sales-error {
+  margin-bottom: 14px;
+}
+
+.sales-list-panel {
+  min-width: 0;
+}
+
+.sales-table {
+  min-width: 700px;
+}
+
+.agriculture-table {
+  min-width: 620px;
+}
+
+.agriculture-harvest-panel {
+  margin-top: 16px;
+}
+
+.agriculture-harvest-form {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.agriculture-harvest-form .button-primary {
+  grid-column: 1 / -1;
+  justify-self: start;
+}
+
+.agriculture-inline-empty {
+  margin-top: 16px;
+}
+
+.agriculture-workspace {
+  display: grid;
+  gap: 18px;
+}
+
+.agriculture-hero {
+  position: relative;
+  display: flex;
+  min-height: 216px;
+  align-items: center;
+  overflow: hidden;
+  border: 1px solid #dfe9df;
+  border-radius: 17px;
+  background:
+    radial-gradient(ellipse at 82% 100%, rgb(183 212 164 / 55%), transparent 40%),
+    linear-gradient(112deg, #f8fbf6 5%, #eaf3e9 59%, #dcebd8 100%);
+  padding: 28px 34px;
+}
+
+.agriculture-hero-copy {
+  position: relative;
+  z-index: 1;
+  max-width: 590px;
+}
+
+.agriculture-hero .page-title {
+  margin-top: 5px;
+  font-size: clamp(25px, 3vw, 36px);
+}
+
+.agriculture-hero .page-description {
+  max-width: 500px;
+  line-height: 1.65;
+}
+
+.agriculture-hero-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  margin-top: 18px;
+  color: #647469;
+  font-size: 11px;
+}
+
+.agriculture-hero-stats strong {
+  color: var(--green-dark);
+  font-size: 15px;
+}
+
+.agriculture-hero-art {
+  position: absolute;
+  inset: 0 0 0 auto;
+  display: grid;
+  width: min(41%, 390px);
+  place-items: center;
+  overflow: hidden;
+  color: #54815a;
+}
+
+.agriculture-hero-art > svg {
+  position: relative;
+  z-index: 2;
+  margin-top: -28px;
+  filter: drop-shadow(0 6px 6px rgb(34 87 49 / 14%));
+}
+
+.hero-sun {
+  position: absolute;
+  top: 24px;
+  right: 23%;
+  width: 57px;
+  height: 57px;
+  border-radius: 50%;
+  background: #f3d996;
+  opacity: .8;
+}
+
+.hero-field {
+  position: absolute;
+  right: -14%;
+  bottom: -34%;
+  width: 126%;
+  height: 65%;
+  border: 1px solid rgb(75 130 78 / 22%);
+  border-radius: 50% 50% 0 0;
+  background: #b7d0a6;
+  transform: rotate(-8deg);
+}
+
+.hero-field.field-two {
+  right: -25%;
+  bottom: -48%;
+  background: #9cbe91;
+  transform: rotate(7deg);
+}
+
+.hero-field.field-three {
+  right: 17%;
+  bottom: -54%;
+  background: #82a976;
+  transform: rotate(-17deg);
+}
+
+.agriculture-toolbar,
+.agriculture-tabs,
+.agriculture-tab,
+.agriculture-farm-filter,
+.agriculture-section-heading,
+.segmented-control,
+.farm-card-title-row,
+.farm-card-stats,
+.farm-card-actions,
+.campaign-card-top,
+.campaign-dates,
+.campaign-actions,
+.campaign-actuals,
+.report-title-row,
+.report-legend {
+  display: flex;
+  align-items: center;
+}
+
+.agriculture-toolbar {
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.agriculture-tabs {
+  gap: 5px;
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: white;
+  padding: 4px;
+}
+
+.agriculture-tab {
+  min-height: 36px;
+  flex: 0 0 auto;
+  justify-content: center;
+  gap: 7px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  padding: 0 12px;
+  color: #727d75;
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.agriculture-tab[aria-selected="true"] {
+  background: var(--green-pale);
+  color: var(--green-dark);
+  font-weight: 650;
+}
+
+.agriculture-farm-filter {
+  gap: 7px;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.agriculture-section-heading {
+  justify-content: space-between;
+  gap: 14px;
+  margin: 3px 0 14px;
+}
+
+.agriculture-section-heading h2 {
+  margin: 0;
+  font-size: 15px;
+  letter-spacing: -.2px;
+}
+
+.agriculture-section-heading p {
+  margin: 5px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.segmented-control {
+  gap: 2px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: white;
+  padding: 3px;
+}
+
+.segmented-control button {
+  min-height: 29px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  padding: 0 10px;
+  color: #7a857d;
+  cursor: pointer;
+  font-size: 10px;
+}
+
+.segmented-control button[aria-pressed="true"] {
+  background: #edf5ee;
+  color: var(--green-dark);
+  font-weight: 650;
+}
+
+.agriculture-create-card,
+.campaign-planner,
+.harvest-entry-card,
+.finance-entry-panel {
+  margin-bottom: 16px;
+}
+
+.agriculture-create-card > summary,
+.campaign-planner > summary,
+.harvest-entry-card > summary,
+.finance-entry-panel > summary {
+  display: flex;
+  min-height: 62px;
+  align-items: center;
+  gap: 11px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.agriculture-create-card > summary::-webkit-details-marker,
+.campaign-planner > summary::-webkit-details-marker,
+.harvest-entry-card > summary::-webkit-details-marker,
+.finance-entry-panel > summary::-webkit-details-marker {
+  display: none;
+}
+
+.agriculture-create-card > summary > span:nth-child(2),
+.campaign-planner > summary > span:nth-child(2),
+.finance-entry-panel > summary > span:nth-child(2),
+.harvest-entry-card > summary > span {
+  display: grid;
+  flex: 1;
+  gap: 4px;
+}
+
+.agriculture-create-card > summary strong,
+.campaign-planner > summary strong,
+.finance-entry-panel > summary strong,
+.harvest-entry-card > summary strong {
+  font-size: 12px;
+}
+
+.agriculture-create-card > summary small,
+.campaign-planner > summary small,
+.finance-entry-panel > summary small,
+.harvest-entry-card > summary small {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.agriculture-add-icon,
+.campaign-icon {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 11px;
+  background: #edf5ed;
+  color: var(--green);
+}
+
+.agriculture-form-grid,
+.campaign-form-grid,
+.agriculture-inline-form {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: end;
+  gap: 12px;
+  padding: 4px 0 3px;
+}
+
+.agriculture-form-grid .button-primary,
+.campaign-form-grid .button-primary,
+.agriculture-inline-form .button-primary {
+  min-height: 43px;
+}
+
+.agriculture-form-grid .auth-field input,
+.agriculture-form-grid .auth-field select,
+.campaign-form-grid .auth-field input,
+.campaign-form-grid .auth-field select,
+.agriculture-inline-form .auth-field input,
+.agriculture-inline-form .auth-field select {
+  min-width: 0;
+  min-height: 42px;
+}
+
+.farm-photo-upload {
+  display: flex;
+  min-height: 69px;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  border: 1px dashed #cbd9cc;
+  border-radius: 9px;
+  padding: 9px 11px;
+  color: var(--green);
+  cursor: pointer;
+  font-size: 10px;
+}
+
+.farm-photo-upload span {
+  color: #34463a;
+  font-weight: 600;
+}
+
+.farm-photo-upload small {
+  width: 100%;
+  padding-left: 27px;
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.farm-photo-upload input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  clip-path: inset(50%);
+}
+
+.farm-card-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.farm-card {
+  overflow: hidden;
+  padding: 0;
+}
+
+.farm-card-image {
+  display: block;
+  width: 100%;
+  height: 154px;
+  object-fit: cover;
+  background: #edf3e8;
+}
+
+.farm-card-image-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 6px;
+  background:
+    radial-gradient(ellipse at 25% 80%, #cadbbb 0 14%, transparent 15%),
+    radial-gradient(ellipse at 85% 87%, #afc99f 0 20%, transparent 21%),
+    linear-gradient(145deg, #e6f0df, #f4f3df);
+  color: #557c56;
+}
+
+.farm-card-image-placeholder span {
+  color: #668068;
+  font-size: 9px;
+}
+
+.farm-card-body {
+  padding: 14px 15px 13px;
+}
+
+.farm-card-title-row {
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.farm-card-title-row h3,
+.campaign-title h3 {
+  margin: 0;
+  font-size: 13px;
+}
+
+.farm-card-title-row p,
+.campaign-title p {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 5px 0 0;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.farm-card-stats {
+  gap: 18px;
+  border-top: 1px solid #f0f2f0;
+  margin-top: 14px;
+  padding-top: 11px;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.farm-card-stats strong {
+  color: #35463b;
+  font-size: 13px;
+}
+
+.farm-card-actions {
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.farm-card-actions .button-secondary {
+  min-height: 31px;
+  font-size: 10px;
+}
+
+.text-action {
+  display: inline-flex;
+  min-height: 31px;
+  align-items: center;
+  gap: 5px;
+  border: 0;
+  background: transparent;
+  padding: 0 3px;
+  color: #78827b;
+  cursor: pointer;
+  font-size: 10px;
+}
+
+.text-action:hover {
+  color: #9b4e43;
+}
+
+.text-action:disabled {
+  cursor: wait;
+  opacity: .6;
+}
+
+.agriculture-data-panel {
+  margin-top: 17px;
+}
+
+.agriculture-data-panel .agriculture-section-heading {
+  margin-bottom: 12px;
+}
+
+.agriculture-inline-form {
+  grid-template-columns: repeat(4, minmax(0, 1fr)) auto;
+  border-top: 1px solid #f0f2f0;
+  margin-top: 15px;
+  padding-top: 15px;
+}
+
+.crop-catalog {
+  border-top: 1px solid #f0f2f0;
+  margin-top: 13px;
+  padding-top: 10px;
+}
+
+.crop-catalog > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #5e6f62;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 600;
+  list-style: none;
+}
+
+.crop-catalog > summary span {
+  border-radius: 99px;
+  background: #f1f4f1;
+  padding: 2px 6px;
+}
+
+.crop-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.crop-chip-list span {
+  border: 1px solid #e8eee8;
+  border-radius: 99px;
+  background: #fafcfa;
+  padding: 5px 9px;
+  color: #53675a;
+  font-size: 9px;
+}
+
+.crop-add-form {
+  display: flex;
+  max-width: 360px;
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.crop-add-form input {
+  min-width: 0;
+  flex: 1;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0 9px;
+  font: inherit;
+  font-size: 10px;
+}
+
+.crop-add-form .button-secondary {
+  min-height: 32px;
+  font-size: 10px;
+}
+
+.crop-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #4a7051;
+}
+
+.table-subtext {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 400;
+}
+
+.agriculture-empty {
+  display: flex;
+  min-height: 190px;
+  align-items: center;
+  flex-direction: column;
+  justify-content: center;
+  text-align: center;
+}
+
+.agriculture-empty.compact {
+  min-height: 120px;
+  margin-top: 12px;
+}
+
+.agriculture-empty h3 {
+  margin: 10px 0 0;
+  font-size: 13px;
+}
+
+.agriculture-empty p {
+  margin: 7px 0 0;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.agriculture-empty-icon {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border-radius: 13px;
+  background: #edf5ed;
+  color: var(--green);
+}
+
+.campaign-planner > summary,
+.harvest-entry-card > summary,
+.finance-entry-panel > summary {
+  list-style: none;
+}
+
+.campaign-form-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border-top: 1px solid #f0f2f0;
+  margin-top: 5px;
+  padding-top: 16px;
+}
+
+.campaign-submit {
+  grid-column: 1 / -1;
+  justify-self: start;
+  padding: 0 16px;
+}
+
+.campaign-list {
+  display: grid;
+  gap: 12px;
+}
+
+.campaign-card {
+  padding: 17px 18px;
+}
+
+.campaign-card-top {
+  gap: 11px;
+}
+
+.campaign-title {
+  min-width: 0;
+  flex: 1;
+}
+
+.campaign-title p {
+  flex-wrap: wrap;
+}
+
+.campaign-dates {
+  justify-content: space-between;
+  margin: 13px 0 10px;
+  color: #879189;
+  font-size: 9px;
+}
+
+.campaign-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border: 1px solid #edf1ed;
+  border-radius: 10px;
+  background: #fafcfa;
+  padding: 11px 5px;
+}
+
+.campaign-metrics > div {
+  display: grid;
+  gap: 6px;
+  padding: 0 10px;
+}
+
+.campaign-metrics > div + div {
+  border-left: 1px solid #e9eee9;
+}
+
+.campaign-metrics span,
+.finance-summary-card > span:first-child,
+.report-kpis span {
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.campaign-metrics strong {
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.positive-value,
+.finance-amount-income {
+  color: #27754a;
+}
+
+.negative-value,
+.finance-amount-expense {
+  color: #aa5145;
+}
+
+.campaign-status-planned {
+  background: #f3f1e7;
+  color: #837147;
+}
+
+.campaign-status-simulated {
+  background: #edf1fa;
+  color: #556d9c;
+}
+
+.campaign-status-active {
+  background: #e8f4eb;
+  color: #27754a;
+}
+
+.campaign-status-closed {
+  background: #edf0ed;
+  color: #657269;
+}
+
+.campaign-status-archived {
+  background: #f1eeee;
+  color: #817270;
+}
+
+.campaign-actuals {
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin-top: 12px;
+  color: #7e8981;
+  font-size: 9px;
+}
+
+.campaign-actuals strong {
+  color: #47574c;
+}
+
+.campaign-actions {
+  flex-wrap: wrap;
+  gap: 8px;
+  border-top: 1px solid #f0f2f0;
+  margin-top: 13px;
+  padding-top: 12px;
+}
+
+.campaign-actions .button-primary,
+.campaign-actions .button-secondary {
+  min-height: 33px;
+  font-size: 10px;
+}
+
+.campaign-sale-form {
+  border-top: 1px solid #f0f2f0;
+  margin-top: 12px;
+  padding-top: 10px;
+}
+
+.campaign-sale-form > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--green);
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 650;
+  list-style: none;
+}
+
+.campaign-sale-form .agriculture-inline-form {
+  grid-template-columns: repeat(4, minmax(0, 1fr)) auto;
+  border: 0;
+  margin-top: 8px;
+  padding-top: 4px;
+}
+
+.finance-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.finance-summary-card {
+  position: relative;
+  display: grid;
+  min-height: 124px;
+  align-content: center;
+  gap: 7px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: white;
+  padding: 14px 15px;
+}
+
+.finance-summary-card > strong {
+  max-width: 100%;
+  padding-right: 28px;
+  font-size: clamp(14px, 1.5vw, 20px);
+  overflow-wrap: anywhere;
+}
+
+.finance-summary-card > small {
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.finance-icon {
+  position: absolute;
+  top: 13px;
+  right: 13px;
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: 9px;
+}
+
+.finance-icon.income,
+.finance-icon.balance {
+  background: #eaf4ed;
+  color: #27754a;
+}
+
+.finance-icon.expense {
+  background: #faefed;
+  color: #ab574c;
+}
+
+.finance-icon.input {
+  background: #f5f2e7;
+  color: #8e7840;
+}
+
+.finance-entry-panel {
+  margin-bottom: 17px;
+}
+
+.finance-entry-panel .campaign-form-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.finance-entry-panel .campaign-submit {
+  grid-column: 1 / -1;
+}
+
+.report-summary-panel {
+  margin-bottom: 16px;
+}
+
+.report-title-row {
+  gap: 11px;
+}
+
+.report-title-row h3 {
+  margin: 0;
+  font-size: 13px;
+}
+
+.report-title-row p {
+  margin: 5px 0 0;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.report-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  border-top: 1px solid #f0f2f0;
+  margin-top: 16px;
+  padding-top: 14px;
+}
+
+.report-kpis > div {
+  display: grid;
+  gap: 6px;
+}
+
+.report-kpis strong {
+  font-size: 13px;
+}
+
+.report-month-list {
+  display: grid;
+  gap: 9px;
+  padding: 8px 0 12px;
+}
+
+.report-month-row {
+  display: grid;
+  grid-template-columns: 35px minmax(80px, 1fr) minmax(75px, auto) minmax(75px, auto);
+  align-items: center;
+  gap: 10px;
+  color: #77827a;
+  font-size: 9px;
+}
+
+.report-month-row > strong {
+  color: #3a714b;
+  font-size: 9px;
+  text-align: right;
+}
+
+.report-month-row > small {
+  color: #aa6257;
+  font-size: 9px;
+  text-align: right;
+}
+
+.report-month-bars {
+  display: grid;
+  gap: 2px;
+}
+
+.report-month-bars > span {
+  display: block;
+  min-width: 2px;
+  height: 5px;
+  border-radius: 99px;
+}
+
+.report-month-bars .report-bar-income,
+.report-legend .report-bar-income {
+  background: #4d9664;
+}
+
+.report-month-bars .report-bar-expense,
+.report-legend .report-bar-expense {
+  background: #d88a7a;
+}
+
+.report-legend {
+  gap: 14px;
+  border-top: 1px solid #f0f2f0;
+  padding-top: 10px;
+  color: #7e8981;
+  font-size: 9px;
+}
+
+.report-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.report-legend i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.sales-table-controls {
+  display: flex;
+  justify-content: flex-end;
+  gap: 9px;
+  margin-top: 16px;
+}
+
+.sales-search {
+  display: flex;
+  min-width: 220px;
+  min-height: 34px;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0 9px;
+  color: #8a948d;
+}
+
+.sales-search input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  color: var(--ink);
+  font: inherit;
+  font-size: 10px;
+}
+
+.sales-search:focus-within {
+  border-color: #77a889;
+  box-shadow: 0 0 0 3px rgb(55 129 91 / 10%);
+}
+
+.sales-filter-label .select-compact {
+  min-height: 34px;
+}
+
+.sales-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+  color: #7d8880;
+  font-size: 10px;
+}
+
+.sales-pagination > div {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.pagination-button {
+  display: grid;
+  width: 29px;
+  height: 29px;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: white;
+  color: #5e6a62;
+  cursor: pointer;
+}
+
+.pagination-button:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.status-select {
+  max-width: 155px;
+  min-height: 28px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 3px 9px;
+  color: #36734a;
+  cursor: pointer;
+  font: inherit;
+  font-size: 9px;
+  font-weight: 600;
+}
+
+.status-select.confirmed,
+.status-pill.confirmed {
+  background: #edf6ef;
+  color: #36734a;
+}
+
+.status-select.preparing,
+.status-pill.preparing {
+  background: #faf3e6;
+  color: #9b7130;
+}
+
+.status-select.delivered,
+.status-pill.delivered {
+  background: #edf3fa;
+  color: #496d96;
+}
+
+.status-select.cancelled,
+.status-pill.cancelled {
+  background: #fff0ef;
+  color: #a14136;
+}
+
+.status-select:focus-visible,
+.chart-style-button:focus-visible,
+.button-primary:focus-visible,
+.button-secondary:focus-visible {
+  outline: 3px solid rgb(55 129 91 / 22%);
+  outline-offset: 2px;
+}
+
+.status-select:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.sales-empty-state {
+  display: flex;
+  min-height: 200px;
+  align-items: center;
+  flex-direction: column;
+  justify-content: center;
+  gap: 9px;
+  padding: 24px;
+  text-align: center;
+}
+
+.sales-empty-state h3,
+.sales-empty-state p {
+  margin: 0;
+}
+
+.sales-empty-state h3 {
+  color: #435047;
+  font-size: 13px;
+}
+
+.sales-empty-state p {
+  max-width: 480px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.visually-hidden {
+  position: absolute;
+  overflow: hidden;
+  width: 1px;
+  height: 1px;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  clip-path: inset(50%);
 }
 
 .bottom-grid {
@@ -703,6 +2060,201 @@ button {
   text-align: right;
 }
 
+.auth-page,
+.auth-loading {
+  display: flex;
+  min-height: 100vh;
+  align-items: center;
+  justify-content: center;
+  padding: 28px 18px;
+}
+
+.auth-page {
+  flex-direction: column;
+  background:
+    radial-gradient(ellipse at 50% 0%, #e8f1e8 0%, transparent 58%),
+    var(--canvas);
+}
+
+.auth-card {
+  width: min(100%, 430px);
+  border: 1px solid var(--line);
+  border-radius: 17px;
+  background: var(--surface);
+  padding: 32px;
+  box-shadow: 0 16px 55px rgb(34 56 41 / 7%);
+}
+
+.auth-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 32px;
+}
+
+.auth-card .eyebrow {
+  margin-bottom: 8px;
+}
+
+.auth-card .page-title {
+  font-size: 26px;
+}
+
+.auth-card .page-description {
+  margin-top: 8px;
+  line-height: 1.65;
+}
+
+.auth-form {
+  display: grid;
+  gap: 16px;
+  margin-top: 25px;
+}
+
+.auth-field {
+  display: grid;
+  gap: 7px;
+  color: #46534a;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.auth-field input {
+  width: 100%;
+  min-height: 43px;
+  border: 1px solid #e2e8e3;
+  border-radius: 9px;
+  outline: none;
+  background: #fff;
+  padding: 0 12px;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 400;
+  transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+
+.auth-field select {
+  width: 100%;
+  min-height: 43px;
+  border: 1px solid #e2e8e3;
+  border-radius: 9px;
+  outline: none;
+  background: #fff;
+  padding: 0 12px;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 400;
+}
+
+.auth-field select:focus {
+  border-color: #77a889;
+  box-shadow: 0 0 0 3px rgb(55 129 91 / 10%);
+}
+
+.auth-field input::placeholder {
+  color: #a0a9a2;
+}
+
+.auth-field input:focus {
+  border-color: #77a889;
+  box-shadow: 0 0 0 3px rgb(55 129 91 / 10%);
+}
+
+.auth-field small {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 400;
+}
+
+.auth-submit {
+  width: 100%;
+  min-height: 43px;
+  margin-top: 2px;
+}
+
+.auth-submit:disabled {
+  cursor: wait;
+  opacity: 0.75;
+}
+
+.auth-spinner {
+  animation: auth-spin 1s linear infinite;
+}
+
+@keyframes auth-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.auth-error {
+  margin: 0;
+  border: 1px solid #f1d5d1;
+  border-radius: 8px;
+  background: #fff8f7;
+  padding: 10px 12px;
+  color: #a14136;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.admin-user-panel {
+  max-width: 720px;
+}
+
+.admin-user-form {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: end;
+}
+
+.admin-user-form .auth-error,
+.admin-user-form .admin-success,
+.admin-user-form .auth-submit {
+  grid-column: 1 / -1;
+}
+
+.admin-success {
+  margin: 0;
+  border: 1px solid #cfe7d4;
+  border-radius: 8px;
+  background: #f5fbf6;
+  padding: 10px 12px;
+  color: #267143;
+  font-size: 12px;
+}
+
+.auth-switch,
+.auth-footer {
+  color: var(--muted);
+  font-size: 11px;
+  text-align: center;
+}
+
+.auth-switch {
+  margin: 21px 0 0;
+}
+
+.auth-switch a {
+  color: var(--green);
+  font-weight: 650;
+}
+
+.auth-footer {
+  margin: 18px 0 0;
+}
+
+.auth-loading {
+  flex-direction: column;
+  gap: 14px;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+.auth-loading .auth-error {
+  max-width: 430px;
+}
+
 .module-placeholder {
   display: flex;
   min-height: 300px;
@@ -768,6 +2320,34 @@ button {
   .metrics-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .farm-card-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .agriculture-form-grid,
+  .campaign-form-grid,
+  .finance-entry-panel .campaign-form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .agriculture-inline-form,
+  .campaign-sale-form .agriculture-inline-form {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .campaign-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px 0;
+  }
+
+  .campaign-metrics > div:nth-child(3) {
+    border-left: 0;
+  }
+
+  .finance-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 760px) {
@@ -785,8 +2365,7 @@ button {
   }
 
   .workspace-switcher,
-  .nav-label,
-  .sidebar-footer {
+  .nav-label {
     display: none;
   }
 
@@ -808,6 +2387,25 @@ button {
     height: 15px;
   }
 
+  .sidebar-footer {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 9px;
+    border-top: 1px solid var(--line);
+    padding-top: 9px;
+  }
+
+  .sidebar-footer > .nav-link {
+    display: none;
+  }
+
+  .profile {
+    min-width: 0;
+    flex: 1;
+    padding: 0 3px;
+  }
+
   .main-area {
     margin-left: 0;
   }
@@ -824,6 +2422,50 @@ button {
   .dashboard-grid,
   .bottom-grid {
     grid-template-columns: 1fr;
+  }
+
+  .admin-user-form {
+    grid-template-columns: 1fr;
+  }
+
+  .sales-order-form {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .sales-order-form .button-primary {
+    width: 100%;
+  }
+
+  .chart-toolbar {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .chart-controls {
+    flex-wrap: wrap;
+  }
+
+  .agriculture-toolbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .agriculture-tabs {
+    width: 100%;
+  }
+
+  .agriculture-farm-filter {
+    align-self: flex-end;
+  }
+
+  .agriculture-hero {
+    min-height: 200px;
+    padding: 23px;
+  }
+
+  .agriculture-hero-art {
+    width: 35%;
+    opacity: .7;
   }
 }
 
@@ -854,6 +2496,131 @@ button {
     padding: 15px;
   }
 
+  .revenue-panel-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .chart-style-button {
+    padding: 0 7px;
+  }
+
+  .chart-style-button span {
+    font-size: 9px;
+  }
+
+  .sales-order-form {
+    grid-template-columns: 1fr;
+  }
+
+  .agriculture-workspace {
+    gap: 13px;
+  }
+
+  .agriculture-hero {
+    min-height: 192px;
+    padding: 20px 17px;
+  }
+
+  .agriculture-hero-copy {
+    max-width: 85%;
+  }
+
+  .agriculture-hero-art {
+    right: -40px;
+    width: 48%;
+    opacity: .4;
+  }
+
+  .agriculture-hero-art > svg {
+    width: 38px;
+  }
+
+  .agriculture-hero-stats {
+    gap: 8px 14px;
+  }
+
+  .agriculture-section-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .agriculture-section-heading > .sales-search,
+  .agriculture-section-heading > .sales-filter-label {
+    width: 100%;
+  }
+
+  .agriculture-form-grid,
+  .campaign-form-grid,
+  .finance-entry-panel .campaign-form-grid,
+  .agriculture-inline-form,
+  .campaign-sale-form .agriculture-inline-form {
+    grid-template-columns: 1fr;
+  }
+
+  .campaign-submit {
+    width: 100%;
+  }
+
+  .farm-card-grid,
+  .finance-summary-grid,
+  .report-kpis {
+    grid-template-columns: 1fr;
+  }
+
+  .farm-card-image {
+    height: 170px;
+  }
+
+  .campaign-card {
+    padding: 14px;
+  }
+
+  .campaign-card-top {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .campaign-card-top > .status-pill {
+    margin-left: 47px;
+  }
+
+  .campaign-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .report-month-row {
+    grid-template-columns: 26px minmax(50px, 1fr) minmax(50px, auto) minmax(50px, auto);
+    gap: 6px;
+  }
+
+  .agriculture-tabs {
+    gap: 2px;
+  }
+
+  .agriculture-tab {
+    min-height: 34px;
+    padding: 0 8px;
+    font-size: 9px;
+  }
+
+  .agriculture-tab svg {
+    width: 14px;
+  }
+
+  .farm-photo-upload {
+    min-height: 62px;
+  }
+
+  .agriculture-harvest-form .button-primary {
+    width: 100%;
+  }
+
+  .dashboard-next-module {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
   .chart-legend {
     gap: 8px;
   }
@@ -864,5 +2631,9 @@ button {
 
   .chart-bar {
     width: 6px;
+  }
+
+  .auth-card {
+    padding: 25px 20px;
   }
 }

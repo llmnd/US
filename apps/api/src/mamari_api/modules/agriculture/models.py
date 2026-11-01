@@ -171,12 +171,8 @@ class Campaign(Base):
     start_date: Mapped[date] = mapped_column(Date, nullable=False)
     expected_harvest_date: Mapped[date] = mapped_column(Date, nullable=False)
     area_hectares: Mapped[Decimal] = mapped_column(Numeric(8, 2), nullable=False)
-    expected_yield_kg_per_hectare: Mapped[Decimal] = mapped_column(
-        Numeric(12, 2), nullable=False
-    )
-    expected_price_fcfa_per_kg: Mapped[Decimal] = mapped_column(
-        Numeric(14, 2), nullable=False
-    )
+    expected_yield_kg_per_hectare: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    expected_price_fcfa_per_kg: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
     estimated_input_cost_fcfa: Mapped[int] = mapped_column(BigInteger, nullable=False)
     estimated_other_cost_fcfa: Mapped[int] = mapped_column(BigInteger, nullable=False)
     simulated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

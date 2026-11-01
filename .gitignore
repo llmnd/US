@@ -19,6 +19,7 @@ __pycache__/
 .env.*
 !.env.example
 *.sqlite3
+storage/
 
 # Editors and operating systems
 .vscode/*

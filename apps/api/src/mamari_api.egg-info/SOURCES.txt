@@ -14,6 +14,13 @@ src/mamari_api/core/base.py
 src/mamari_api/core/config.py
 src/mamari_api/core/database.py
 src/mamari_api/modules/__init__.py
+src/mamari_api/modules/agriculture/__init__.py
+src/mamari_api/modules/agriculture/models.py
+src/mamari_api/modules/agriculture/router.py
+src/mamari_api/modules/agriculture/schemas.py
+src/mamari_api/modules/dashboard/__init__.py
+src/mamari_api/modules/dashboard/router.py
+src/mamari_api/modules/dashboard/schemas.py
 src/mamari_api/modules/health/__init__.py
 src/mamari_api/modules/health/router.py
 src/mamari_api/modules/identity/__init__.py
@@ -25,6 +32,12 @@ src/mamari_api/modules/identity/security.py
 src/mamari_api/modules/identity/service.py
 src/mamari_api/modules/organizations/__init__.py
 src/mamari_api/modules/organizations/router.py
+src/mamari_api/modules/sales/__init__.py
+src/mamari_api/modules/sales/models.py
+src/mamari_api/modules/sales/router.py
+src/mamari_api/modules/sales/schemas.py
+tests/test_agriculture.py
 tests/test_config.py
 tests/test_health.py
 tests/test_identity.py
+tests/test_sales.py

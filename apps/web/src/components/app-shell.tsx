@@ -1,14 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import type { ReactNode } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState, type ReactNode } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Activity,
   Bell,
   Building2,
   CalendarDays,
-  ChevronDown,
   ChevronRight,
   CircleHelp,
   ClipboardList,
@@ -17,11 +17,18 @@ import {
   Image,
   LayoutDashboard,
   Leaf,
+  LogOut,
   Package,
   Settings2,
   ShoppingCart,
   UsersRound,
 } from "lucide-react";
+import {
+  ApiError,
+  apiRequest,
+  getApiErrorMessage,
+  type UserProfile,
+} from "@/lib/api/client";
 
 const navigation = [
   { label: "Vue d'ensemble", href: "/", icon: LayoutDashboard },
@@ -38,10 +45,86 @@ const navigation = [
   { label: "Administration", href: "/administration", icon: Settings2 },
 ];
 
+const roleLabels = {
+  owner: "Propriétaire",
+  admin: "Administratrice",
+  manager: "Gestionnaire",
+  operator: "Opérateur",
+  reader: "Lecture seule",
+} as const;
+
 export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
   const pathname = usePathname();
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const isPublicRoute = pathname === "/login";
+  const [logoutError, setLogoutError] = useState<string | null>(null);
+  const profile = useQuery({
+    queryKey: ["auth", "me"],
+    queryFn: () => apiRequest<UserProfile>("/auth/me"),
+    enabled: !isPublicRoute,
+    retry: false,
+  });
+
+  useEffect(() => {
+    if (!isPublicRoute && profile.error instanceof ApiError && profile.error.status === 401) {
+      router.replace(`/login?next=${encodeURIComponent(pathname)}`);
+    }
+  }, [isPublicRoute, pathname, profile.error, router]);
+
+  if (isPublicRoute) return <>{children}</>;
+
+  if (profile.isPending) {
+    return (
+      <div className="auth-loading" role="status">
+        <span className="brand-mark">
+          <Leaf size={19} />
+        </span>
+        <span>Chargement de votre espace…</span>
+      </div>
+    );
+  }
+
+  if (profile.isError || !profile.data) {
+    return (
+      <div className="auth-loading">
+        <p className="auth-error">{getApiErrorMessage(profile.error)}</p>
+        <button className="button-primary" type="button" onClick={() => void profile.refetch()}>
+          Réessayer
+        </button>
+      </div>
+    );
+  }
+
+  const membership = profile.data.memberships[0];
+  if (!membership) {
+    return (
+      <div className="auth-loading">
+        <p className="auth-error">Aucune organisation active n&apos;est associée à votre compte.</p>
+        <button
+          className="button-secondary"
+          type="button"
+          onClick={() => router.replace("/login")}
+        >
+          Retour à la connexion
+        </button>
+      </div>
+    );
+  }
+
   const currentPage =
     navigation.find((item) => item.href === pathname)?.label ?? "Vue d'ensemble";
+
+  async function handleLogout() {
+    setLogoutError(null);
+    try {
+      await apiRequest<{ message: string }>("/auth/logout", { method: "POST" });
+      queryClient.clear();
+      router.replace("/login");
+    } catch (error) {
+      setLogoutError(getApiErrorMessage(error));
+    }
+  }
 
   return (
     <div className="app-shell">
@@ -56,14 +139,15 @@ export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
           </span>
         </Link>
 
-        <button className="workspace-switcher" type="button" aria-label="Entreprise active">
-          <span className="workspace-avatar">AM</span>
-          <span className="workspace-copy">
-            <strong>AgriMariam</strong>
-            <span>Entreprise principale</span>
+        <div className="workspace-switcher" aria-label="Organisation active">
+          <span className="workspace-avatar">
+            {membership.organization_name.slice(0, 2).toLocaleUpperCase("fr")}
           </span>
-          <ChevronDown size={15} color="#879189" />
-        </button>
+          <span className="workspace-copy">
+            <strong>{membership.organization_name}</strong>
+            <span>Votre organisation</span>
+          </span>
+        </div>
 
         <nav aria-label="Modules">
           <div className="nav-label">Espace de travail</div>
@@ -96,20 +180,38 @@ export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
             <ChevronRight size={14} className="nav-badge" />
           </Link>
           <div className="profile">
-            <span className="profile-avatar">MD</span>
-            <span className="profile-copy">
-              <strong>Marie Diallo</strong>
-              <span>Administratrice</span>
+            <span className="profile-avatar">
+              {profile.data.full_name
+                .split(/\s+/)
+                .slice(0, 2)
+                .map((part) => part.charAt(0))
+                .join("")
+                .toLocaleUpperCase("fr")}
             </span>
-            <ChevronDown size={15} color="#879189" />
+            <span className="profile-copy">
+              <strong title={profile.data.full_name}>{profile.data.full_name}</strong>
+              <span title={profile.data.username}>
+                {roleLabels[membership.role]} · {profile.data.username}
+              </span>
+            </span>
+            <button
+              className="profile-logout"
+              type="button"
+              onClick={() => void handleLogout()}
+              aria-label="Se déconnecter"
+              title="Se déconnecter"
+            >
+              <LogOut size={15} />
+            </button>
           </div>
+          {logoutError ? <p className="logout-error" role="alert">{logoutError}</p> : null}
         </div>
       </aside>
 
       <div className="main-area">
         <header className="topbar">
           <div className="breadcrumb">
-            <span>AgriMariam</span>
+            <span>{membership.organization_name}</span>
             <ChevronRight size={14} />
             <strong>{currentPage}</strong>
           </div>

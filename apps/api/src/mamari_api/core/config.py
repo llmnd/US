@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     bootstrap_admin_username: str = "mamari"
     bootstrap_admin_password: SecretStr = SecretStr("passer123m")
     access_token_minutes: int = Field(default=15, ge=5, le=60)
+    upload_directory: Path = PROJECT_ROOT / "storage" / "uploads"
 
     @model_validator(mode="after")
     def validate_production_secrets(self) -> "Settings":
