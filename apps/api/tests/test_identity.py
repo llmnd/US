@@ -27,6 +27,12 @@ async def test_default_admin_is_created_on_first_login(client: AsyncClient) -> N
     )
     assert current.status_code == 200
     assert current.json()["slug"] == "mamari"
+    crops = await client.get(
+        "/api/v1/agriculture/crops",
+        headers={"X-Organization-ID": organization_id},
+    )
+    assert crops.status_code == 200
+    assert "Maïs" in {crop["name"] for crop in crops.json()}
 
 
 @pytest.mark.asyncio

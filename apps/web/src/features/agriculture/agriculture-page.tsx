@@ -347,6 +347,18 @@ export function AgriculturePage() {
     enabled: Boolean(membership),
     retry: false,
   });
+  const campaignParcels = useQuery({
+    queryKey: ["agriculture", "parcels", organizationId, "campaign-options", selectedFarmId],
+    queryFn: () => {
+      const params = new URLSearchParams({ page: "1", page_size: "100", active: "true" });
+      if (selectedFarmId) params.set("farm_id", selectedFarmId);
+      return apiRequest<ParcelPage>(`/agriculture/parcels?${params}`, {
+        headers: organizationHeaders,
+      });
+    },
+    enabled: Boolean(membership),
+    retry: false,
+  });
   const campaignStatus = campaignFilter === "archived" ? "archived" : undefined;
   const campaigns = useQuery({
     queryKey: ["agriculture", "campaigns", organizationId, campaignFilter, selectedFarmId, campaignPage],
@@ -523,12 +535,19 @@ export function AgriculturePage() {
     const form = event.currentTarget;
     const data = new FormData(form);
     try {
+      const parcelId = data.get("parcel_id");
+      const parcel = typeof parcelId === "string"
+        ? campaignParcels.data?.items.find((item) => item.id === parcelId)
+        : undefined;
+      if (!parcel) {
+        throw new Error("La parcelle sélectionnée n’est plus disponible. Actualisez la liste puis réessayez.");
+      }
       const campaign = await apiRequest<Campaign>("/agriculture/campaigns", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...organizationHeaders },
         body: JSON.stringify({
-          parcel_id: data.get("parcel_id"),
-          crop_id: parcels.data?.items.find((parcel) => parcel.id === data.get("parcel_id"))?.crop_id,
+          parcel_id: parcel.id,
+          crop_id: parcel.crop_id,
           name: data.get("name"),
           season: data.get("season"),
           start_date: data.get("start_date"),
@@ -890,9 +909,9 @@ export function AgriculturePage() {
         </label>
       </div>
 
-      {(farms.isError || activeFarmOptions.isError || crops.isError) ? (
+      {(farms.isError || activeFarmOptions.isError || crops.isError || campaignParcels.isError) ? (
         <div className="dashboard-error" role="alert">
-          <p>{getApiErrorMessage(farms.error ?? activeFarmOptions.error ?? crops.error)}</p>
+          <p>{getApiErrorMessage(farms.error ?? activeFarmOptions.error ?? crops.error ?? campaignParcels.error)}</p>
           <button className="button-secondary" type="button" onClick={() => void refreshAgriculture()}>Réessayer</button>
         </div>
       ) : null}
@@ -1070,13 +1089,13 @@ export function AgriculturePage() {
             </div>
           </div>
           <FeedbackMessage feedback={campaignFeedback} />
-          {campaignFilter === "active" && canManage && activeFarms.length && parcels.data?.items.length ? (
+          {campaignFilter === "active" && canManage && activeFarms.length && campaignParcels.data?.items.length ? (
             <details className="panel campaign-planner" open>
               <summary><span className="agriculture-add-icon"><Plus size={17} /></span><span><strong>Planifier une campagne</strong><small>Définissez vos hypothèses avant de la lancer</small></span><ChevronRight size={16} /></summary>
               <form className="campaign-form-grid" onSubmit={handleCampaignSubmit}>
                 <Field label="Nom de la campagne"><input maxLength={120} minLength={2} name="name" placeholder="Ex. Maïs · Hivernage 2026" required /></Field>
                 <Field label="Saison"><input maxLength={80} minLength={2} name="season" placeholder="Ex. 2026-Hivernage" required /></Field>
-                <Field label="Parcelle"><select defaultValue="" name="parcel_id" required><option disabled value="">Choisir une parcelle</option>{(parcels.data?.items ?? []).filter((parcel) => parcel.is_active).map((parcel) => <option key={parcel.id} value={parcel.id}>{parcel.name} · {parcel.crop}</option>)}</select></Field>
+                <Field label="Parcelle"><select defaultValue="" name="parcel_id" required><option disabled value="">Choisir une parcelle</option>{campaignParcels.data.items.map((parcel) => <option key={parcel.id} value={parcel.id}>{parcel.name} · {parcel.crop}</option>)}</select></Field>
                 <Field label="Début"><input defaultValue={today} name="start_date" required type="date" /></Field>
                 <Field label="Récolte prévue"><input name="expected_harvest_date" required type="date" /></Field>
                 <Field label="Surface (ha)"><input min="0.01" name="area_hectares" placeholder="2.5" required step="0.01" type="number" /></Field>
@@ -1087,6 +1106,9 @@ export function AgriculturePage() {
                 <button className="button-primary campaign-submit" disabled={campaignSubmitting} type="submit">{campaignSubmitting ? "Planification…" : "Enregistrer le plan"}</button>
               </form>
             </details>
+          ) : null}
+          {campaignFilter === "active" && canManage && activeFarms.length && campaignParcels.data && !campaignParcels.data.items.length ? (
+            <div className="panel agriculture-empty compact"><p>Créez une parcelle active pour pouvoir planifier une campagne.</p></div>
           ) : null}
           {canManage && activeCampaignOptions.some((campaign) => campaign.status === "active") ? (
             <details className="panel harvest-entry-card">

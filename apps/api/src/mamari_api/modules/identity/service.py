@@ -6,6 +6,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from mamari_api.core.config import get_settings
+from mamari_api.modules.agriculture.catalog import DEFAULT_CROP_NAMES
+from mamari_api.modules.agriculture.models import Crop
 from mamari_api.modules.identity.models import Membership, MembershipRole, Organization, User
 from mamari_api.modules.identity.schemas import CreateUserRequest
 from mamari_api.modules.identity.security import hash_password, verify_password
@@ -23,6 +25,14 @@ async def ensure_bootstrap_admin(
         organization = Organization(name="Mamari", slug="mamari")
         session.add(organization)
         await session.flush()
+
+    has_crops = await session.scalar(
+        select(Crop.id).where(Crop.organization_id == organization.id).limit(1)
+    )
+    if has_crops is None:
+        session.add_all(
+            Crop(organization_id=organization.id, name=name) for name in DEFAULT_CROP_NAMES
+        )
 
     user = await session.scalar(select(User).where(User.username == username))
     if user is None:

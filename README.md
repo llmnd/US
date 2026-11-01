@@ -165,7 +165,9 @@ curl -fsS https://mamari.fisafigroupe.com/api/v1/health
   `0005_farm_campaign_finance` les rattache aux fermes et cultures, puis ajoute
   les campagnes et mouvements financiers en conservant les données existantes ;
   `0006_parcel_photos` ajoute la métadonnée photo des parcelles ;
-  `0007_operations_tasks` ajoute le planning des tâches.
+  `0007_operations_tasks` ajoute le planning des tâches ;
+  `0008_seed_crop_catalog` initialise le catalogue des cultures des organisations
+  qui n’en possèdent pas encore.
 
 ## Principes de conception
 

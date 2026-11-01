@@ -116,7 +116,7 @@ async def test_campaign_planning_simulation_start_close_and_sale(
     other_crop_response = await client.post(
         "/api/v1/agriculture/crops",
         headers=headers,
-        json={"name": "Riz"},
+        json={"name": "Sésame"},
     )
     assert other_crop_response.status_code == 201
     campaign_payload = {
