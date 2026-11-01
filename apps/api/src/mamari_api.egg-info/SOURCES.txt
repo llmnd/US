@@ -16,4 +16,15 @@ src/mamari_api/core/database.py
 src/mamari_api/modules/__init__.py
 src/mamari_api/modules/health/__init__.py
 src/mamari_api/modules/health/router.py
+src/mamari_api/modules/identity/__init__.py
+src/mamari_api/modules/identity/dependencies.py
+src/mamari_api/modules/identity/models.py
+src/mamari_api/modules/identity/router.py
+src/mamari_api/modules/identity/schemas.py
+src/mamari_api/modules/identity/security.py
+src/mamari_api/modules/identity/service.py
+src/mamari_api/modules/organizations/__init__.py
+src/mamari_api/modules/organizations/router.py
+tests/test_config.py
 tests/test_health.py
+tests/test_identity.py

@@ -8,6 +8,9 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from mamari_api.core.base import Base
 from mamari_api.core.config import get_settings
+from mamari_api.modules.agriculture import models as agriculture_models  # noqa: F401
+from mamari_api.modules.identity import models as identity_models  # noqa: F401
+from mamari_api.modules.sales import models as sales_models  # noqa: F401
 
 config = context.config
 config.set_main_option(

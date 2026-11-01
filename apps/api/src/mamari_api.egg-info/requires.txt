@@ -1,12 +1,16 @@
 alembic<2,>=1.15
 asyncpg<1,>=0.30
+email-validator<3,>=2.2
 fastapi<1,>=0.115
+PyJWT<3,>=2.10
+pwdlib[argon2]<1,>=0.2.1
 pydantic-settings<3,>=2.8
 sqlalchemy[asyncio]<3,>=2.0.40
 uvicorn[standard]<1,>=0.34
 
 [dev]
 httpx<1,>=0.28
+aiosqlite<1,>=0.21
 pytest<9,>=8.3
 pytest-asyncio<1,>=0.26
 ruff<1,>=0.11
