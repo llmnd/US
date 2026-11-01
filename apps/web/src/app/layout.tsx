@@ -5,6 +5,7 @@ import { Providers } from "@/components/providers";
 import "./globals.css";
 import "./refined.css";
 import "./refined-plus.css";
+import "./auth.css";
 
 export const metadata: Metadata = {
   title: {

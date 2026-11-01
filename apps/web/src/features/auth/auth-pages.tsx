@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent, type ReactNode } from "react";
@@ -35,14 +36,47 @@ function AuthLayout({
 }>) {
   return (
     <main className="auth-page">
-      <div className="auth-card">
-        <AuthBrand />
-        <p className="eyebrow">{eyebrow}</p>
-        <h1 className="page-title">{title}</h1>
-        <p className="page-description">{description}</p>
-        {children}
-      </div>
-      <p className="auth-footer">Mamari · Le pilotage clair de votre entreprise.</p>
+      <section className="auth-visual" aria-hidden="true">
+        <Image
+          className="auth-visual-main"
+          src="/images/login-corn.png"
+          alt=""
+          fill
+          priority
+          sizes="(max-width: 860px) 100vw, 55vw"
+        />
+        <div className="auth-visual-shade" />
+        <div className="auth-photo-card auth-photo-card-tractor">
+          <Image
+            src="/images/login-tractor.png"
+            alt=""
+            fill
+            sizes="(max-width: 860px) 24vw, 14vw"
+          />
+        </div>
+        <div className="auth-photo-card auth-photo-card-cows">
+          <Image
+            src="/images/login-cows.png"
+            alt=""
+            fill
+            sizes="(max-width: 860px) 24vw, 14vw"
+          />
+        </div>
+        <div className="auth-visual-copy">
+          <span>Au rythme de vos saisons</span>
+          <p>La sérénité de piloter votre activité, simplement.</p>
+        </div>
+      </section>
+      <section className="auth-content">
+        <div className="auth-card">
+          <AuthBrand />
+          <p className="eyebrow">{eyebrow}</p>
+          <h1 className="page-title">{title}</h1>
+          <p className="page-description">{description}</p>
+          {children}
+        </div>
+        <p className="auth-footer">Mamari · Le pilotage clair de votre entreprise.</p>
+      </section>
     </main>
   );
 }

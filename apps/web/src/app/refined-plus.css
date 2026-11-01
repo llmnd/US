@@ -259,6 +259,154 @@ details[open] > summary > svg:last-child { transform: rotate(90deg); }
 .crop-cell { color: var(--green); }
 .table-subtext { font-size: 11px; }
 
+.parcel-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
+  gap: 18px;
+  margin-top: 20px;
+}
+
+.parcel-card {
+  min-width: 0;
+  overflow: hidden;
+  padding: 0;
+}
+
+.parcel-card-image {
+  width: 100%;
+  height: 190px;
+  object-fit: cover;
+}
+
+.parcel-card-image.farm-card-image-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.parcel-card-image.farm-card-image-placeholder svg {
+  width: 30px;
+  height: 30px;
+}
+
+.parcel-card-image.farm-card-image-placeholder span {
+  font-size: 12px;
+}
+
+.parcel-card-body { padding: 18px; }
+
+.parcel-card-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.parcel-card-heading h3 {
+  margin-bottom: 8px;
+  font-family: var(--serif);
+  font-size: 21px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.parcel-card-heading .status-pill { flex: 0 0 auto; }
+
+.parcel-card-details {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  margin-top: 18px;
+  border-top: 1px solid var(--hair);
+  padding-top: 14px;
+}
+
+.parcel-card-details span { display: grid; min-width: 0; gap: 5px; }
+.parcel-card-details small { color: var(--muted); font-size: 11px; }
+.parcel-card-details strong { overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+
+.parcel-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+  border-top: 1px solid var(--hair);
+  padding-top: 12px;
+}
+
+.parcel-card-actions .button-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 36px;
+  padding: 0 13px;
+  font-size: 12px;
+}
+
+.parcel-edit-dialog {
+  width: min(620px, calc(100vw - 32px));
+  max-width: none;
+  max-height: min(90vh, 760px);
+  overflow: auto;
+  margin: auto;
+  border: 0;
+  border-radius: 22px;
+  padding: 0;
+  color: var(--ink);
+  box-shadow: 0 24px 80px rgb(20 30 22 / 28%);
+}
+
+.parcel-edit-dialog::backdrop {
+  background: rgb(15 27 18 / 52%);
+  backdrop-filter: blur(3px);
+}
+
+.parcel-edit-dialog-content { padding: 28px; }
+
+.parcel-edit-dialog-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 22px;
+}
+
+.parcel-edit-dialog-heading h2 {
+  font-family: var(--serif);
+  font-size: 27px;
+  font-weight: 500;
+}
+
+.parcel-edit-dialog-heading p { margin-top: 5px; color: var(--muted); font-size: 13px; }
+
+.parcel-edit-dialog-close {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: #f3f4f1;
+  color: var(--ink);
+  cursor: pointer;
+  font-size: 26px;
+  line-height: 1;
+}
+
+.parcel-edit-form { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 0; }
+.parcel-edit-form .photo-preview-field,
+.parcel-edit-form .photo-remove-option,
+.parcel-edit-dialog-actions { grid-column: 1 / -1; }
+
+.parcel-edit-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 8px;
+}
+
 .agriculture-table th { text-transform: lowercase; }
 .agriculture-table th::first-letter { text-transform: uppercase; }
 
@@ -326,6 +474,8 @@ details[open] > summary > svg:last-child { transform: rotate(90deg); }
   .finance-entry-panel { padding: 4px 20px; }
   .campaign-card { padding: 22px; }
   .farm-card-image { height: 190px; }
+  .parcel-card-image { height: 170px; }
+  .parcel-edit-dialog-content { padding: 22px; }
 }
 
 @media (max-width: 480px) {
@@ -349,6 +499,9 @@ details[open] > summary > svg:last-child { transform: rotate(90deg); }
   .farm-card-title-row h3 { font-size: 24px; }
   .farm-card-actions { gap: 6px 10px; }
   .farm-card-actions .agriculture-edit-details[open] > form { right: auto; left: 0; }
+  .parcel-edit-form { grid-template-columns: 1fr; }
+  .parcel-edit-dialog-actions { flex-direction: column-reverse; }
+  .parcel-edit-dialog-actions button { width: 100%; }
   .campaign-card { padding: 18px; }
   .campaign-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 0; }
   .campaign-metrics > div:nth-child(3) { border-left: 0; }

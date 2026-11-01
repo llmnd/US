@@ -285,6 +285,7 @@ export function AgriculturePage() {
   const [parcelPage, setParcelPage] = useState(1);
   const [farmFeedback, setFarmFeedback] = useState<Feedback>(null);
   const [parcelFeedback, setParcelFeedback] = useState<Feedback>(null);
+  const [selectedParcelForEdit, setSelectedParcelForEdit] = useState<Parcel | null>(null);
   const [campaignFeedback, setCampaignFeedback] = useState<Feedback>(null);
   const [financeFeedback, setFinanceFeedback] = useState<Feedback>(null);
   const [farmSubmitting, setFarmSubmitting] = useState(false);
@@ -295,6 +296,7 @@ export function AgriculturePage() {
   const [harvestSubmitting, setHarvestSubmitting] = useState(false);
   const [financeSubmitting, setFinanceSubmitting] = useState(false);
   const [actionPending, setActionPending] = useState<string | null>(null);
+  const parcelEditDialogRef = useRef<HTMLDialogElement>(null);
   const deferredParcelSearch = useDeferredValue(parcelSearch.trim());
   const profile = useQuery({
     queryKey: ["auth", "me"],
@@ -308,6 +310,12 @@ export function AgriculturePage() {
     : undefined;
   const canManage = Boolean(membership && membership.role !== "reader");
   const today = new Date().toISOString().slice(0, 10);
+
+  useEffect(() => {
+    if (selectedParcelForEdit && parcelEditDialogRef.current && !parcelEditDialogRef.current.open) {
+      parcelEditDialogRef.current.showModal();
+    }
+  }, [selectedParcelForEdit]);
 
   const farms = useQuery({
     queryKey: ["agriculture", "farms", organizationId, farmFilter],
@@ -815,7 +823,7 @@ export function AgriculturePage() {
       setParcelPhotoReset((value) => value + 1);
       await refreshAgriculture();
       setParcelFeedback({ kind: "success", message: `Parcelle « ${updated.name} » mise à jour.` });
-      form.closest("details")?.removeAttribute("open");
+      form.closest("dialog")?.close();
     } catch (error) {
       setParcelFeedback({ kind: "error", message: getApiErrorMessage(error) });
     } finally {
@@ -1013,16 +1021,19 @@ export function AgriculturePage() {
               </div>
             </div>
             {canManage && activeFarms.length ? (
-              <form className="agriculture-inline-form" onSubmit={handleParcelSubmit}>
-                <Field label="Ferme"><select defaultValue={selectedFarmId || activeFarms[0]?.id} name="farm_id" required>{activeFarms.map((farm) => <option key={farm.id} value={farm.id}>{farm.name}</option>)}</select></Field>
-                <Field label="Nom de la parcelle"><input maxLength={120} minLength={2} name="name" placeholder="Ex. Parcelle Nord" required /></Field>
-                <Field label="Culture"><select defaultValue="" name="crop_id" required><option disabled value="">Choisir une culture</option>{(crops.data ?? []).map((crop) => <option key={crop.id} value={crop.id}>{crop.name}</option>)}</select></Field>
-                <Field label="Superficie (ha)"><input min="0.01" name="area_hectares" placeholder="2.5" required step="0.01" type="number" /></Field>
-                <PhotoPreviewField key={`parcel-photo-${parcelPhotoReset}`} name="photo" label="Photo de la parcelle" organizationId={organizationId!} />
-                <button className="button-primary" disabled={parcelSubmitting} type="submit">{parcelSubmitting ? "Ajout…" : "Ajouter"}</button>
-              </form>
+              <details className="panel agriculture-create-card parcel-create-card">
+                <summary><span className="agriculture-add-icon"><Plus size={17} /></span><span><strong>Ajouter une parcelle</strong><small>Rattachez une culture et une superficie à une ferme</small></span><ChevronRight size={16} /></summary>
+                <form className="agriculture-inline-form" onSubmit={handleParcelSubmit}>
+                  <Field label="Ferme"><select defaultValue={selectedFarmId || activeFarms[0]?.id} name="farm_id" required>{activeFarms.map((farm) => <option key={farm.id} value={farm.id}>{farm.name}</option>)}</select></Field>
+                  <Field label="Nom de la parcelle"><input maxLength={120} minLength={2} name="name" placeholder="Ex. Parcelle Nord" required /></Field>
+                  <Field label="Culture"><select defaultValue="" name="crop_id" required><option disabled value="">Choisir une culture</option>{(crops.data ?? []).map((crop) => <option key={crop.id} value={crop.id}>{crop.name}</option>)}</select></Field>
+                  <Field label="Superficie (ha)"><input min="0.01" name="area_hectares" placeholder="2.5" required step="0.01" type="number" /></Field>
+                  <PhotoPreviewField key={`parcel-photo-${parcelPhotoReset}`} name="photo" label="Photo de la parcelle" organizationId={organizationId!} />
+                  <button className="button-primary" disabled={parcelSubmitting} type="submit">{parcelSubmitting ? "Ajout…" : "Ajouter la parcelle"}</button>
+                </form>
+              </details>
             ) : null}
-            <FeedbackMessage feedback={parcelFeedback} />
+            {!selectedParcelForEdit ? <FeedbackMessage feedback={parcelFeedback} /> : null}
             {canManage ? (
               <details className="crop-catalog">
                 <summary><Sprout size={14} />Catalogue des cultures <span>{crops.data?.length ?? 0}</span></summary>
@@ -1035,46 +1046,69 @@ export function AgriculturePage() {
             ) : null}
             {parcels.isPending ? <div className="dashboard-loading" role="status">Chargement des parcelles…</div> : parcels.data?.items.length ? (
               <>
-                <div className="table-wrap">
-                  <table className="data-table agriculture-table">
-                    <thead><tr><th scope="col">PARCELLE</th><th scope="col">FERME</th><th scope="col">CULTURE</th><th scope="col">SUPERFICIE</th><th scope="col">ÉTAT</th>{canManage ? <th scope="col">ACTIONS</th> : null}</tr></thead>
-                    <tbody>{parcels.data.items.map((parcel) => <tr key={parcel.id}>
-                      <td className="table-primary">
-                        <div className="parcel-name-cell">
-                          <PrivatePhoto photoUrl={parcel.photo_url} alt={`Photo de ${parcel.name}`} className="parcel-thumbnail" organizationId={organizationId!} />
-                          <span>{parcel.name}</span>
+                <div className="parcel-card-grid">
+                  {parcels.data.items.map((parcel) => (
+                    <article className="panel parcel-card" key={parcel.id}>
+                      <PrivatePhoto photoUrl={parcel.photo_url} alt={`Photo de ${parcel.name}`} className="parcel-card-image" organizationId={organizationId!} />
+                      <div className="parcel-card-body">
+                        <div className="parcel-card-heading">
+                          <div><h3>{parcel.name}</h3><span className="crop-cell"><Sprout size={14} />{parcel.crop}</span></div>
+                          <span className={`status-pill ${parcel.is_active ? "delivered" : "cancelled"}`}>{parcel.is_active ? "Active" : "Archivée"}</span>
                         </div>
-                      </td>
-                      <td>{parcel.farm_name}</td>
-                      <td><span className="crop-cell"><Sprout size={13} />{parcel.crop}</span></td>
-                      <td>{formattedNumber(parcel.area_hectares)} ha</td>
-                      <td><span className={`status-pill ${parcel.is_active ? "delivered" : "cancelled"}`}>{parcel.is_active ? "Active" : "Archivée"}</span></td>
-                      {canManage ? <td>
-                        <div className="parcel-actions">
-                          {parcel.is_active ? (
-                            <details className="agriculture-edit-details">
-                              <summary aria-label={`Modifier ${parcel.name}`}><Pencil size={14} />Modifier</summary>
-                              <form className="agriculture-form-grid" onSubmit={(event) => void handleParcelUpdateSubmit(event, parcel)}>
-                                <Field label="Nom de la parcelle"><input defaultValue={parcel.name} maxLength={120} minLength={2} name="name" required /></Field>
-                                <Field label="Superficie (ha)"><input defaultValue={parcel.area_hectares} min="0.01" name="area_hectares" required step="0.01" type="number" /></Field>
-                                <PhotoPreviewField key={`parcel-edit-photo-${parcel.id}-${parcelPhotoReset}`} name="photo" label="Remplacer la photo" organizationId={organizationId!} currentPhotoUrl={parcel.photo_url} />
-                                {parcel.photo_url ? <label className="photo-remove-option"><input name="remove_photo" type="checkbox" value="on" />Supprimer la photo actuelle</label> : null}
-                                <button className="button-primary" disabled={actionPending === `${parcel.id}:edit`} type="submit">{actionPending === `${parcel.id}:edit` ? "Enregistrement…" : "Enregistrer"}</button>
-                              </form>
-                            </details>
-                          ) : null}
-                          <button className="text-action" type="button" disabled={actionPending === `${parcel.id}:${parcel.is_active ? "archive" : "restore"}`} onClick={() => void parcelAction(parcel, parcel.is_active ? "archive" : "restore")}>
-                            {parcel.is_active ? <Archive size={14} /> : <RotateCcw size={14} />}
-                            {actionPending === `${parcel.id}:${parcel.is_active ? "archive" : "restore"}` ? "…" : parcel.is_active ? "Archiver" : "Restaurer"}
-                          </button>
+                        <div className="parcel-card-details">
+                          <span><small>Ferme</small><strong>{parcel.farm_name}</strong></span>
+                          <span><small>Superficie</small><strong>{formattedNumber(parcel.area_hectares)} ha</strong></span>
                         </div>
-                      </td> : null}
-                    </tr>)}</tbody>
-                  </table>
+                        {canManage ? (
+                          <div className="parcel-card-actions">
+                            {parcel.is_active ? (
+                              <button className="button-secondary" type="button" onClick={() => {
+                                setParcelFeedback(null);
+                                setSelectedParcelForEdit(parcel);
+                              }}><Pencil size={14} />Modifier</button>
+                            ) : null}
+                            <button className="text-action" type="button" disabled={actionPending === `${parcel.id}:${parcel.is_active ? "archive" : "restore"}`} onClick={() => void parcelAction(parcel, parcel.is_active ? "archive" : "restore")}>
+                              {parcel.is_active ? <Archive size={14} /> : <RotateCcw size={14} />}
+                              {actionPending === `${parcel.id}:${parcel.is_active ? "archive" : "restore"}` ? "…" : parcel.is_active ? "Archiver" : "Restaurer"}
+                            </button>
+                          </div>
+                        ) : null}
+                      </div>
+                    </article>
+                  ))}
                 </div>
                 <Pagination page={parcelPage} total={parcels.data.total} onChange={setParcelPage} />
               </>
             ) : !parcels.isError ? <div className="agriculture-empty compact"><p>{deferredParcelSearch ? "Aucune parcelle ne correspond à cette recherche." : "Créez une parcelle dans une ferme pour préparer votre première campagne."}</p></div> : null}
+            {selectedParcelForEdit ? (
+              <dialog
+                aria-labelledby="parcel-edit-title"
+                className="parcel-edit-dialog"
+                onClose={() => setSelectedParcelForEdit(null)}
+                onClick={(event) => {
+                  if (event.target === event.currentTarget) parcelEditDialogRef.current?.close();
+                }}
+                ref={parcelEditDialogRef}
+              >
+                <div className="parcel-edit-dialog-content">
+                  <div className="parcel-edit-dialog-heading">
+                    <div><h2 id="parcel-edit-title">Modifier la parcelle</h2><p>{selectedParcelForEdit.name} · {selectedParcelForEdit.farm_name}</p></div>
+                    <button className="parcel-edit-dialog-close" type="button" aria-label="Fermer" onClick={() => parcelEditDialogRef.current?.close()}>×</button>
+                  </div>
+                  <FeedbackMessage feedback={parcelFeedback} />
+                  <form className="agriculture-form-grid parcel-edit-form" key={selectedParcelForEdit.id} onSubmit={(event) => void handleParcelUpdateSubmit(event, selectedParcelForEdit)}>
+                    <Field label="Nom de la parcelle"><input defaultValue={selectedParcelForEdit.name} maxLength={120} minLength={2} name="name" required /></Field>
+                    <Field label="Superficie (ha)"><input defaultValue={selectedParcelForEdit.area_hectares} min="0.01" name="area_hectares" required step="0.01" type="number" /></Field>
+                    <PhotoPreviewField key={`parcel-edit-photo-${selectedParcelForEdit.id}-${parcelPhotoReset}`} name="photo" label="Remplacer la photo" organizationId={organizationId!} currentPhotoUrl={selectedParcelForEdit.photo_url} />
+                    {selectedParcelForEdit.photo_url ? <label className="photo-remove-option"><input name="remove_photo" type="checkbox" value="on" />Supprimer la photo actuelle</label> : null}
+                    <div className="parcel-edit-dialog-actions">
+                      <button className="button-secondary" type="button" onClick={() => parcelEditDialogRef.current?.close()}>Annuler</button>
+                      <button className="button-primary" disabled={actionPending === `${selectedParcelForEdit.id}:edit`} type="submit">{actionPending === `${selectedParcelForEdit.id}:edit` ? "Enregistrement…" : "Enregistrer"}</button>
+                    </div>
+                  </form>
+                </div>
+              </dialog>
+            ) : null}
           </section>
         </div>
       ) : null}
