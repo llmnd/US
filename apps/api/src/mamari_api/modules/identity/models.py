@@ -63,6 +63,8 @@ class Membership(Base):
     role: Mapped[str] = mapped_column(
         String(16), default=MembershipRole.OWNER.value, nullable=False
     )
+    phone: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    photo_filename: Mapped[str | None] = mapped_column(String(80), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False

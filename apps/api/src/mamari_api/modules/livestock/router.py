@@ -43,7 +43,7 @@ router = APIRouter(prefix="/livestock")
 CurrentOrganizationDep = Annotated[CurrentMembership, Depends(get_current_membership)]
 CanManageLivestockDep = Annotated[
     CurrentMembership,
-    Depends(require_roles("owner", "admin", "manager", "operator")),
+    Depends(require_roles("owner", "admin", "manager")),
 ]
 
 MAX_PHOTO_BYTES = 5 * 1024 * 1024

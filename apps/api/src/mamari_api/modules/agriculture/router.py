@@ -56,7 +56,7 @@ router = APIRouter(prefix="/agriculture")
 CurrentOrganizationDep = Annotated[CurrentMembership, Depends(get_current_membership)]
 CanManageAgricultureDep = Annotated[
     CurrentMembership,
-    Depends(require_roles("owner", "admin", "manager", "operator")),
+    Depends(require_roles("owner", "admin", "manager")),
 ]
 MONTH_LABELS = (
     "Jan",

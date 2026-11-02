@@ -2,12 +2,13 @@ import uuid
 from datetime import date, datetime
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, StringConstraints, model_validator
+from pydantic import BaseModel, StringConstraints, model_validator
 
 TaskTitle = Annotated[str, StringConstraints(strip_whitespace=True, min_length=2, max_length=160)]
 TaskDescription = Annotated[str, StringConstraints(strip_whitespace=True, max_length=2000)]
 TaskStatus = Literal["todo", "in_progress", "done", "archived"]
 TaskPriority = Literal["low", "normal", "high", "urgent"]
+TaskNote = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=2000)]
 
 
 class CreateOperationTaskRequest(BaseModel):
@@ -25,6 +26,8 @@ class UpdateOperationTaskRequest(BaseModel):
     priority: TaskPriority | None = None
     due_date: date | None = None
     assigned_user_id: uuid.UUID | None = None
+    progress_note: TaskNote | None = None
+    delay_reason: TaskNote | None = None
 
     @model_validator(mode="after")
     def require_update_field(self) -> "UpdateOperationTaskRequest":
@@ -42,7 +45,11 @@ class OperationTaskResponse(BaseModel):
     due_date: date | None
     assigned_user_id: uuid.UUID | None
     assigned_user_name: str | None
+    assigned_user_phone: str | None
+    assigned_user_photo_url: str | None
     created_by_name: str
+    progress_note: str | None
+    delay_reason: str | None
     created_at: datetime
     updated_at: datetime
 
@@ -64,8 +71,19 @@ class OperationTaskSummaryResponse(BaseModel):
 
 
 class OperationMemberResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
     id: uuid.UUID
     username: str
     full_name: str
+    role: str
+    phone: str | None
+    photo_url: str | None
+
+
+class OperationTaskUpdateResponse(BaseModel):
+    id: uuid.UUID
+    user_id: uuid.UUID
+    user_name: str
+    status: TaskStatus | None
+    note: str | None
+    delay_reason: str | None
+    created_at: datetime

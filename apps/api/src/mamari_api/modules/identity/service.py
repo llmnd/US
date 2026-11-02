@@ -70,7 +70,7 @@ async def create_organization_user(
     if existing_user is not None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Un compte existe déjà avec cet identifiant.",
+            detail="Cet identifiant est déjà utilisé. Choisissez-en un autre.",
         )
 
     user = User(
@@ -83,16 +83,24 @@ async def create_organization_user(
         organization_id=organization.id,
         user_id=user.id,
         role=data.role,
+        phone=data.phone or None,
     )
-    session.add_all((user, membership))
+    session.add(user)
     try:
+        await session.flush()
+        session.add(membership)
         await session.commit()
-    except IntegrityError:
+    except IntegrityError as error:
         await session.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Un compte existe déjà avec cet identifiant.",
-        ) from None
+        constraint = getattr(getattr(error.orig, "diag", None), "constraint_name", None)
+        if constraint == "uq_users_username" or str(error.orig) == (
+            "UNIQUE constraint failed: users.username"
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Cet identifiant est déjà utilisé. Choisissez-en un autre.",
+            ) from None
+        raise
     await session.refresh(user)
     await session.refresh(membership)
     return user, membership

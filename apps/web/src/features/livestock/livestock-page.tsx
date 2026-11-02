@@ -222,7 +222,9 @@ export function LivestockPage() {
   const membership = profile.data?.memberships[0];
   const organizationId = membership?.organization_id;
   const organizationHeaders = organizationId ? { "X-Organization-ID": organizationId } : undefined;
-  const canManage = Boolean(membership && membership.role !== "reader");
+  const canManage = Boolean(
+    membership && ["owner", "admin", "manager"].includes(membership.role),
+  );
 
   const overview = useQuery({
     queryKey: ["livestock", "overview", organizationId],

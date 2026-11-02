@@ -2,9 +2,10 @@ import uuid
 from datetime import datetime
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, StringConstraints
+from pydantic import BaseModel, ConfigDict, StringConstraints, model_validator
 
 Password = Annotated[str, StringConstraints(min_length=6, max_length=128)]
+Phone = Annotated[str, StringConstraints(strip_whitespace=True, min_length=6, max_length=32)]
 Username = Annotated[
     str,
     StringConstraints(
@@ -17,6 +18,7 @@ Username = Annotated[
 ]
 FullName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=2, max_length=160)]
 
+
 class LoginRequest(BaseModel):
     username: Username
     password: Password
@@ -27,6 +29,30 @@ class CreateUserRequest(BaseModel):
     full_name: FullName
     password: Password
     role: Literal["admin", "manager", "operator", "reader"]
+    phone: Phone | None = None
+
+
+class UpdateOrganizationUserRequest(BaseModel):
+    full_name: FullName | None = None
+    role: Literal["admin", "manager", "operator", "reader"] | None = None
+    phone: Phone | None = None
+    is_active: bool | None = None
+
+    @model_validator(mode="after")
+    def require_update_field(self) -> "UpdateOrganizationUserRequest":
+        if not self.model_fields_set:
+            raise ValueError("Renseignez au moins un champ à modifier.")
+        return self
+
+
+class OrganizationMemberResponse(BaseModel):
+    id: uuid.UUID
+    username: str
+    full_name: str
+    role: Literal["owner", "admin", "manager", "operator", "reader"]
+    phone: str | None
+    photo_url: str | None
+    is_active: bool
 
 
 class MembershipResponse(BaseModel):
@@ -50,6 +76,9 @@ class OrganizationUserResponse(BaseModel):
     username: str
     full_name: str
     role: Literal["owner", "admin", "manager", "operator", "reader"]
+    phone: str | None = None
+    photo_url: str | None = None
+    is_active: bool = True
 
 
 class OrganizationResponse(BaseModel):

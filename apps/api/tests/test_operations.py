@@ -74,6 +74,23 @@ async def test_tasks_can_be_planned_assigned_searched_and_completed(
     assert filtered.json()["total"] == 1
     assert filtered.json()["items"][0]["id"] == task["id"]
 
+    open_tasks = await client.get(
+        "/api/v1/operations/tasks?bucket=open&page_size=1",
+        headers=headers,
+    )
+    assert open_tasks.status_code == 200
+    assert open_tasks.json()["total"] == 2
+    assert len(open_tasks.json()["items"]) == 1
+    assert open_tasks.json()["page_size"] == 1
+
+    overdue_tasks = await client.get(
+        "/api/v1/operations/tasks?bucket=overdue",
+        headers=headers,
+    )
+    assert overdue_tasks.status_code == 200
+    assert overdue_tasks.json()["total"] == 1
+    assert overdue_tasks.json()["items"][0]["id"] == task["id"]
+
     summary = await client.get("/api/v1/operations/summary", headers=headers)
     assert summary.status_code == 200
     assert summary.json() == {
@@ -95,6 +112,12 @@ async def test_tasks_can_be_planned_assigned_searched_and_completed(
     summary = await client.get("/api/v1/operations/summary", headers=headers)
     assert summary.json()["overdue"] == 0
     assert summary.json()["done"] == 1
+    no_overdue_tasks = await client.get(
+        "/api/v1/operations/tasks?bucket=overdue",
+        headers=headers,
+    )
+    assert no_overdue_tasks.status_code == 200
+    assert no_overdue_tasks.json()["total"] == 0
 
     archived = await client.patch(
         f"/api/v1/operations/tasks/{task['id']}",
@@ -163,3 +186,89 @@ async def test_task_assignments_and_permissions_are_organization_scoped(
         json={"status": "done"},
     )
     assert forbidden_update.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_employees_only_see_and_update_assigned_tasks_with_delay_reasons(
+    client: AsyncClient,
+) -> None:
+    organization_id = await admin_organization(client)
+    headers = {"X-Organization-ID": organization_id}
+    member = await client.post(
+        "/api/v1/organizations/users",
+        headers=headers,
+        json={
+            "username": "field-worker",
+            "full_name": "Awa Ndiaye",
+            "password": "secret6",
+            "role": "operator",
+        },
+    )
+    assert member.status_code == 201
+    assigned = await client.post(
+        "/api/v1/operations/tasks",
+        headers=headers,
+        json={
+            "title": "Préparer le terrain",
+            "due_date": (date.today() - timedelta(days=1)).isoformat(),
+            "assigned_user_id": member.json()["id"],
+        },
+    )
+    assert assigned.status_code == 201
+    private_task = await client.post(
+        "/api/v1/operations/tasks",
+        headers=headers,
+        json={"title": "Réserver le matériel"},
+    )
+    assert private_task.status_code == 201
+
+    client.cookies.clear()
+    employee_login = await client.post(
+        "/api/v1/auth/login",
+        json={"username": "field-worker", "password": "secret6"},
+    )
+    assert employee_login.status_code == 200
+    visible = await client.get("/api/v1/operations/tasks", headers=headers)
+    assert visible.status_code == 200
+    assert [task["id"] for task in visible.json()["items"]] == [assigned.json()["id"]]
+    assert visible.json()["items"][0]["assigned_user_phone"] is None
+
+    forbidden = await client.patch(
+        f"/api/v1/operations/tasks/{private_task.json()['id']}",
+        headers=headers,
+        json={"status": "done"},
+    )
+    assert forbidden.status_code == 403
+    unjustified = await client.patch(
+        f"/api/v1/operations/tasks/{assigned.json()['id']}",
+        headers=headers,
+        json={"status": "in_progress"},
+    )
+    assert unjustified.status_code == 422
+    updated = await client.patch(
+        f"/api/v1/operations/tasks/{assigned.json()['id']}",
+        headers=headers,
+        json={
+            "status": "in_progress",
+            "progress_note": "Préparation commencée",
+            "delay_reason": "La pluie a retardé l’équipe.",
+        },
+    )
+    assert updated.status_code == 200
+    assert updated.json()["status"] == "in_progress"
+    assert updated.json()["delay_reason"] == "La pluie a retardé l’équipe."
+    history = await client.get(
+        f"/api/v1/operations/tasks/{assigned.json()['id']}/updates",
+        headers=headers,
+    )
+    assert history.status_code == 200
+    assert history.json()[0]["user_name"] == "Awa Ndiaye"
+    assert history.json()[0]["note"] == "Préparation commencée"
+    assert history.json()[0]["delay_reason"] == "La pluie a retardé l’équipe."
+
+    forbidden_edit = await client.patch(
+        f"/api/v1/operations/tasks/{assigned.json()['id']}",
+        headers=headers,
+        json={"title": "Tâche modifiée"},
+    )
+    assert forbidden_edit.status_code == 403

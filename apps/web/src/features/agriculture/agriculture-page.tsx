@@ -139,6 +139,7 @@ function PrivatePhoto({
     if (!photoUrl) return;
     void apiBlobRequest(photoUrl, {
       headers: { "X-Organization-ID": organizationId },
+      cache: "no-store",
     }).then((blob) => {
       if (active) {
         objectUrl = URL.createObjectURL(blob);
@@ -285,6 +286,7 @@ export function AgriculturePage() {
   const [parcelPage, setParcelPage] = useState(1);
   const [farmFeedback, setFarmFeedback] = useState<Feedback>(null);
   const [parcelFeedback, setParcelFeedback] = useState<Feedback>(null);
+  const [selectedFarmForEdit, setSelectedFarmForEdit] = useState<Farm | null>(null);
   const [selectedParcelForEdit, setSelectedParcelForEdit] = useState<Parcel | null>(null);
   const [campaignFeedback, setCampaignFeedback] = useState<Feedback>(null);
   const [financeFeedback, setFinanceFeedback] = useState<Feedback>(null);
@@ -296,6 +298,7 @@ export function AgriculturePage() {
   const [harvestSubmitting, setHarvestSubmitting] = useState(false);
   const [financeSubmitting, setFinanceSubmitting] = useState(false);
   const [actionPending, setActionPending] = useState<string | null>(null);
+  const farmEditDialogRef = useRef<HTMLDialogElement>(null);
   const parcelEditDialogRef = useRef<HTMLDialogElement>(null);
   const deferredParcelSearch = useDeferredValue(parcelSearch.trim());
   const profile = useQuery({
@@ -308,8 +311,16 @@ export function AgriculturePage() {
   const organizationHeaders = organizationId
     ? { "X-Organization-ID": organizationId }
     : undefined;
-  const canManage = Boolean(membership && membership.role !== "reader");
+  const canManage = Boolean(
+    membership && ["owner", "admin", "manager"].includes(membership.role),
+  );
   const today = new Date().toISOString().slice(0, 10);
+
+  useEffect(() => {
+    if (selectedFarmForEdit && farmEditDialogRef.current && !farmEditDialogRef.current.open) {
+      farmEditDialogRef.current.showModal();
+    }
+  }, [selectedFarmForEdit]);
 
   useEffect(() => {
     if (selectedParcelForEdit && parcelEditDialogRef.current && !parcelEditDialogRef.current.open) {
@@ -763,7 +774,7 @@ export function AgriculturePage() {
       setFarmPhotoReset((value) => value + 1);
       await refreshAgriculture();
       setFarmFeedback({ kind: "success", message: `Ferme « ${updated.name} » mise à jour.` });
-      form.closest("details")?.removeAttribute("open");
+      form.closest("dialog")?.close();
     } catch (error) {
       setFarmFeedback({ kind: "error", message: getApiErrorMessage(error) });
     } finally {
@@ -936,7 +947,7 @@ export function AgriculturePage() {
               <button type="button" aria-pressed={farmFilter === "archived"} onClick={() => setFarmFilter("archived")}>Archives</button>
             </div>
           </div>
-          <FeedbackMessage feedback={farmFeedback} />
+          {!selectedFarmForEdit ? <FeedbackMessage feedback={farmFeedback} /> : null}
           {farmFilter === "active" && canManage ? (
             <details className="panel agriculture-create-card">
               <summary><span className="agriculture-add-icon"><Plus size={17} /></span><span><strong>Ajouter une ferme</strong><small>Nom, localisation et photo de votre exploitation</small></span><ChevronRight size={16} /></summary>
@@ -960,7 +971,7 @@ export function AgriculturePage() {
             <div className="farm-card-grid">
               {farms.data.items.map((farm) => (
                 <article className="farm-card panel" key={farm.id}>
-                  <PrivatePhoto photoUrl={farm.photo_url} alt={`Vue de ${farm.name}`} organizationId={organizationId!} />
+                  <PrivatePhoto key={`${farm.id}-${farmPhotoReset}`} photoUrl={farm.photo_url} alt={`Vue de ${farm.name}`} organizationId={organizationId!} />
                   <div className="farm-card-body">
                     <div className="farm-card-title-row">
                       <div><h3>{farm.name}</h3>{farm.location ? <p><MapPin size={13} />{farm.location}</p> : null}</div>
@@ -979,16 +990,10 @@ export function AgriculturePage() {
                       {canManage ? (
                         <>
                           {farm.is_active ? (
-                            <details className="agriculture-edit-details">
-                              <summary aria-label={`Modifier ${farm.name}`}><Pencil size={14} />Modifier</summary>
-                              <form className="agriculture-form-grid" onSubmit={(event) => void handleFarmUpdateSubmit(event, farm)}>
-                                <Field label="Nom de la ferme"><input defaultValue={farm.name} maxLength={120} minLength={2} name="name" required /></Field>
-                                <Field label="Localisation"><input defaultValue={farm.location ?? ""} maxLength={180} name="location" /></Field>
-                                <PhotoPreviewField key={`farm-edit-photo-${farm.id}-${farmPhotoReset}`} name="photo" label="Remplacer la photo" organizationId={organizationId!} currentPhotoUrl={farm.photo_url} />
-                                {farm.photo_url ? <label className="photo-remove-option"><input name="remove_photo" type="checkbox" value="true" />Supprimer la photo actuelle</label> : null}
-                                <button className="button-primary" disabled={actionPending === `${farm.id}:edit`} type="submit">{actionPending === `${farm.id}:edit` ? "Enregistrement…" : "Enregistrer"}</button>
-                              </form>
-                            </details>
+                            <button className="button-secondary" type="button" onClick={() => {
+                              setFarmFeedback(null);
+                              setSelectedFarmForEdit(farm);
+                            }}><Pencil size={14} />Modifier</button>
                           ) : null}
                           <button className="text-action" type="button" disabled={actionPending === `${farm.id}:${farm.is_active ? "archive" : "restore"}`} onClick={() => void farmAction(farm, farm.is_active ? "archive" : "restore")}>
                             {farm.is_active ? <Archive size={14} /> : <RotateCcw size={14} />}
@@ -1008,8 +1013,37 @@ export function AgriculturePage() {
               <p>{farmFilter === "active" ? "Créez une ferme pour y organiser ses parcelles et campagnes." : "Les fermes archivées apparaîtront ici."}</p>
             </div>
           )}
+            {selectedFarmForEdit ? (
+              <dialog
+                aria-labelledby="farm-edit-title"
+                className="parcel-edit-dialog farm-edit-dialog"
+                onClose={() => setSelectedFarmForEdit(null)}
+                onClick={(event) => {
+                  if (event.target === event.currentTarget) farmEditDialogRef.current?.close();
+                }}
+                ref={farmEditDialogRef}
+              >
+                <div className="parcel-edit-dialog-content">
+                  <div className="parcel-edit-dialog-heading">
+                    <div><h2 id="farm-edit-title">Modifier la ferme</h2><p>{selectedFarmForEdit.name}</p></div>
+                    <button className="parcel-edit-dialog-close" type="button" aria-label="Fermer" onClick={() => farmEditDialogRef.current?.close()}>×</button>
+                  </div>
+                  <FeedbackMessage feedback={farmFeedback} />
+                  <form className="agriculture-form-grid farm-edit-form" key={selectedFarmForEdit.id} onSubmit={(event) => void handleFarmUpdateSubmit(event, selectedFarmForEdit)}>
+                    <Field label="Nom de la ferme"><input defaultValue={selectedFarmForEdit.name} maxLength={120} minLength={2} name="name" required /></Field>
+                    <Field label="Localisation"><input defaultValue={selectedFarmForEdit.location ?? ""} maxLength={180} name="location" /></Field>
+                    <PhotoPreviewField key={`farm-edit-photo-${selectedFarmForEdit.id}-${farmPhotoReset}`} name="photo" label="Remplacer la photo" organizationId={organizationId!} currentPhotoUrl={selectedFarmForEdit.photo_url} />
+                    {selectedFarmForEdit.photo_url ? <label className="photo-remove-option"><input name="remove_photo" type="checkbox" value="true" />Supprimer la photo actuelle</label> : null}
+                    <div className="parcel-edit-dialog-actions">
+                      <button className="button-secondary" type="button" onClick={() => farmEditDialogRef.current?.close()}>Annuler</button>
+                      <button className="button-primary" disabled={actionPending === `${selectedFarmForEdit.id}:edit`} type="submit">{actionPending === `${selectedFarmForEdit.id}:edit` ? "Enregistrement…" : "Enregistrer"}</button>
+                    </div>
+                  </form>
+                </div>
+              </dialog>
+            ) : null}
 
-          <section className="panel agriculture-data-panel" id="parcel-section">
+            <section className="panel agriculture-data-panel" id="parcel-section">
             <div className="agriculture-section-heading">
               <div><h2>Parcelles</h2><p>{selectedFarm ? `Parcelles de ${selectedFarm.name}` : "Parcelles de toutes les fermes actives"}</p></div>
               <div className="parcel-toolbar">

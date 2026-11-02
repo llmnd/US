@@ -62,7 +62,9 @@ export function SalesPage() {
     enabled: Boolean(membership),
     retry: false,
   });
-  const canManageSales = membership?.role !== "reader";
+  const canManageSales = Boolean(
+    membership && ["owner", "admin", "manager"].includes(membership.role),
+  );
   const updateStatus = useMutation({
     mutationFn: ({ id, status }: { id: string; status: OrderStatus }) => {
       if (!membership) throw new Error("Aucune organisation active n’est associée au compte.");

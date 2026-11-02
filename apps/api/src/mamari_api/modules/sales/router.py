@@ -23,7 +23,7 @@ router = APIRouter()
 CurrentOrganizationDep = Annotated[CurrentMembership, Depends(get_current_membership)]
 CanManageSalesDep = Annotated[
     CurrentMembership,
-    Depends(require_roles("owner", "admin", "manager", "operator")),
+    Depends(require_roles("owner", "admin", "manager")),
 ]
 
 

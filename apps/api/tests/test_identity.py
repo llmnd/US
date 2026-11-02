@@ -1,3 +1,4 @@
+from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
@@ -94,11 +95,28 @@ async def test_admin_can_create_a_user_for_mamari(client: AsyncClient) -> None:
             "full_name": "Membre Mamari",
             "password": "secret6",
             "role": "operator",
+            "phone": "+221 77 123 45 67",
         },
     )
     assert created.status_code == 201
     assert created.json()["username"] == "equipe"
     assert created.json()["role"] == "operator"
+    assert created.json()["phone"] == "+221 77 123 45 67"
+    members = await client.get(
+        "/api/v1/organizations/users",
+        headers={"X-Organization-ID": organization_id},
+    )
+    assert members.status_code == 200
+    member = next(user for user in members.json() if user["id"] == created.json()["id"])
+    assert member["phone"] == "+221 77 123 45 67"
+    updated = await client.patch(
+        f"/api/v1/organizations/users/{created.json()['id']}",
+        headers={"X-Organization-ID": organization_id},
+        json={"role": "manager", "phone": "+221 76 555 12 34"},
+    )
+    assert updated.status_code == 200
+    assert updated.json()["role"] == "manager"
+    assert updated.json()["phone"] == "+221 76 555 12 34"
 
     client.cookies.clear()
     member_login = await client.post(
@@ -118,6 +136,125 @@ async def test_admin_can_create_a_user_for_mamari(client: AsyncClient) -> None:
         },
     )
     assert forbidden.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_member_profile_photo_is_private_and_organization_scoped(
+    client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
+) -> None:
+    login = await client.post(
+        "/api/v1/auth/login",
+        json={"username": "mamari", "password": "passer123m"},
+    )
+    organization_id = login.json()["memberships"][0]["organization_id"]
+    monkeypatch.setattr(
+        "mamari_api.modules.organizations.router.get_settings",
+        lambda: SimpleNamespace(upload_directory=tmp_path),
+    )
+    created = await client.post(
+        "/api/v1/organizations/users",
+        headers={"X-Organization-ID": organization_id},
+        json={
+            "username": "photo-member",
+            "full_name": "Membre photo",
+            "password": "secret6",
+            "role": "operator",
+        },
+    )
+    assert created.status_code == 201
+    response = await client.put(
+        f"/api/v1/organizations/users/{created.json()['id']}/photo",
+        headers={"X-Organization-ID": organization_id},
+        files={"photo": ("profile.png", b"\x89PNG\r\n\x1a\nprofile", "image/png")},
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["photo_url"]
+    photo = await client.get(
+        f"/api/v1{response.json()['photo_url']}",
+        headers={"X-Organization-ID": organization_id},
+    )
+    assert photo.status_code == 200, photo.text
+    assert photo.content.startswith(b"\x89PNG\r\n\x1a\n")
+
+    other_member = await client.post(
+        "/api/v1/organizations/users",
+        headers={"X-Organization-ID": organization_id},
+        json={
+            "username": "other-photo-member",
+            "full_name": "Autre membre photo",
+            "password": "secret6",
+            "role": "operator",
+        },
+    )
+    other_photo = await client.put(
+        f"/api/v1/organizations/users/{other_member.json()['id']}/photo",
+        headers={"X-Organization-ID": organization_id},
+        files={"photo": ("profile.png", b"\x89PNG\r\n\x1a\nprofile", "image/png")},
+    )
+    assert other_photo.status_code == 200
+    client.cookies.clear()
+    employee_login = await client.post(
+        "/api/v1/auth/login",
+        json={"username": "photo-member", "password": "secret6"},
+    )
+    assert employee_login.status_code == 200
+    assert employee_login.json()["memberships"][0]["role"] == "operator"
+    assert employee_login.json()["id"] == created.json()["id"]
+    forbidden = await client.get(
+        f"/api/v1{other_photo.json()['photo_url']}",
+        headers={"X-Organization-ID": organization_id},
+    )
+    assert forbidden.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_operator_cannot_mutate_business_modules(client: AsyncClient) -> None:
+    login = await client.post(
+        "/api/v1/auth/login",
+        json={"username": "mamari", "password": "passer123m"},
+    )
+    organization_id = login.json()["memberships"][0]["organization_id"]
+    headers = {"X-Organization-ID": organization_id}
+    created = await client.post(
+        "/api/v1/organizations/users",
+        headers=headers,
+        json={
+            "username": "limited-worker",
+            "full_name": "Employé limité",
+            "password": "secret6",
+            "role": "operator",
+        },
+    )
+    assert created.status_code == 201
+    client.cookies.clear()
+    employee_login = await client.post(
+        "/api/v1/auth/login",
+        json={"username": "limited-worker", "password": "secret6"},
+    )
+    assert employee_login.status_code == 200
+    member_list = await client.get("/api/v1/organizations/users", headers=headers)
+
+    farm = await client.post(
+        "/api/v1/agriculture/farms",
+        headers=headers,
+        json={"name": "Ferme interdite"},
+    )
+    facility = await client.post(
+        "/api/v1/livestock/facilities",
+        headers=headers,
+        json={"name": "Poulailler interdit"},
+    )
+    order = await client.post(
+        "/api/v1/sales/orders",
+        headers=headers,
+        json={"customer_name": "Client interdit", "amount_fcfa": 2000},
+    )
+    assert farm.status_code == 403
+    assert facility.status_code == 403
+    assert order.status_code == 403
+    assert member_list.status_code == 403
 
 
 @pytest.mark.asyncio

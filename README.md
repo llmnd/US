@@ -86,12 +86,18 @@ n’a été enregistrée.
 - L’administrateur peut créer des utilisateurs dans Administration. L’API
   `POST /api/v1/organizations/users` exige un compte propriétaire ou
   administrateur, une organisation autorisée et un mot de passe d’au moins
-  6 caractères. Les mots de passe sont hachés avec Argon2id.
+  6 caractères. La page Administration permet aussi de gérer les rôles,
+  suspendre/réactiver un accès, enregistrer le téléphone WhatsApp et la photo
+  de profil des membres. Les mots de passe sont hachés avec Argon2id.
 - `POST /api/v1/auth/login`, `POST /api/v1/auth/logout` et `GET /api/v1/auth/me`
   gèrent les sessions avec un cookie `HttpOnly`.
 - Les routes de domaine protégées doivent utiliser la dépendance
   `get_current_membership` et exiger l’en-tête `X-Organization-ID`. Les rôles
   disponibles sont `owner`, `admin`, `manager`, `operator` et `reader`.
+  Seuls les propriétaires, administrateurs et responsables peuvent gérer les
+  données métier des modules ; un employé (`operator`) consulte uniquement les
+  opérations qui lui sont attribuées et transmet leur avancement. Le rôle
+  `reader` reste en lecture seule.
 - Le module Ventes fournit les routes paginées et filtrables
   `GET /api/v1/sales/orders`, l’enregistrement d’une commande par
   `POST /api/v1/sales/orders` et le changement de statut par
@@ -109,6 +115,11 @@ n’a été enregistrée.
   `UPLOAD_DIRECTORY` vers un stockage persistant partagé avec l’API.
 - Le module Opérations suit les tâches de l’équipe, avec échéance, priorité,
   responsable, recherche, filtres et états à faire/en cours/terminé/archivé.
+  Les employés ne voient que les tâches qui leur sont attribuées et peuvent
+  transmettre leur avancement ; une tâche en retard demande une justification.
+  Les responsables et administrateurs suivent l’activité, consultent son
+  historique et peuvent contacter un collaborateur via WhatsApp. Le tableau se
+  rafraîchit automatiquement toutes les 15 secondes (sans connexion WebSocket).
   Les tâches et leurs statistiques sont isolées par organisation via
   `/api/v1/operations`.
 - Le module Élevage suit les animaux individuels et les lots, leurs bâtiments,
@@ -116,6 +127,8 @@ n’a été enregistrée.
   alimentation. Les bâtiments rattachés à une ferme ajoutent automatiquement
   les coûts aux Finances et les recettes de production aux revenus. Les médias
   privés sont stockés sous `UPLOAD_DIRECTORY` et limités à 5 Mo.
+- La migration `0010_operations_collaborators` ajoute les profils des membres,
+  les comptes rendus des tâches et leur historique.
 - Avant d’exposer le serveur sur Internet, remplacer `BOOTSTRAP_ADMIN_PASSWORD`
   par un secret propre à l’instance dans `.env`, et définir une clé
   `JWT_SECRET_KEY` unique d’au moins 32 caractères ainsi que les origines de
