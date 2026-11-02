@@ -256,6 +256,7 @@ class FinanceTransaction(Base):
         Uuid, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
     )
     transaction_type: Mapped[str] = mapped_column(String(8), nullable=False)
+    source: Mapped[str] = mapped_column(String(16), nullable=False, default="agriculture")
     category: Mapped[str] = mapped_column(String(24), nullable=False)
     label: Mapped[str] = mapped_column(String(160), nullable=False)
     amount_fcfa: Mapped[int] = mapped_column(BigInteger, nullable=False)

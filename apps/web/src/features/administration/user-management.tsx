@@ -1,8 +1,21 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Camera, MessageCircle, UserRound, UserRoundPlus } from "lucide-react";
-import { useState, type FormEvent } from "react";
+import {
+  Camera,
+  ChevronDown,
+  ChevronRight,
+  Lock,
+  MessageCircle,
+  Search,
+  ShieldCheck,
+  UserCheck,
+  UserRound,
+  UserRoundPlus,
+  Users,
+  UserX,
+} from "lucide-react";
+import { useMemo, useState, type FormEvent } from "react";
 import { MemberAvatar } from "@/components/member-avatar";
 import {
   ApiError,
@@ -12,6 +25,7 @@ import {
 } from "@/lib/api/client";
 
 type MemberRole = "owner" | "admin" | "manager" | "operator" | "reader";
+type RoleFilter = "all" | "admins" | "team" | "readers";
 
 interface OrganizationMember {
   id: string;
@@ -30,6 +44,28 @@ const roleOptions: { value: Exclude<MemberRole, "owner">; label: string }[] = [
   { value: "reader", label: "Lecture seule" },
 ];
 
+const roleLabels: Record<MemberRole, string> = {
+  owner: "Propriétaire",
+  admin: "Administrateur",
+  manager: "Responsable",
+  operator: "Employé",
+  reader: "Lecture seule",
+};
+
+const roleFilters: { value: RoleFilter; label: string }[] = [
+  { value: "all", label: "Tous" },
+  { value: "admins", label: "Administrateurs" },
+  { value: "team", label: "Équipe" },
+  { value: "readers", label: "Lecture" },
+];
+
+function matchesRole(role: MemberRole, filter: RoleFilter): boolean {
+  if (filter === "all") return true;
+  if (filter === "admins") return role === "owner" || role === "admin";
+  if (filter === "team") return role === "manager" || role === "operator";
+  return role === "reader";
+}
+
 function whatsappUrl(phone: string | null, fullName: string): string | null {
   const dialString = phone?.trim();
   if (!dialString || (!dialString.startsWith("+") && !dialString.startsWith("00"))) return null;
@@ -42,6 +78,10 @@ export function UserManagement() {
   const queryClient = useQueryClient();
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const [roleFilter, setRoleFilter] = useState<RoleFilter>("all");
   const profile = useQuery({
     queryKey: ["auth", "me"],
     queryFn: () => apiRequest<UserProfile>("/auth/me"),
@@ -84,6 +124,7 @@ export function UserManagement() {
     onSuccess: async (user) => {
       setError(null);
       setMessage(`Le compte « ${user.username} » a été créé.`);
+      setInviteOpen(false);
       await refreshMembers();
     },
     onError: (submitError) => {
@@ -134,6 +175,27 @@ export function UserManagement() {
     },
   });
 
+  const list = useMemo(() => members.data ?? [], [members.data]);
+  const stats = useMemo(
+    () => ({
+      total: list.length,
+      active: list.filter((member) => member.is_active).length,
+      suspended: list.filter((member) => !member.is_active).length,
+      admins: list.filter((member) => member.role === "owner" || member.role === "admin").length,
+    }),
+    [list],
+  );
+  const visibleMembers = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    return list.filter(
+      (member) =>
+        matchesRole(member.role, roleFilter)
+        && (!needle
+          || member.full_name.toLowerCase().includes(needle)
+          || member.username.toLowerCase().includes(needle)),
+    );
+  }, [list, query, roleFilter]);
+
   function handleCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setMessage(null);
@@ -163,19 +225,47 @@ export function UserManagement() {
     );
   }
 
+  const kpis = [
+    { label: "Membres", value: stats.total, detail: "comptes dans l’organisation", icon: Users },
+    { label: "Accès actifs", value: stats.active, detail: "peuvent se connecter", icon: UserCheck },
+    { label: "Suspendus", value: stats.suspended, detail: "accès désactivés", icon: UserX },
+    { label: "Administrateurs", value: stats.admins, detail: "propriétaire inclus", icon: ShieldCheck },
+  ];
+
   return (
     <div className="admin-members-page">
-      <section className="panel admin-user-panel" aria-labelledby="create-user-title">
-        <div className="panel-header">
-          <div>
-            <h2 className="panel-title" id="create-user-title">Inviter un collaborateur</h2>
-            <p className="panel-subtitle">
-              Créez son accès, choisissez son rôle et ajoutez un numéro WhatsApp pour le joindre.
-            </p>
-          </div>
-          <span className="admin-section-icon"><UserRoundPlus size={19} /></span>
-        </div>
-        <form className="auth-form admin-user-form" onSubmit={handleCreate}>
+      {members.data ? (
+        <section className="metrics-grid" aria-label="Indicateurs de l’équipe">
+          {kpis.map(({ label, value, detail, icon: Icon }) => (
+            <article className="metric-card" key={label}>
+              <div className="metric-heading">
+                <span>{label}</span>
+                <span className="metric-icon"><Icon size={16} /></span>
+              </div>
+              <div className="metric-value">{value.toLocaleString("fr-FR")}</div>
+              <div className="metric-foot">{detail}</div>
+            </article>
+          ))}
+        </section>
+      ) : null}
+
+      {error ? <p className="auth-error" role="alert">{error}</p> : null}
+      {message ? <p className="admin-success" role="status">{message}</p> : null}
+
+      <details
+        className="panel adm-invite"
+        open={inviteOpen}
+        onToggle={(event) => setInviteOpen(event.currentTarget.open)}
+      >
+        <summary>
+          <span className="agriculture-add-icon"><UserRoundPlus size={17} /></span>
+          <span>
+            <strong>Inviter un collaborateur</strong>
+            <small>Créez son accès, choisissez son rôle et son contact WhatsApp</small>
+          </span>
+          <ChevronRight size={16} />
+        </summary>
+        <form className="adm-invite-form" onSubmit={handleCreate}>
           <label className="auth-field">
             <span>Identifiant</span>
             <input
@@ -193,23 +283,6 @@ export function UserManagement() {
             <input autoComplete="name" minLength={2} maxLength={160} name="full_name" required />
           </label>
           <label className="auth-field">
-            <span>Téléphone / WhatsApp</span>
-            <input autoComplete="tel" maxLength={32} name="phone" placeholder="+indicatif 77 000 00 00" type="tel" />
-            <small>Ajoutez l’indicatif international pour activer le contact WhatsApp.</small>
-          </label>
-          <label className="auth-field">
-            <span>Mot de passe temporaire</span>
-            <input
-              autoComplete="new-password"
-              minLength={6}
-              maxLength={128}
-              name="password"
-              required
-              type="password"
-            />
-            <small>6 caractères minimum.</small>
-          </label>
-          <label className="auth-field">
             <span>Rôle et accès</span>
             <select className="admin-role-select" defaultValue="operator" name="role">
               {roleOptions.map((option) => (
@@ -217,22 +290,58 @@ export function UserManagement() {
               ))}
             </select>
           </label>
-          {error ? <p className="auth-error" role="alert">{error}</p> : null}
-          {message ? <p className="admin-success" role="status">{message}</p> : null}
-          <button className="button-primary auth-submit" disabled={createMember.isPending} type="submit">
-            {createMember.isPending ? "Création en cours…" : "Créer le compte"}
-          </button>
+          <label className="auth-field">
+            <span>Téléphone / WhatsApp</span>
+            <input autoComplete="tel" maxLength={32} name="phone" placeholder="+indicatif 77 000 00 00" type="tel" />
+            <small>Avec l’indicatif international pour activer WhatsApp.</small>
+          </label>
+          <label className="auth-field">
+            <span>Mot de passe temporaire</span>
+            <input autoComplete="new-password" minLength={6} maxLength={128} name="password" required type="password" />
+            <small>6 caractères minimum.</small>
+          </label>
+          <div className="adm-form-foot">
+            <button className="button-primary" disabled={createMember.isPending} type="submit">
+              {createMember.isPending ? "Création en cours…" : "Créer le compte"}
+            </button>
+          </div>
         </form>
-      </section>
+      </details>
 
-      <section className="panel admin-directory-panel" aria-labelledby="members-title">
-        <div className="panel-header">
+      <section className="panel adm-directory" aria-labelledby="members-title">
+        <div className="adm-directory-head">
           <div>
             <h2 className="panel-title" id="members-title">Équipe et accès</h2>
             <p className="panel-subtitle">Gérez les rôles, les contacts et les profils de votre organisation.</p>
           </div>
-          <span className="admin-member-count">{members.data?.length ?? 0} membre(s)</span>
+          <span className="adm-count">{visibleMembers.length} / {stats.total} membre(s)</span>
         </div>
+
+        <div className="adm-toolbar">
+          <div className="segmented-control" role="group" aria-label="Filtrer par rôle">
+            {roleFilters.map((filter) => (
+              <button
+                key={filter.value}
+                type="button"
+                aria-pressed={roleFilter === filter.value}
+                onClick={() => setRoleFilter(filter.value)}
+              >
+                {filter.label}
+              </button>
+            ))}
+          </div>
+          <label className="sales-search">
+            <Search size={15} />
+            <span className="visually-hidden">Rechercher un membre</span>
+            <input
+              type="search"
+              value={query}
+              placeholder="Nom ou identifiant"
+              onChange={(event) => setQuery(event.target.value)}
+            />
+          </label>
+        </div>
+
         {members.isError ? (
           <div className="dashboard-error" role="alert">
             <p>{getApiErrorMessage(members.error)}</p>
@@ -242,123 +351,164 @@ export function UserManagement() {
           </div>
         ) : members.isPending ? (
           <div className="dashboard-loading" role="status">Chargement de l’équipe…</div>
-        ) : members.data?.length ? (
-          <div className="admin-member-list">
-            {members.data.map((member) => (
-              <article className={`admin-member-card ${member.is_active ? "" : "is-inactive"}`} key={member.id}>
-                <MemberAvatar
-                  organizationId={organizationId}
-                  userId={member.id}
-                  name={member.full_name}
-                  photoUrl={member.photo_url}
-                  className="admin-member-avatar"
-                />
-                <div className="admin-member-info">
-                  <strong>{member.full_name}</strong>
-                  <span>@{member.username} · {member.is_active ? "Accès actif" : "Accès suspendu"}</span>
-                  {member.phone ? <span>{member.phone}</span> : <span>Pas de numéro renseigné</span>}
-                </div>
-                <div className="admin-member-actions">
-                  {member.role === "owner" ? (
-                    <span className="admin-owner-label">Propriétaire</span>
-                  ) : (
-                    <label className="auth-field">
-                      <span className="visually-hidden">Rôle de {member.full_name}</span>
-                      <select
-                        aria-label={`Rôle de ${member.full_name}`}
-                        value={member.role}
-                        disabled={updateMember.isPending}
-                        onChange={(event) => updateMember.mutate({
-                          id: member.id,
-                          changes: { role: event.currentTarget.value as MemberRole },
-                        })}
-                      >
-                        {roleOptions.map((option) => (
-                          <option key={option.value} value={option.value}>{option.label}</option>
-                        ))}
-                      </select>
-                    </label>
-                  )}
-                  {whatsappUrl(member.phone, member.full_name) ? (
-                    <a
-                      className="operations-whatsapp-link"
-                      href={whatsappUrl(member.phone, member.full_name) ?? undefined}
-                      target="_blank"
-                      rel="noreferrer"
-                      aria-label={`Écrire à ${member.full_name} sur WhatsApp`}
-                    >
-                      <MessageCircle size={15} />WhatsApp
-                    </a>
-                  ) : null}
-                  <label className="admin-photo-button">
-                    <Camera size={15} />
-                    Photo
-                    <input
-                      accept="image/jpeg,image/png,image/webp"
-                      aria-label={`Modifier la photo de ${member.full_name}`}
-                      disabled={uploadPhoto.isPending}
-                      onChange={(event) => {
-                        const file = event.currentTarget.files?.[0];
-                        if (!file) return;
-                        const form = new FormData();
-                        form.append("photo", file);
-                        uploadPhoto.mutate({ id: member.id, form });
-                        event.currentTarget.value = "";
-                      }}
-                      type="file"
-                    />
-                  </label>
-                  {member.id !== profile.data?.id && member.role !== "owner" ? (
-                    <button
-                      className="button-secondary admin-access-button"
-                      disabled={updateMember.isPending}
-                      type="button"
-                      onClick={() => updateMember.mutate({
-                        id: member.id,
-                        changes: { is_active: !member.is_active },
-                      })}
-                    >
-                      {member.is_active ? "Suspendre" : "Réactiver"}
-                    </button>
-                  ) : (
-                    <span className="admin-you-label">
-                      <UserRound size={14} />
-                      {member.role === "owner" ? "Compte protégé" : "Vous"}
-                    </span>
-                  )}
-                </div>
-                <form
-                  className="admin-member-edit-form"
-                  onSubmit={(event) => {
-                    event.preventDefault();
-                    const formData = new FormData(event.currentTarget);
-                    updateMember.mutate({
-                      id: member.id,
-                      changes: {
-                        full_name: String(formData.get("full_name") ?? ""),
-                        phone: String(formData.get("phone") ?? "").trim() || null,
-                      },
-                    });
-                  }}
+        ) : visibleMembers.length ? (
+          <div className="adm-list">
+            {visibleMembers.map((member) => {
+              const isOpen = expandedId === member.id;
+              const whatsapp = whatsappUrl(member.phone, member.full_name);
+              const isProtected = member.id === profile.data?.id || member.role === "owner";
+              return (
+                <article
+                  className={`adm-member${isOpen ? " is-open" : ""}${member.is_active ? "" : " is-inactive"}`}
+                  key={member.id}
                 >
-                  <label className="auth-field">
-                    <span>Nom</span>
-                    <input defaultValue={member.full_name} maxLength={160} minLength={2} name="full_name" required />
-                  </label>
-                  <label className="auth-field">
-                    <span>Téléphone</span>
-                    <input defaultValue={member.phone ?? ""} maxLength={32} name="phone" type="tel" />
-                  </label>
-                  <button className="button-secondary" disabled={updateMember.isPending} type="submit">Enregistrer</button>
-                </form>
-              </article>
-            ))}
+                  <div className="adm-row">
+                    <MemberAvatar
+                      organizationId={organizationId}
+                      userId={member.id}
+                      name={member.full_name}
+                      photoUrl={member.photo_url}
+                      className="adm-avatar"
+                    />
+                    <div className="adm-info">
+                      <strong>{member.full_name}</strong>
+                      <span>@{member.username}{member.phone ? ` · ${member.phone}` : ""}</span>
+                    </div>
+                    <div className="adm-badges">
+                      <span className={`adm-role adm-role-${member.role}`}>{roleLabels[member.role]}</span>
+                      <span className={`status-pill ${member.is_active ? "delivered" : "cancelled"}`}>
+                        {member.is_active ? "Actif" : "Suspendu"}
+                      </span>
+                    </div>
+                    <div className="adm-actions">
+                      {whatsapp ? (
+                        <a
+                          className="adm-icon-link"
+                          href={whatsapp}
+                          target="_blank"
+                          rel="noreferrer"
+                          aria-label={`Écrire à ${member.full_name} sur WhatsApp`}
+                        >
+                          <MessageCircle size={16} />
+                        </a>
+                      ) : null}
+                      <button
+                        className="adm-manage"
+                        type="button"
+                        aria-expanded={isOpen}
+                        aria-controls={`adm-panel-${member.id}`}
+                        onClick={() => setExpandedId(isOpen ? null : member.id)}
+                      >
+                        Gérer <ChevronDown size={15} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {isOpen ? (
+                    <div className="adm-panel" id={`adm-panel-${member.id}`}>
+                      <form
+                        className="adm-edit-form"
+                        key={`${member.full_name}|${member.phone ?? ""}`}
+                        onSubmit={(event) => {
+                          event.preventDefault();
+                          const formData = new FormData(event.currentTarget);
+                          updateMember.mutate({
+                            id: member.id,
+                            changes: {
+                              full_name: String(formData.get("full_name") ?? ""),
+                              phone: String(formData.get("phone") ?? "").trim() || null,
+                            },
+                          });
+                        }}
+                      >
+                        <label className="auth-field">
+                          <span>Nom</span>
+                          <input defaultValue={member.full_name} maxLength={160} minLength={2} name="full_name" required />
+                        </label>
+                        <label className="auth-field">
+                          <span>Téléphone</span>
+                          <input defaultValue={member.phone ?? ""} maxLength={32} name="phone" type="tel" />
+                        </label>
+                        <button className="button-primary" disabled={updateMember.isPending} type="submit">
+                          Enregistrer
+                        </button>
+                      </form>
+
+                      <div className="adm-side">
+                        {member.role === "owner" ? (
+                          <span className="adm-note"><Lock size={14} />Compte propriétaire protégé</span>
+                        ) : (
+                          <label className="auth-field">
+                            <span>Rôle et accès</span>
+                            <select
+                              aria-label={`Rôle de ${member.full_name}`}
+                              value={member.role}
+                              disabled={updateMember.isPending}
+                              onChange={(event) => updateMember.mutate({
+                                id: member.id,
+                                changes: { role: event.currentTarget.value as MemberRole },
+                              })}
+                            >
+                              {roleOptions.map((option) => (
+                                <option key={option.value} value={option.value}>{option.label}</option>
+                              ))}
+                            </select>
+                          </label>
+                        )}
+                        <div className="adm-side-buttons">
+                          <label className="adm-chip adm-file">
+                            <Camera size={15} />
+                            Changer la photo
+                            <input
+                              accept="image/jpeg,image/png,image/webp"
+                              aria-label={`Modifier la photo de ${member.full_name}`}
+                              disabled={uploadPhoto.isPending}
+                              onChange={(event) => {
+                                const file = event.currentTarget.files?.[0];
+                                if (!file) return;
+                                const form = new FormData();
+                                form.append("photo", file);
+                                uploadPhoto.mutate({ id: member.id, form });
+                                event.currentTarget.value = "";
+                              }}
+                              type="file"
+                            />
+                          </label>
+                          {isProtected ? (
+                            <span className="adm-note">
+                              <UserRound size={14} />
+                              {member.role === "owner" ? "Accès non suspendable" : "Votre compte"}
+                            </span>
+                          ) : (
+                            <button
+                              className={`adm-chip ${member.is_active ? "is-danger" : ""}`}
+                              disabled={updateMember.isPending}
+                              type="button"
+                              onClick={() => updateMember.mutate({
+                                id: member.id,
+                                changes: { is_active: !member.is_active },
+                              })}
+                            >
+                              {member.is_active ? "Suspendre l’accès" : "Réactiver l’accès"}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
+                </article>
+              );
+            })}
           </div>
         ) : (
           <div className="operations-empty">
             <span><UserRound size={22} /></span>
-            <h3>Aucun membre dans l’équipe</h3>
-            <p>Les comptes de vos collaborateurs apparaîtront ici après leur création.</p>
+            <h3>{list.length ? "Aucun résultat" : "Aucun membre dans l’équipe"}</h3>
+            <p>
+              {list.length
+                ? "Essayez un autre nom ou changez le filtre de rôle."
+                : "Les comptes de vos collaborateurs apparaîtront ici après leur création."}
+            </p>
           </div>
         )}
       </section>

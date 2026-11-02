@@ -200,3 +200,63 @@ class LivestockRecord(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
     )
+
+
+class LivestockFinanceTransaction(Base):
+    __tablename__ = "livestock_finance_transactions"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["organization_id", "animal_id"],
+            ["livestock_animals.organization_id", "livestock_animals.id"],
+            name="fk_livestock_finance_org_animal",
+            ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ["organization_id", "group_id"],
+            ["livestock_groups.organization_id", "livestock_groups.id"],
+            name="fk_livestock_finance_org_group",
+            ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ["organization_id", "facility_id"],
+            ["livestock_facilities.organization_id", "livestock_facilities.id"],
+            name="fk_livestock_finance_org_facility",
+            ondelete="RESTRICT",
+        ),
+        CheckConstraint(
+            "transaction_type IN ('income', 'expense')",
+            name="ck_livestock_finance_type",
+        ),
+        CheckConstraint("amount_fcfa > 0", name="ck_livestock_finance_amount_positive"),
+        CheckConstraint(
+            "animal_id IS NULL OR group_id IS NULL",
+            name="ck_livestock_finance_one_subject",
+        ),
+        UniqueConstraint("source_record_id", name="uq_livestock_finance_source_record"),
+        Index("ix_livestock_finance_org_date", "organization_id", "transaction_date"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False
+    )
+    animal_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
+    group_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
+    facility_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
+    source_record_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("livestock_records.id", ondelete="RESTRICT"), nullable=True
+    )
+    created_by_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    )
+    transaction_type: Mapped[str] = mapped_column(String(8), nullable=False)
+    category: Mapped[str] = mapped_column(String(32), nullable=False)
+    label: Mapped[str] = mapped_column(String(160), nullable=False)
+    amount_fcfa: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    transaction_date: Mapped[date] = mapped_column(Date, nullable=False, default=date.today)
+    quantity: Mapped[Decimal | None] = mapped_column(Numeric(14, 3), nullable=True)
+    unit: Mapped[str | None] = mapped_column(String(24), nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
+    )

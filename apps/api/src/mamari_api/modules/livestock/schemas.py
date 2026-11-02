@@ -11,6 +11,7 @@ LivestockName = Annotated[
 ShortText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)]
 SpeciesName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=2, max_length=60)]
 RecordType = Literal["health", "reproduction", "production", "feed"]
+LivestockFinanceType = Literal["income", "expense"]
 EventDate = date
 
 
@@ -145,6 +146,67 @@ class RecordResponse(BaseModel):
     is_resolved: bool
     notes: str | None
     created_at: datetime
+
+
+class CreateLivestockFinanceTransactionRequest(BaseModel):
+    transaction_type: LivestockFinanceType
+    category: ShortText
+    label: Annotated[str, StringConstraints(strip_whitespace=True, min_length=2, max_length=160)]
+    amount_fcfa: Annotated[int, Field(gt=0, le=9_000_000_000_000_000)]
+    transaction_date: date = Field(default_factory=date.today)
+    animal_id: uuid.UUID | None = None
+    group_id: uuid.UUID | None = None
+    facility_id: uuid.UUID | None = None
+    quantity: Annotated[Decimal, Field(gt=0, max_digits=12, decimal_places=3)] | None = None
+    unit: Annotated[str, StringConstraints(strip_whitespace=True, max_length=24)] | None = None
+    notes: Annotated[str, StringConstraints(strip_whitespace=True, max_length=2000)] | None = None
+
+    @model_validator(mode="after")
+    def validate_subject(self) -> "CreateLivestockFinanceTransactionRequest":
+        if self.animal_id is not None and self.group_id is not None:
+            raise ValueError("Choisissez un animal ou un lot, pas les deux.")
+        return self
+
+
+class LivestockFinanceTransactionResponse(BaseModel):
+    id: uuid.UUID
+    transaction_type: LivestockFinanceType
+    category: str
+    label: str
+    amount_fcfa: int
+    transaction_date: date
+    animal_id: uuid.UUID | None
+    animal_name: str | None
+    group_id: uuid.UUID | None
+    group_name: str | None
+    facility_id: uuid.UUID | None
+    facility_name: str | None
+    quantity: Decimal | None
+    unit: str | None
+    notes: str | None
+    created_at: datetime
+
+
+class LivestockFinanceTransactionPageResponse(BaseModel):
+    items: list[LivestockFinanceTransactionResponse]
+    total: int
+    page: int
+    page_size: int
+
+
+class MonthlyLivestockFinanceResponse(BaseModel):
+    month: str
+    month_number: int
+    amount_fcfa: int
+
+
+class LivestockFinanceSummaryResponse(BaseModel):
+    year: int
+    income_fcfa: int
+    expenses_fcfa: int
+    balance_fcfa: int
+    monthly_income: list[MonthlyLivestockFinanceResponse]
+    monthly_expenses: list[MonthlyLivestockFinanceResponse]
 
 
 class MonthlyProductionTotal(BaseModel):
