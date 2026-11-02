@@ -3,7 +3,7 @@
 import NextImage from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Activity,
@@ -15,8 +15,7 @@ import {
   ClipboardList,
   Coins,
   Factory,
-  Home,
-  Image,
+  Image as ImageIcon,
   LayoutDashboard,
   Leaf,
   LogOut,
@@ -24,6 +23,7 @@ import {
   Settings2,
   ShoppingCart,
   UsersRound,
+  X,
 } from "lucide-react";
 import {
   ApiError,
@@ -42,7 +42,7 @@ const navigation = [
   { label: "Ventes", href: "/ventes", icon: ShoppingCart },
   { label: "Finances", href: "/finances", icon: Coins },
   { label: "Ressources humaines", href: "/rh", icon: UsersRound },
-  { label: "Communication", href: "/communication", icon: Image },
+  { label: "Communication", href: "/communication", icon: ImageIcon },
   { label: "Entreprise", href: "/entreprise", icon: Building2 },
   { label: "Administration", href: "/administration", icon: Settings2 },
 ];
@@ -59,6 +59,8 @@ export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
   const pathname = usePathname();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const profileButtonRef = useRef<HTMLButtonElement>(null);
+  const profileDialogRef = useRef<HTMLDialogElement>(null);
   const isPublicRoute =
     pathname === "/" ||
     pathname === "/produits" ||
@@ -67,6 +69,7 @@ export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
     pathname === "/login";
   const [logoutError, setLogoutError] = useState<string | null>(null);
   const [logoutPending, setLogoutPending] = useState(false);
+  const [profileDialogOpen, setProfileDialogOpen] = useState(false);
   const profile = useQuery({
     queryKey: ["auth", "me"],
     queryFn: () => apiRequest<UserProfile>("/auth/me"),
@@ -79,6 +82,17 @@ export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
       router.replace(`/login?next=${encodeURIComponent(pathname)}`);
     }
   }, [isPublicRoute, pathname, profile.error, router]);
+
+  useEffect(() => {
+    const dialog = profileDialogRef.current;
+    if (!dialog) return;
+
+    if (profileDialogOpen && !dialog.open) {
+      dialog.showModal();
+    } else if (!profileDialogOpen && dialog.open) {
+      dialog.close();
+    }
+  }, [profileDialogOpen]);
 
   if (isPublicRoute) return <>{children}</>;
 
@@ -120,6 +134,12 @@ export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
 
   const currentPage =
     navigation.find((item) => item.href === pathname)?.label ?? "Vue d'ensemble";
+  const profileInitials = profile.data.full_name
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part.charAt(0))
+    .join("")
+    .toLocaleUpperCase("fr");
 
   async function handleLogout() {
     if (logoutPending) return;
@@ -170,23 +190,17 @@ export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
         </nav>
 
         <div className="sidebar-footer">
-          <Link className="nav-link public-site-link" href="/" aria-label="Accéder au site public">
-            <Home size={17} strokeWidth={1.8} />
-            <span>Site public</span>
-          </Link>
-          <Link className="nav-link" href="/aide">
-            <CircleHelp size={17} strokeWidth={1.8} />
-            <span>Centre d&apos;aide</span>
-            <ChevronRight size={14} className="nav-badge" />
-          </Link>
-          <div className="profile">
+          <button
+            ref={profileButtonRef}
+            className="profile profile-trigger"
+            type="button"
+            aria-haspopup="dialog"
+            aria-expanded={profileDialogOpen}
+            aria-controls="profile-dialog"
+            onClick={() => setProfileDialogOpen(true)}
+          >
             <span className="profile-avatar">
-              {profile.data.full_name
-                .split(/\s+/)
-                .slice(0, 2)
-                .map((part) => part.charAt(0))
-                .join("")
-                .toLocaleUpperCase("fr")}
+              {profileInitials}
             </span>
             <span className="profile-copy">
               <strong title={profile.data.full_name}>{profile.data.full_name}</strong>
@@ -194,22 +208,73 @@ export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
                 {roleLabels[membership.role]} · {profile.data.username}
               </span>
             </span>
+            <ChevronRight className="profile-trigger-chevron" size={16} aria-hidden="true" />
+          </button>
+        </div>
+      </aside>
+
+      <dialog
+        ref={profileDialogRef}
+        id="profile-dialog"
+        className="profile-dialog"
+        aria-labelledby="profile-dialog-title"
+        onClose={() => setProfileDialogOpen(false)}
+        onClick={(event) => {
+          if (event.target === event.currentTarget) setProfileDialogOpen(false);
+        }}
+      >
+        <section className="profile-dialog-card">
+          <header className="profile-dialog-header">
+            <div>
+              <p className="profile-dialog-eyebrow">Votre compte</p>
+              <h2 id="profile-dialog-title">Profil et actions</h2>
+            </div>
             <button
-              className="profile-logout"
+              className="profile-dialog-close"
+              type="button"
+              aria-label="Fermer le profil"
+              onClick={() => setProfileDialogOpen(false)}
+              autoFocus
+            >
+              <X size={18} />
+            </button>
+          </header>
+
+          <div className="profile-dialog-identity">
+            <span className="profile-avatar profile-dialog-avatar" aria-hidden="true">
+              {profileInitials}
+            </span>
+            <span className="profile-dialog-copy">
+              <strong>{profile.data.full_name}</strong>
+              <span>{roleLabels[membership.role]} · {profile.data.username}</span>
+              <span>{membership.organization_name}</span>
+            </span>
+          </div>
+
+          <div className="profile-dialog-actions">
+            <Link
+              className="profile-dialog-action"
+              href="/aide"
+              onClick={() => setProfileDialogOpen(false)}
+            >
+              <CircleHelp size={18} aria-hidden="true" />
+              <span>Centre d&apos;aide</span>
+              <ChevronRight size={16} aria-hidden="true" />
+            </Link>
+            <button
+              className="profile-dialog-action profile-dialog-logout"
               type="button"
               onClick={() => void handleLogout()}
               disabled={logoutPending}
-              aria-label={logoutPending ? "Déconnexion en cours" : "Se déconnecter"}
               aria-busy={logoutPending}
-              title="Se déconnecter"
             >
-              <LogOut size={15} aria-hidden="true" />
-              <span>{logoutPending ? "Déconnexion…" : "Se déconnecter"}</span>
+              <LogOut size={18} aria-hidden="true" />
+              <span>{logoutPending ? "Déconnexion en cours…" : "Se déconnecter"}</span>
             </button>
           </div>
           {logoutError ? <p className="logout-error" role="alert">{logoutError}</p> : null}
-        </div>
-      </aside>
+        </section>
+      </dialog>
 
       <div className="main-area">
         <header className="topbar">

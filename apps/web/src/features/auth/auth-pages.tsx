@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowRight, Leaf, LoaderCircle } from "lucide-react";
+import { ArrowRight, Home, Leaf, LoaderCircle } from "lucide-react";
 import {
   apiRequest,
   getApiErrorMessage,
@@ -74,6 +74,10 @@ function AuthLayout({
       </section>
 
       <section className="auth-content">
+        <Link className="auth-home-link" href="/" aria-label="Retour au site public">
+          <Home size={17} strokeWidth={1.8} />
+          <span>Accueil</span>
+        </Link>
         <div className="auth-card">
           <AuthBrand />
           <p className="eyebrow">{eyebrow}</p>

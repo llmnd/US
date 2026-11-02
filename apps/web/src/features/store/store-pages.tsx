@@ -206,29 +206,38 @@ export function PublicHomePage() {
           <div className="public-hero-photo">
             <div className="public-hero-copy">
               <p className="public-eyebrow">Cultiver · Élever · Partager</p>
-              <h1>La terre nous rassemble.</h1>
+              <h1>
+                La terre nous
+                <br />
+                <em>rassemble.</em>
+              </h1>
               <p>
                 Des savoir-faire vivants, des produits choisis avec soin et une
                 entreprise qui grandit au rythme des saisons.
               </p>
-              <Link className="public-primary-link" href="/produits">
-                Découvrir nos produits <ArrowRight size={17} />
-              </Link>
+              <div className="public-hero-actions">
+                <Link className="public-primary-link" href="/produits">
+                  Découvrir nos produits <ArrowRight size={17} />
+                </Link>
+                <Link className="public-hero-story-link" href="/qui-sommes-nous">
+                  Notre histoire
+                </Link>
+              </div>
               <p className="public-hero-meta">
                 <Leaf size={12} /> Une aventure portée par le terrain
               </p>
             </div>
-            <div className="public-hero-collage" aria-label="La vie à la ferme, entre élevage et pâturage">
-              <figure className="public-hero-image public-hero-image-cows">
+            <div className="public-hero-collage" role="group" aria-label="La vie à la ferme, entre élevage et pâturage">
+              <figure className="public-hero-image public-hero-image-horses">
                 <Image
-                  alt="Deux vaches dans un pâturage."
+                  alt="Deux chevaux profitent d’un pré au soleil."
                   fill
                   priority
                   quality={90}
-                  sizes="(max-width: 600px) 100vw, (max-width: 820px) 92vw, 34vw"
-                  src="/images/mamari-hero-cows.png"
+                  sizes="(max-width: 600px) 100vw, (max-width: 1100px) 92vw, 36vw"
+                  src="/images/mamari-hero-horses.png"
                 />
-                <figcaption>Au plus près du vivant</figcaption>
+                <figcaption>Au rythme des saisons</figcaption>
               </figure>
               <figure className="public-hero-image public-hero-image-pasture">
                 <Image
@@ -240,15 +249,15 @@ export function PublicHomePage() {
                 />
                 <figcaption>La vie au pré</figcaption>
               </figure>
-              <figure className="public-hero-image public-hero-image-horses">
+              <figure className="public-hero-image public-hero-image-cows">
                 <Image
-                  alt="Deux chevaux dans un pré."
+                  alt="Deux vaches dans un pâturage."
                   fill
                   quality={85}
-                  sizes="(max-width: 600px) 33vw, (max-width: 820px) 30vw, 18vw"
-                  src="/images/mamari-hero-horses.png"
+                  sizes="(max-width: 600px) 33vw, (max-width: 820px) 30vw, 20vw"
+                  src="/images/mamari-hero-cows.png"
                 />
-                <figcaption>Au rythme des saisons</figcaption>
+                <figcaption>Au plus près du vivant</figcaption>
               </figure>
               <figure className="public-hero-image public-hero-image-chickens">
                 <Image

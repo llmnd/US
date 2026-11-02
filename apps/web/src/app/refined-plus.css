@@ -16,10 +16,6 @@
 }
 .nav-list::-webkit-scrollbar { display: none; }
 
-/* profil sur toute la largeur, déconnexion en dessous */
-.profile { flex-wrap: wrap; row-gap: 12px; padding: 12px 6px 0; }
-.profile-logout { flex: 1 0 100%; min-height: 38px; }
-
 /* ---------- Dashboard : finitions ---------- */
 .metric-heading span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
@@ -122,15 +118,24 @@ details[open] > summary > svg:last-child { transform: rotate(90deg); }
 .photo-input-placeholder { background: #e9eee8; font-size: 12px; }
 
 /* ---------- Agriculture : fermes ---------- */
-.farm-card-grid { gap: 22px; }
+.farm-card-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); grid-auto-rows: 1fr; align-items: stretch; gap: 22px; }
 
-.farm-card { padding: 10px; }
+.farm-card { display: flex; min-width: 0; height: 100%; flex-direction: column; overflow: hidden; padding: 0; }
 
 .farm-card-image {
-  height: 210px;
-  border-radius: 18px;
+  width: 100%;
+  height: 230px;
+  flex: 0 0 230px;
+  border-radius: 0;
   background-color: #f3f4f1;
   object-fit: cover;
+}
+
+.farm-card .farm-card-image-placeholder {
+  width: 100%;
+  height: 230px;
+  flex: 0 0 230px;
+  border-radius: 0;
 }
 
 .farm-card-image-placeholder {
@@ -139,16 +144,19 @@ details[open] > summary > svg:last-child { transform: rotate(90deg); }
 }
 .farm-card-image-placeholder span { color: #8fa596; font-size: 12px; }
 
-.farm-card-body { padding: 20px 12px 10px; }
+.farm-card-body { display: flex; min-width: 0; flex: 1; flex-direction: column; padding: 20px 18px 16px; }
 
-.farm-card-title-row h3 { font-family: var(--serif); font-size: 26px; font-weight: 500; letter-spacing: -0.3px; line-height: 1.05; }
-.farm-card-title-row p { margin-top: 8px; font-size: 12px; }
+.farm-card-title-row { min-height: 68px; align-items: flex-start; }
+.farm-card-title-row > div { min-width: 0; }
+.farm-card-title-row h3 { display: -webkit-box; overflow: hidden; font-family: var(--serif); font-size: 26px; font-weight: 500; letter-spacing: -0.3px; line-height: 1.05; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.farm-card-title-row p { overflow: hidden; margin-top: 8px; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 
-.farm-card-stats { gap: 28px; margin-top: 20px; border-top-color: var(--hair); padding-top: 16px; font-size: 12px; }
+.farm-card-stats { gap: 28px; margin-top: auto; border-top-color: var(--hair); padding-top: 16px; font-size: 12px; }
 .farm-card-stats strong { margin-right: 4px; font-family: var(--serif); font-size: 22px; font-weight: 500; }
 
-.farm-card-actions { flex-wrap: wrap; gap: 6px 14px; margin-top: 18px; }
+.farm-card-actions { min-height: 58px; flex-wrap: wrap; align-content: flex-start; gap: 6px 10px; margin-top: 18px; }
 .farm-card-actions .button-secondary { min-height: 38px; padding: 0 16px; font-size: 12px; white-space: nowrap; }
+.farm-card-actions .text-action { margin-left: auto; }
 
 .panel .button-secondary,
 .campaign-card .button-secondary { background: #f3f4f1; box-shadow: none; }
@@ -172,7 +180,29 @@ details[open] > summary > svg:last-child { transform: rotate(90deg); }
 .agriculture-empty p { font-size: 13px; }
 
 /* ---------- Agriculture : parcelles ---------- */
-.agriculture-data-panel { margin-top: 24px; }
+.agriculture-data-panel { margin-top: 24px; padding: 28px; }
+.agriculture-data-panel > .agriculture-section-heading { align-items: flex-end; gap: 20px; }
+.agriculture-data-panel .parcel-toolbar { min-width: 0; }
+.parcel-card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); align-items: stretch; gap: 18px; margin-top: 22px; }
+.parcel-card { display: flex; min-width: 0; flex-direction: column; overflow: hidden; padding: 0; border-radius: 20px; background: #fff; box-shadow: var(--soft); transition: transform 180ms ease, box-shadow 180ms ease; }
+.parcel-card:hover { transform: translateY(-3px); box-shadow: 0 16px 34px rgb(20 30 22 / 10%); }
+.parcel-card-image,
+.parcel-card .parcel-card-image-placeholder { display: grid; width: 100%; height: 190px; flex: 0 0 auto; place-items: center; object-fit: cover; }
+.parcel-card .parcel-card-image-placeholder { gap: 8px; background: linear-gradient(145deg, #edf3e9, #f7f8f5); color: #76917b; }
+.parcel-card .parcel-card-image-placeholder span { color: #78877b; font-size: 11px; }
+.parcel-card-body { display: grid; flex: 1; gap: 18px; padding: 20px; }
+.parcel-card-heading { display: flex; min-width: 0; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.parcel-card-heading > div { display: grid; min-width: 0; gap: 9px; }
+.parcel-card-heading h3 { overflow: hidden; margin: 0; color: #25372a; font-family: var(--serif); font-size: 24px; font-weight: 500; letter-spacing: -0.3px; text-overflow: ellipsis; }
+.parcel-card-heading .crop-cell { width: fit-content; border-radius: 999px; background: #eef3ee; padding: 5px 10px; font-size: 11px; font-weight: 600; }
+.parcel-card-heading .status-pill { flex: 0 0 auto; }
+.parcel-card-details { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; border-top: 1px solid var(--hair); padding-top: 15px; }
+.parcel-card-details > span { display: grid; min-width: 0; gap: 5px; }
+.parcel-card-details small { color: var(--muted); font-size: 10px; }
+.parcel-card-details strong { overflow: hidden; color: #38473b; font-size: 12px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.parcel-card-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; border-top: 1px solid var(--hair); padding-top: 14px; }
+.parcel-card-actions .button-secondary { min-height: 36px; padding: 0 13px; font-size: 11px; }
+.parcel-card-actions .text-action { min-height: 36px; margin-left: auto; font-size: 11px; }
 .parcel-thumbnail { width: 52px; height: 42px; border-radius: 10px; }
 .crop-catalog { border-top-color: var(--hair); margin-top: 18px; padding-top: 16px; }
 .crop-catalog > summary { font-size: 12px; }
@@ -248,7 +278,8 @@ details[open] > summary > svg:last-child { transform: rotate(90deg); }
   .harvest-entry-card,
   .finance-entry-panel { padding: 4px 20px; }
   .campaign-card { padding: 22px; }
-  .farm-card-image { height: 190px; }
+  .farm-card-image,
+  .farm-card .farm-card-image-placeholder { height: 210px; flex-basis: 210px; }
 }
 
 /* ---------- Administration : équipe & accès ---------- */
@@ -339,6 +370,7 @@ details[open] > summary > svg:last-child { transform: rotate(90deg); }
 }
 
 @media (max-width: 560px) {
+  .farm-card-grid { grid-template-columns: minmax(0, 1fr); }
   .adm-invite { padding: 4px 20px; }
   .adm-invite-form { grid-template-columns: 1fr; }
   .adm-edit-form { grid-template-columns: 1fr; }
@@ -740,6 +772,15 @@ details[open] > summary > svg:last-child { transform: rotate(90deg); }
 .sales-empty-state p { font-size: 13px; }
 
 @media (max-width: 560px) {
+  .agriculture-data-panel { padding: 20px; }
+  .agriculture-data-panel > .agriculture-section-heading { align-items: stretch; }
+  .agriculture-data-panel .parcel-toolbar { justify-content: flex-start; }
+  .parcel-card-grid { grid-template-columns: minmax(0, 1fr); gap: 14px; margin-top: 18px; }
+  .parcel-card-image,
+  .parcel-card .parcel-card-image-placeholder { height: 180px; }
+  .parcel-card-body { gap: 15px; padding: 17px; }
+  .parcel-card-heading h3 { font-size: 22px; }
+  .parcel-card-actions .text-action { margin-left: 0; }
   .sales-create-panel { padding: 4px 20px; }
   .sales-list-panel { padding: 22px; }
   .sales-table-controls .sales-search,
