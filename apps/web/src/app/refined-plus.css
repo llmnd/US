@@ -692,3 +692,57 @@ details[open] > summary > svg:last-child { transform: rotate(90deg); }
   .operations-form-actions button { flex: 1; }
   .parcel-edit-dialog-content { padding: 24px; }
 }
+
+/* ---------- Ventes ---------- */
+.sales-create-panel { margin-bottom: 20px; padding: 8px 28px; }
+.sales-create-panel > summary { display: flex; min-height: 68px; align-items: center; gap: 14px; cursor: pointer; list-style: none; }
+.sales-create-panel > summary::-webkit-details-marker { display: none; }
+.sales-create-panel > summary > span:nth-child(2) { display: grid; flex: 1; gap: 4px; }
+.sales-create-panel > summary strong { font-size: 14px; }
+.sales-create-panel > summary small { color: var(--muted); font-size: 12px; }
+.sales-create-panel > summary > svg:last-child { color: #a3aca5; transition: transform 160ms ease; }
+
+.sales-order-form { gap: 18px; margin-top: 0; border-top: 1px solid var(--hair); padding: 22px 0 20px; }
+.sales-order-form .button-primary { min-height: 44px; padding: 0 24px; }
+
+.sales-list-panel { padding: 30px 30px 14px; }
+.sales-table-controls { flex-wrap: wrap; justify-content: space-between; gap: 12px; margin: 22px 0 10px; }
+.sales-table-controls .sales-search { min-width: 280px; min-height: 42px; padding: 0 16px; border-radius: 999px; font-size: 12px; }
+.sales-table-controls .select-compact { min-height: 42px; padding: 0 18px; }
+
+.sales-table { margin-top: 4px; border-collapse: separate; border-spacing: 0; }
+.sales-table th { padding: 0 16px 14px; }
+.sales-table td { border-bottom-color: var(--hair); padding: 20px 16px; transition: background 140ms ease; }
+.sales-table tbody tr:hover td { background: #fafaf7; }
+.sales-table tbody tr:hover td:first-child { border-radius: 16px 0 0 16px; }
+.sales-table tbody tr:hover td:last-child { border-radius: 0 16px 16px 0; }
+.sales-table tbody tr:last-child td { border-bottom: 0; }
+.sales-table th:nth-child(4),
+.sales-table td:nth-child(4) { text-align: right; }
+.sales-table td:nth-child(4) { font-family: var(--serif); font-size: 19px; font-weight: 500; letter-spacing: -0.2px; white-space: nowrap; }
+
+.status-select,
+.status-pill { min-height: 28px; border: 0; border-radius: 999px; padding: 0 14px; font-size: 12px; font-weight: 600; }
+.status-pill { display: inline-flex; padding: 5px 12px; font-size: 11px; }
+.status-select { min-height: 34px; }
+.status-select.confirmed,
+.status-pill.confirmed { background: var(--green-pale); color: var(--green-dark); }
+.status-select.preparing,
+.status-pill.preparing { background: #f7f1e3; color: #9c7a30; }
+.status-select.delivered,
+.status-pill.delivered { background: #edf2f8; color: #4f6f98; }
+.status-select.cancelled,
+.status-pill.cancelled { background: #fdf3f1; color: #b34d3e; }
+
+.sales-empty-state { min-height: 280px; gap: 12px; }
+.sales-empty-state .chart-empty-icon { width: 52px; height: 52px; background: var(--green-pale); box-shadow: none; }
+.sales-empty-state h3 { color: var(--ink); font-family: var(--serif); font-size: 26px; font-weight: 500; }
+.sales-empty-state p { font-size: 13px; }
+
+@media (max-width: 560px) {
+  .sales-create-panel { padding: 4px 20px; }
+  .sales-list-panel { padding: 22px; }
+  .sales-table-controls .sales-search,
+  .sales-table-controls .sales-filter-label,
+  .sales-table-controls .select-compact { width: 100%; }
+}

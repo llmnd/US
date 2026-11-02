@@ -45,7 +45,14 @@ function AuthLayout({
           priority
           sizes="(max-width: 860px) 100vw, 55vw"
         />
+
         <div className="auth-visual-shade" />
+
+        <div className="auth-visual-mark">
+          <Leaf size={16} strokeWidth={1.8} />
+          <span>mamari</span>
+        </div>
+
         <div className="auth-photo-card auth-photo-card-tractor">
           <Image
             src="/images/login-tractor.png"
@@ -62,11 +69,13 @@ function AuthLayout({
             sizes="(max-width: 860px) 24vw, 14vw"
           />
         </div>
+
         <div className="auth-visual-copy">
           <span>Au rythme de vos saisons</span>
           <p>La sérénité de piloter votre activité, simplement.</p>
         </div>
       </section>
+
       <section className="auth-content">
         <div className="auth-card">
           <AuthBrand />
@@ -75,7 +84,9 @@ function AuthLayout({
           <p className="page-description">{description}</p>
           {children}
         </div>
-        <p className="auth-footer">Mamari · Le pilotage clair de votre entreprise.</p>
+        <p className="auth-footer">
+          Mamari · Le pilotage clair de votre entreprise.
+        </p>
       </section>
     </main>
   );
@@ -146,9 +157,19 @@ export function LoginPage() {
             type="password"
           />
         </label>
-        {error ? <p className="auth-error" role="alert">{error}</p> : null}
-        <button className="button-primary auth-submit" disabled={isSubmitting} type="submit">
-          {isSubmitting ? <LoaderCircle className="auth-spinner" size={16} /> : null}
+        {error ? (
+          <p className="auth-error" role="alert">
+            {error}
+          </p>
+        ) : null}
+        <button
+          className="button-primary auth-submit"
+          disabled={isSubmitting}
+          type="submit"
+        >
+          {isSubmitting ? (
+            <LoaderCircle className="auth-spinner" size={16} />
+          ) : null}
           Se connecter
           {!isSubmitting ? <ArrowRight size={16} /> : null}
         </button>
