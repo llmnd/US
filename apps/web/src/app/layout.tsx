@@ -6,6 +6,7 @@ import "./globals.css";
 import "./refined.css";
 import "./refined-plus.css";
 import "./auth.css";
+import "./public.css";
 
 export const metadata: Metadata = {
   title: {

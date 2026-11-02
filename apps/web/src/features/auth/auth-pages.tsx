@@ -118,7 +118,7 @@ export function LoginPage() {
       const destination =
         requestedPath?.startsWith("/") && !requestedPath.startsWith("//")
           ? requestedPath
-          : "/";
+          : "/dashboard";
       router.replace(destination);
     } catch (submitError) {
       setError(getApiErrorMessage(submitError));

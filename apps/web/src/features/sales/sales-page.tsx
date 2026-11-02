@@ -2,7 +2,14 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useDeferredValue, useState, type FormEvent } from "react";
-import { ChevronLeft, ChevronRight, Search, ShoppingBasket } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Plus,
+  Search,
+  ShoppingBasket,
+} from "lucide-react";
 import {
   apiRequest,
   getApiErrorMessage,
@@ -17,7 +24,7 @@ import {
   type SalesOrderPage,
 } from "@/features/sales/sales-types";
 
-const statuses = ["confirmed", "preparing", "delivered", "cancelled"] as const;
+const statuses = ["pending", "confirmed", "preparing", "delivered", "cancelled"] as const;
 
 function isOrderStatus(value: string): value is OrderStatus {
   return statuses.some((status) => status === value);
@@ -142,7 +149,9 @@ export function SalesPage() {
         <section className="panel sales-create-panel" aria-labelledby="create-order-title">
           <div className="panel-header">
             <div>
-              <h2 className="panel-title" id="create-order-title">Enregistrer une commande</h2>
+              <h2 className="panel-title" id="create-order-title">
+                <Plus size={16} aria-hidden="true" /> Enregistrer une commande
+              </h2>
               <p className="panel-subtitle">La référence est générée automatiquement.</p>
             </div>
           </div>
@@ -248,6 +257,7 @@ export function SalesPage() {
                   <tr>
                     <th scope="col">RÉFÉRENCE</th>
                     <th scope="col">CLIENT</th>
+                    <th scope="col">ARTICLES</th>
                     <th scope="col">DATE</th>
                     <th scope="col">MONTANT</th>
                     <th scope="col">STATUT</th>
@@ -257,11 +267,35 @@ export function SalesPage() {
                   {ordersData.items.map((order) => (
                     <tr key={order.id}>
                       <td className="table-primary">{order.reference}</td>
-                      <td>{order.customer_name}</td>
+                      <td>
+                        <span className="sales-customer-details">
+                          <strong>{order.customer_name}</strong>
+                          {order.customer_phone ? <small>{order.customer_phone}</small> : null}
+                          {order.customer_email ? <small>{order.customer_email}</small> : null}
+                          {order.delivery_address ? <small>{order.delivery_address}</small> : null}
+                        </span>
+                      </td>
+                      <td>
+                        {order.items.length ? (
+                          <details className="sales-order-items">
+                            <summary>
+                              {order.items.length} article(s) <ChevronDown size={13} />
+                            </summary>
+                            <div>
+                              {order.items.map((item, index) => (
+                                <p key={`${order.id}-${item.product_id ?? index}`}>
+                                  <strong>{item.quantity} × {item.product_name}</strong>
+                                  <span>{formatFcfa(item.quantity * item.unit_price_fcfa)}</span>
+                                </p>
+                              ))}
+                            </div>
+                          </details>
+                        ) : <span className="sales-manual-order">Saisie manuelle</span>}
+                      </td>
                       <td>{formatDate(order.order_date)}</td>
                       <td className="table-primary">{formatFcfa(order.amount_fcfa)}</td>
                       <td>
-                        {canManageSales ? (
+                        {canManageSales && order.status !== "cancelled" ? (
                           <label className="status-select-label">
                             <span className="visually-hidden">Statut de {order.reference}</span>
                             <select
@@ -331,7 +365,7 @@ export function SalesPage() {
             <p>
               {deferredSearch || statusFilter !== "all"
                 ? "Modifiez vos filtres ou votre recherche."
-                : "Les ventes saisies ici alimenteront le chiffre d'affaires du tableau de bord."}
+                : "Les commandes de la boutique et les ventes saisies ici apparaîtront dans ce suivi."}
             </p>
           </div>
         ) : null}

@@ -93,7 +93,11 @@ async def read_dashboard_overview(
                     case(
                         (
                             SalesOrder.status.in_(
-                                (OrderStatus.CONFIRMED.value, OrderStatus.PREPARING.value)
+                                (
+                                    OrderStatus.PENDING.value,
+                                    OrderStatus.CONFIRMED.value,
+                                    OrderStatus.PREPARING.value,
+                                )
                             ),
                             1,
                         ),

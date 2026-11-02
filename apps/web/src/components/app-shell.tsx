@@ -31,7 +31,7 @@ import {
 } from "@/lib/api/client";
 
 const navigation = [
-  { label: "Vue d'ensemble", href: "/", icon: LayoutDashboard },
+  { label: "Vue d'ensemble", href: "/dashboard", icon: LayoutDashboard },
   { label: "Opérations", href: "/operations", icon: ClipboardList },
   { label: "Agriculture", href: "/agriculture", icon: Leaf },
   { label: "Élevage", href: "/elevage", icon: Activity },
@@ -57,7 +57,11 @@ export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
   const pathname = usePathname();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const isPublicRoute = pathname === "/login";
+  const isPublicRoute =
+    pathname === "/" ||
+    pathname === "/produits" ||
+    pathname === "/panier" ||
+    pathname === "/login";
   const [logoutError, setLogoutError] = useState<string | null>(null);
   const [logoutPending, setLogoutPending] = useState(false);
   const profile = useQuery({

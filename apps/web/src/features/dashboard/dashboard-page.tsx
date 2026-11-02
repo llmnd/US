@@ -47,6 +47,7 @@ const chartStyles: Array<{
 ];
 
 const statusClassNames = {
+  pending: "warning",
   confirmed: "",
   preparing: "warning",
   delivered: "delivered",
