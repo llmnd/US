@@ -15,10 +15,7 @@ import {
 function AuthBrand() {
   return (
     <Link className="auth-brand" href="/" aria-label="Mamari, accueil">
-      <span className="brand-mark">
-        <Leaf size={19} strokeWidth={2.2} />
-      </span>
-      <span className="brand-name">mamari</span>
+      <Image alt="" className="auth-brand-logo" height={72} src="/icon.png" width={74} />
     </Link>
   );
 }

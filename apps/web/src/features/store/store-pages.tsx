@@ -17,8 +17,6 @@ import {
   Sprout,
   Tractor,
   Wheat,
-  Star,
-  Quote,
   Truck,
   Sun,
   CalendarDays,
@@ -43,16 +41,19 @@ function PublicHeader() {
   return (
     <header className="public-header">
       <Link className="public-brand" href="/" aria-label="Mamari, accueil">
-        <span className="brand-mark"><Leaf size={19} strokeWidth={2.2} /></span>
-        <span className="public-brand-copy">
-          <span>mamari</span>
-          <small>Terre &amp; traditions</small>
-        </span>
+        <Image
+          alt=""
+          className="public-brand-logo"
+          height={76}
+          priority
+          src="/icon.png"
+          width={78}
+        />
       </Link>
       <nav className="public-navigation" aria-label="Navigation principale">
         <span className="public-nav-links">
           <Link href="/#activites">Nos activités</Link>
-          <Link href="/#histoire">Notre histoire</Link>
+          <Link href="/qui-sommes-nous">Qui sommes-nous ?</Link>
           <Link href="/produits">La boutique</Link>
         </span>
         <span className="public-nav-actions">
@@ -61,7 +62,7 @@ function PublicHeader() {
             <span>Panier</span>
             {cartCount ? <span className="public-cart-count">{cartCount}</span> : null}
           </Link>
-          <Link className="public-login-link" href="/login">
+          <Link className="public-login-link" href="/dashboard">
             Espace équipe <ArrowRight size={14} />
           </Link>
         </span>
@@ -79,22 +80,27 @@ function PublicFooter() {
       <div className="public-footer-main">
         <div className="public-footer-about">
           <Link className="public-brand" href="/" aria-label="Mamari, accueil">
-            <span className="brand-mark"><Leaf size={18} /></span>
-            <span>mamari</span>
+            <Image
+              alt=""
+              className="public-brand-logo"
+              height={66}
+              src="/icon.png"
+              width={68}
+            />
           </Link>
           <p>Des activités agricoles durables et des produits choisis avec soin, au rythme des saisons.</p>
         </div>
         <nav className="public-footer-nav" aria-label="Découvrir Mamari">
           <h2>Découvrir</h2>
           <Link href="/#activites">Nos activités</Link>
-          <Link href="/#histoire">Notre histoire</Link>
+          <Link href="/qui-sommes-nous">Qui sommes-nous ?</Link>
           <Link href="/produits">La boutique</Link>
           <Link href="/panier">Votre panier</Link>
         </nav>
         <div className="public-footer-team">
           <h2>Une question ?</h2>
           <p>Notre équipe est à votre écoute pour vous accompagner.</p>
-          <Link href="/login">Espace équipe <ArrowRight size={14} /></Link>
+          <Link href="/dashboard">Espace équipe <ArrowRight size={14} /></Link>
         </div>
       </div>
       <div className="public-footer-bottom">
@@ -198,14 +204,6 @@ export function PublicHomePage() {
         {/* ---------- HERO ---------- */}
         <section className="public-hero">
           <div className="public-hero-photo">
-            <Image
-              alt=""
-              fill
-              priority
-              sizes="(max-width: 900px) 100vw, 72vw"
-              src="/images/login-corn.png"
-            />
-            <div className="public-hero-shade" />
             <div className="public-hero-copy">
               <p className="public-eyebrow">Cultiver · Élever · Partager</p>
               <h1>La terre nous rassemble.</h1>
@@ -217,28 +215,68 @@ export function PublicHomePage() {
                 Découvrir nos produits <ArrowRight size={17} />
               </Link>
               <p className="public-hero-meta">
-                <span>·</span>
-                <Users size={12} /> 1 200+ familles nous font confiance
+                <Leaf size={12} /> Une aventure portée par le terrain
               </p>
             </div>
-            <div className="public-hero-stamp">
-              <Leaf size={19} />
-              <span>Du champ<br />à votre table</span>
+            <div className="public-hero-collage" aria-label="La vie à la ferme, entre élevage et pâturage">
+              <figure className="public-hero-image public-hero-image-cows">
+                <Image
+                  alt="Deux vaches dans un pâturage."
+                  fill
+                  priority
+                  quality={90}
+                  sizes="(max-width: 600px) 100vw, (max-width: 820px) 92vw, 34vw"
+                  src="/images/mamari-hero-cows.png"
+                />
+                <figcaption>Au plus près du vivant</figcaption>
+              </figure>
+              <figure className="public-hero-image public-hero-image-pasture">
+                <Image
+                  alt="Des animaux se reposent dans un pré ensoleillé."
+                  fill
+                  quality={85}
+                  sizes="(max-width: 600px) 33vw, (max-width: 820px) 30vw, 18vw"
+                  src="/images/mamari-hero-pasture.png"
+                />
+                <figcaption>La vie au pré</figcaption>
+              </figure>
+              <figure className="public-hero-image public-hero-image-horses">
+                <Image
+                  alt="Deux chevaux dans un pré."
+                  fill
+                  quality={85}
+                  sizes="(max-width: 600px) 33vw, (max-width: 820px) 30vw, 18vw"
+                  src="/images/mamari-hero-horses.png"
+                />
+                <figcaption>Au rythme des saisons</figcaption>
+              </figure>
+              <figure className="public-hero-image public-hero-image-chickens">
+                <Image
+                  alt="Une poule et son élevage en plein air."
+                  fill
+                  quality={85}
+                  sizes="(max-width: 600px) 33vw, (max-width: 820px) 30vw, 18vw"
+                  src="/images/mamari-hero-chickens.png"
+                />
+                <figcaption>La ferme en mouvement</figcaption>
+              </figure>
             </div>
-          </div>
-          <div className="public-hero-note">
-            <span>Une aventure ancrée dans le vivant</span>
-            <p>Nous faisons grandir des activités agricoles durables et des liens de confiance.</p>
           </div>
         </section>
 
         {/* ---------- STATS ---------- */}
-        <section className="public-stats">
-          <div className="public-stats-grid">
-            <div><strong>8</strong><span>années d&apos;expérience</span></div>
-            <div><strong>12</strong><span>hectares cultivés</span></div>
-            <div><strong>45</strong><span>produits de la ferme</span></div>
-            <div><strong>1 200<span className="accent">+</span></strong><span>familles servies</span></div>
+        <section className="public-values-strip" aria-label="Les valeurs Mamari">
+          <div>
+            <span className="public-values-icon"><Sprout size={19} /></span>
+            <p><strong>La terre</strong><small>Notre premier repère</small></p>
+          </div>
+          <div>
+            <span className="public-values-icon"><Wheat size={19} /></span>
+            <p><strong>Le savoir-faire</strong><small>Apprendre, chaque jour</small></p>
+          </div>
+          <div>
+            <span className="public-values-icon"><Users size={19} /></span>
+            <p><strong>Le lien humain</strong><small>Avancer ensemble</small></p>
           </div>
         </section>
 
@@ -276,55 +314,70 @@ export function PublicHomePage() {
         {/* ---------- HISTOIRE ---------- */}
         <section className="public-section public-story" id="histoire">
           <div className="public-story-copy">
-            <p className="public-eyebrow">Notre histoire</p>
-            <h2>Une aventure qui a pris racine.</h2>
+            <p className="public-eyebrow">Qui sommes-nous ?</p>
+            <h2>Une histoire qui se construit sur le terrain.</h2>
             <p>
-              Depuis 2016, Mamari cultive bien plus que des produits : un lien de
-              confiance avec la terre et ceux qui la travaillent. Chaque saison
-              nous rappelle l&apos;importance du rythme juste et du travail bien fait.
+              Mamari grandit au fil du travail, des apprentissages et des rencontres.
+              Au cœur de cette aventure : le respect de la terre, le goût du travail
+              bien fait et l&apos;envie de bâtir quelque chose qui ait du sens.
             </p>
-            <ul className="public-story-timeline">
-              <li>
-                <span>2016</span>
-                <div>
-                  <strong>Premières parcelles</strong>
-                  <p>Une petite exploitation familiale voit le jour.</p>
-                </div>
-              </li>
-              <li>
-                <span>2020</span>
-                <div>
-                  <strong>L&apos;élevage rejoint l&apos;aventure</strong>
-                  <p>Diversification et respect du bien-être animal.</p>
-                </div>
-              </li>
-              <li>
-                <span>2024</span>
-                <div>
-                  <strong>La boutique en ligne</strong>
-                  <p>Nos produits livrés directement chez vous.</p>
-                </div>
-              </li>
-            </ul>
-            <Link className="public-text-link" href="/produits">
-              Découvrir nos produits <ArrowRight size={15} />
+            <Link className="public-text-link" href="/qui-sommes-nous">
+              Découvrir notre histoire <ArrowRight size={15} />
             </Link>
           </div>
           <div className="public-story-visual">
             <Image
-              alt=""
+              alt="Un membre de l’équipe observe une parcelle et prend des notes sur le terrain."
               fill
+              quality={90}
               sizes="(max-width: 900px) 90vw, 45vw"
-              src="/images/login-corn.png"
-              style={{ objectPosition: "center 30%" }}
+              src="/images/mamari-field-work.png"
             />
             <div className="public-story-badge">
               <Leaf size={18} />
               <div>
-                <strong>100% local</strong>
-                <span>cultivé &amp; engagé</span>
+                <strong>Au plus près du terrain</strong>
+                <span>Le travail, à hauteur d&apos;humain</span>
               </div>
             </div>
+          </div>
+        </section>
+
+        <section className="public-section public-home-history">
+          <div className="public-home-history-copy">
+            <p className="public-eyebrow">L&apos;aventure Mamari</p>
+            <h2>Une aventure qui a pris racine.</h2>
+            <p>
+              Mamari cultive bien plus que des produits : un lien de confiance
+              avec la terre et celles et ceux qui la travaillent. Chaque saison
+              rappelle l&apos;importance du rythme juste et du travail bien fait.
+            </p>
+            <ol className="public-home-history-timeline">
+              <li>
+                <span>La terre</span>
+                <div>
+                  <strong>L&apos;agriculture au cœur de l&apos;aventure</strong>
+                  <p>Le travail de la terre et le respect des saisons nous guident.</p>
+                </div>
+              </li>
+              <li>
+                <span>L&apos;élevage</span>
+                <div>
+                  <strong>Des activités qui grandissent</strong>
+                  <p>Une exploitation vivante, attentive au bien-être animal.</p>
+                </div>
+              </li>
+              <li>
+                <span>Le partage</span>
+                <div>
+                  <strong>Des produits plus proches de vous</strong>
+                  <p>La boutique prolonge le lien entre Mamari et ses clients.</p>
+                </div>
+              </li>
+            </ol>
+            <Link className="public-text-link" href="/produits">
+              Découvrir nos produits <ArrowRight size={15} />
+            </Link>
           </div>
         </section>
 
@@ -396,48 +449,30 @@ export function PublicHomePage() {
           </div>
         </section>
 
-        {/* ---------- TÉMOIGNAGES ---------- */}
-        <section className="public-section public-testimonials">
+        {/* ---------- VISAGES DE MAMARI ---------- */}
+        <section className="public-section public-home-gallery">
           <div className="public-section-heading">
             <div>
-              <p className="public-eyebrow">Ils nous font confiance</p>
-              <h2>Des voix qui nous animent.</h2>
+              <p className="public-eyebrow">Une aventure humaine</p>
+              <h2>Le chemin se fait ensemble.</h2>
             </div>
+            <Link className="public-text-link" href="/qui-sommes-nous">
+              Rencontrer Mamari <ArrowRight size={15} />
+            </Link>
           </div>
-          <div className="public-testimonials-grid">
-            <blockquote>
-              <Quote size={20} />
-              <p>« Une qualité irréprochable et un contact toujours chaleureux. On sent le soin dans chaque produit. »</p>
-              <footer>
-                <span className="public-testimonial-avatar">AD</span>
-                <div>
-                  <strong>Awa D.</strong>
-                  <small>Cliente fidèle</small>
-                </div>
-              </footer>
-            </blockquote>
-            <blockquote>
-              <Quote size={20} />
-              <p>« Des produits qui ont du goût et une histoire. Ma famille ne jure plus que par Mamari. »</p>
-              <footer>
-                <span className="public-testimonial-avatar">KM</span>
-                <div>
-                  <strong>Kofi M.</strong>
-                  <small>Client depuis 2022</small>
-                </div>
-              </footer>
-            </blockquote>
-            <blockquote>
-              <Quote size={20} />
-              <p>« Un partenariat de confiance, des livraisons ponctuelles et un vrai respect des saisons. »</p>
-              <footer>
-                <span className="public-testimonial-avatar">FS</span>
-                <div>
-                  <strong>Fatou S.</strong>
-                  <small>Restauratrice partenaire</small>
-                </div>
-              </footer>
-            </blockquote>
+          <div className="public-home-gallery-grid">
+            <figure className="public-home-gallery-card public-home-gallery-field">
+              <Image alt="Travail de suivi des cultures dans une parcelle." fill quality={90} sizes="(max-width: 700px) 100vw, 40vw" src="/images/mamari-survey.png" />
+              <figcaption><span>01</span><strong>Être au contact du terrain</strong></figcaption>
+            </figure>
+            <figure className="public-home-gallery-card">
+              <Image alt="Remise d’un certificat de reconnaissance au dirigeant de Mamari." fill quality={90} sizes="(max-width: 700px) 100vw, 30vw" src="/images/mamari-certificate.png" />
+              <figcaption><span>02</span><strong>Apprendre et faire ses preuves</strong></figcaption>
+            </figure>
+            <figure className="public-home-gallery-card">
+              <Image alt="Cérémonie de remise de distinctions." fill quality={90} sizes="(max-width: 700px) 100vw, 30vw" src="/images/mamari-recognition.png" />
+              <figcaption><span>03</span><strong>Faire grandir une ambition</strong></figcaption>
+            </figure>
           </div>
         </section>
 
@@ -447,8 +482,8 @@ export function PublicHomePage() {
             <p className="public-eyebrow">L&apos;aventure Mamari</p>
             <h2>Une question ou une envie de collaborer ?</h2>
           </div>
-          <Link className="public-secondary-link" href="/produits">
-            Visiter la boutique <ChevronRight size={16} />
+          <Link className="public-secondary-link" href="/qui-sommes-nous">
+            Qui sommes-nous ? <ChevronRight size={16} />
           </Link>
         </section>
 
@@ -480,6 +515,152 @@ export function PublicHomePage() {
                 </>
               )}
             </form>
+          </div>
+        </section>
+      </main>
+      <PublicFooter />
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  ABOUT                                                              */
+/* ------------------------------------------------------------------ */
+export function AboutPage() {
+  return (
+    <div className="public-site">
+      <PublicHeader />
+      <main className="public-about">
+        <section className="public-about-hero">
+          <div className="public-about-hero-copy">
+            <p className="public-eyebrow">Qui sommes-nous ?</p>
+            <h1>Une histoire de terre, de travail et de liens humains.</h1>
+            <p>
+              Mamari grandit au fil des saisons, des apprentissages et des
+              rencontres. Une aventure agricole portée par une conviction :
+              le travail de la terre peut nourrir bien plus que nos assiettes.
+            </p>
+            <div className="public-about-hero-actions">
+              <Link className="public-primary-link" href="/#activites">
+                Nos activités <ArrowRight size={16} />
+              </Link>
+              <Link className="public-about-secondary-link" href="/produits">
+                Découvrir la boutique
+              </Link>
+            </div>
+            <span className="public-about-signature">Au rythme de la terre, avec celles et ceux qui la font vivre.</span>
+          </div>
+          <figure className="public-about-hero-visual">
+            <Image
+              alt="Un technicien de Mamari observe une parcelle avec un instrument de mesure."
+              fill
+              priority
+              quality={90}
+              sizes="(max-width: 900px) 100vw, 48vw"
+              src="/images/mamari-survey.png"
+            />
+            <figcaption>
+              <span>Notre histoire</span>
+              <strong>Commence au contact du terrain.</strong>
+            </figcaption>
+          </figure>
+        </section>
+
+        <section className="public-about-opening">
+          <span aria-hidden="true">“</span>
+          <p>
+            Faire grandir Mamari, c&apos;est croire qu&apos;avec de la patience,
+            du courage et les bonnes personnes à ses côtés, une idée peut
+            prendre racine et devenir utile à beaucoup.
+          </p>
+          <small>La conviction qui nous accompagne</small>
+        </section>
+
+        <section className="public-about-human">
+          <div className="public-about-human-visual">
+            <figure className="public-about-human-portrait">
+              <Image
+                alt="Portrait d’un membre de l’équipe Mamari."
+                fill
+                quality={90}
+                sizes="(max-width: 800px) 88vw, 38vw"
+                src="/images/mamari-portrait.png"
+              />
+            </figure>
+            <figure className="public-about-human-moment">
+              <Image
+                alt="Un membre de Mamari face à l’horizon."
+                fill
+                quality={90}
+                sizes="(max-width: 800px) 42vw, 18vw"
+                src="/images/mamari-team.png"
+              />
+              <figcaption>Regarder plus loin</figcaption>
+            </figure>
+          </div>
+          <div className="public-about-human-copy">
+            <p className="public-eyebrow">Derrière chaque projet, des personnes</p>
+            <h2>Une ambition n&apos;a de sens que si elle est partagée.</h2>
+            <p>
+              Il y a les idées, bien sûr. Mais il y a surtout les personnes qui
+              les portent : celles qui apprennent, qui recommencent, qui
+              transmettent et qui donnent le meilleur d&apos;elles-mêmes.
+            </p>
+            <p>
+              Mamari, c&apos;est cette énergie humaine mise au service d&apos;un
+              projet agricole en mouvement, avec l&apos;envie de faire les choses
+              avec sérieux et avec cœur.
+            </p>
+          </div>
+        </section>
+
+        <section className="public-section public-about-values">
+          <div className="public-section-heading">
+            <div>
+              <p className="public-eyebrow">Ce que nous voulons faire grandir</p>
+              <h2>Plus qu&apos;une récolte.</h2>
+            </div>
+            <p>Une façon d&apos;entreprendre attentive à la terre comme aux personnes.</p>
+          </div>
+          <div className="public-about-values-grid">
+            <article>
+              <span><Sprout size={21} /></span>
+              <h3>Prendre soin du vivant</h3>
+              <p>Respecter les saisons, comprendre le terrain et avancer avec attention.</p>
+            </article>
+            <article>
+              <span><Wheat size={21} /></span>
+              <h3>Faire les choses avec cœur</h3>
+              <p>Apporter du soin à chaque étape, du premier geste au produit partagé.</p>
+            </article>
+            <article>
+              <span><Users size={21} /></span>
+              <h3>Grandir ensemble</h3>
+              <p>Écouter, apprendre et reconnaître la valeur de chaque contribution.</p>
+            </article>
+          </div>
+        </section>
+
+        <section className="public-about-closing">
+          <div className="public-about-closing-copy">
+            <p className="public-eyebrow">Et la suite s&apos;écrit ensemble</p>
+            <h2>Merci de faire une place à Mamari dans votre histoire.</h2>
+            <p>
+              Chaque rencontre, chaque échange et chaque produit partagé
+              prolongent cette aventure.
+            </p>
+            <Link className="public-primary-link" href="/produits">
+              Découvrir nos produits <ArrowRight size={16} />
+            </Link>
+          </div>
+          <div className="public-about-closing-photos">
+            <Image
+              alt="Un moment de rencontre autour de projets agricoles."
+              fill
+              quality={90}
+              sizes="(max-width: 800px) 88vw, 34vw"
+              src="/images/mamari-event.png"
+            />
           </div>
         </section>
       </main>

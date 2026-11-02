@@ -1,5 +1,6 @@
 "use client";
 
+import NextImage from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
@@ -14,6 +15,7 @@ import {
   ClipboardList,
   Coins,
   Factory,
+  Home,
   Image,
   LayoutDashboard,
   Leaf,
@@ -61,6 +63,7 @@ export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
     pathname === "/" ||
     pathname === "/produits" ||
     pathname === "/panier" ||
+    pathname === "/qui-sommes-nous" ||
     pathname === "/login";
   const [logoutError, setLogoutError] = useState<string | null>(null);
   const [logoutPending, setLogoutPending] = useState(false);
@@ -82,9 +85,7 @@ export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
   if (profile.isPending) {
     return (
       <div className="auth-loading" role="status">
-        <span className="brand-mark">
-          <Leaf size={19} />
-        </span>
+        <NextImage alt="" className="private-brand-logo" height={42} src="/icon.png" width={44} />
         <span>Chargement de votre espace…</span>
       </div>
     );
@@ -127,7 +128,7 @@ export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
     try {
       await apiRequest<{ message: string }>("/auth/logout", { method: "POST" });
       queryClient.clear();
-      router.replace("/login");
+      router.replace("/");
     } catch (error) {
       setLogoutError(getApiErrorMessage(error));
     } finally {
@@ -139,11 +140,8 @@ export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
     <div className="app-shell">
       <aside className="sidebar" aria-label="Navigation principale">
         <Link className="brand" href="/" aria-label="Mamari, accueil">
-          <span className="brand-mark">
-            <Leaf size={19} strokeWidth={2.2} />
-          </span>
+          <NextImage alt="" className="private-brand-logo" height={62} src="/icon.png" width={64} />
           <span>
-            <span className="brand-name">mamari</span>
             <span className="brand-caption">Gestion d&apos;entreprise</span>
           </span>
         </Link>
@@ -172,6 +170,10 @@ export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
         </nav>
 
         <div className="sidebar-footer">
+          <Link className="nav-link public-site-link" href="/" aria-label="Accéder au site public">
+            <Home size={17} strokeWidth={1.8} />
+            <span>Site public</span>
+          </Link>
           <Link className="nav-link" href="/aide">
             <CircleHelp size={17} strokeWidth={1.8} />
             <span>Centre d&apos;aide</span>
