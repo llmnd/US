@@ -51,6 +51,9 @@ class SalesOrder(Base):
     created_by_id: Mapped[uuid.UUID] = mapped_column(
         Uuid, ForeignKey("users.id", ondelete="RESTRICT"), nullable=True
     )
+    customer_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("sales_customers.id", ondelete="SET NULL"), nullable=True
+    )
     reference: Mapped[str] = mapped_column(String(32), nullable=False)
     customer_name: Mapped[str] = mapped_column(String(160), nullable=False)
     customer_phone: Mapped[str | None] = mapped_column(String(32), nullable=True)
@@ -69,6 +72,30 @@ class SalesOrder(Base):
         cascade="all, delete-orphan",
         lazy="selectin",
         order_by="SalesOrderItem.created_at",
+    )
+
+
+class Customer(Base):
+    __tablename__ = "sales_customers"
+    __table_args__ = (
+        Index("ix_sales_customers_org_name", "organization_id", "name"),
+        Index("ix_sales_customers_org_phone", "organization_id", "phone"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False
+    )
+    customer_type: Mapped[str] = mapped_column(String(16), nullable=False, default="individual")
+    name: Mapped[str] = mapped_column(String(160), nullable=False)
+    company_name: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    phone: Mapped[str] = mapped_column(String(32), nullable=False)
+    email: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    address: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    city: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
     )
 
 

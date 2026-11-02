@@ -119,6 +119,20 @@ async def test_livestock_groups_animals_care_production_feed_and_finance(
     )
     assert eggs_response.status_code == 201, eggs_response.text
 
+    birth_response = await client.post(
+        "/api/v1/livestock/records",
+        headers=headers,
+        json={
+            "record_type": "reproduction",
+            "category": "birth",
+            "title": "Mise bas",
+            "group_id": group["id"],
+            "quantity": 5,
+            "unit": "œufs",
+        },
+    )
+    assert birth_response.status_code == 201, birth_response.text
+
     feed_response = await client.post(
         "/api/v1/livestock/records",
         headers=headers,
@@ -139,15 +153,66 @@ async def test_livestock_groups_animals_care_production_feed_and_finance(
     overview = await client.get("/api/v1/livestock/overview", headers=headers)
     assert overview.status_code == 200, overview.text
     assert overview.json()["animal_count"] == 1
+    assert overview.json()["female_animal_count"] == 1
+    assert overview.json()["male_animal_count"] == 0
+    assert overview.json()["species_count"] == 1
     assert overview.json()["group_count"] == 1
+    assert overview.json()["group_head_count"] == 40
     assert overview.json()["facility_count"] == 1
+    assert overview.json()["health_record_count"] == 1
     assert overview.json()["health_follow_up_count"] == 1
+    assert overview.json()["upcoming_care_count"] == 1
+    assert overview.json()["care_due_soon_count"] == 0
     assert overview.json()["upcoming_care"][0]["overdue"] is True
+    assert overview.json()["production_month_count"] == 2
     production_totals = {
         row["unit"]: float(row["quantity"])
         for row in overview.json()["production_month_totals"]
     }
     assert production_totals == {"litres": 8.5, "œufs": 12}
+    assert overview.json()["reproduction_month_count"] == 1
+    reproduction_totals = {
+        row["unit"]: float(row["quantity"])
+        for row in overview.json()["reproduction_month_totals"]
+    }
+    assert reproduction_totals == {"œufs": 5}
+    assert overview.json()["feed_month_count"] == 1
+    feed_totals = {
+        row["unit"]: float(row["quantity"])
+        for row in overview.json()["feed_month_totals"]
+    }
+    assert feed_totals == {"kg": 25}
+    assert overview.json()["feed_month_cost_fcfa"] == 15000
+
+    current_month_start = date.today().replace(day=1)
+    if current_month_start.month == 12:
+        next_month_start = date(current_month_start.year + 1, 1, 1)
+    else:
+        next_month_start = date(current_month_start.year, current_month_start.month + 1, 1)
+    for event_date, title in (
+        (current_month_start - timedelta(days=1), "Production du mois précédent"),
+        (next_month_start, "Production du mois suivant"),
+    ):
+        outside_month_production = await client.post(
+            "/api/v1/livestock/records",
+            headers=headers,
+            json={
+                "record_type": "production",
+                "category": "other",
+                "title": title,
+                "animal_id": animal["id"],
+                "event_date": event_date.isoformat(),
+                "quantity": 99,
+                "unit": "kg",
+            },
+        )
+        assert outside_month_production.status_code == 201, outside_month_production.text
+    current_month_overview = await client.get("/api/v1/livestock/overview", headers=headers)
+    current_month_totals = {
+        row["unit"]: float(row["quantity"])
+        for row in current_month_overview.json()["production_month_totals"]
+    }
+    assert current_month_totals == {"litres": 8.5, "œufs": 12}
 
     resolved = await client.patch(
         f"/api/v1/livestock/records/{care_response.json()['id']}/resolve",
@@ -174,6 +239,48 @@ async def test_livestock_groups_animals_care_production_feed_and_finance(
     assert transactions_by_label["Aliment pondeuse"]["transaction_type"] == "expense"
     assert transactions_by_label["Collecte du matin"]["amount_fcfa"] == 6000
     assert transactions_by_label["Collecte du matin"]["transaction_type"] == "income"
+
+    livestock_finances = await client.get(
+        f"/api/v1/livestock/finance/transactions?year={date.today().year}",
+        headers=headers,
+    )
+    assert livestock_finances.status_code == 200, livestock_finances.text
+    assert livestock_finances.json()["total"] == 2
+    livestock_finances_by_label = {
+        item["label"]: item for item in livestock_finances.json()["items"]
+    }
+    assert livestock_finances_by_label["Collecte du matin"]["animal_name"] == animal["name"]
+    assert livestock_finances_by_label["Aliment pondeuse"]["group_name"] == group["name"]
+
+    finance_summary = await client.get(
+        f"/api/v1/livestock/finance/summary?year={date.today().year}",
+        headers=headers,
+    )
+    assert finance_summary.status_code == 200, finance_summary.text
+    assert finance_summary.json()["income_fcfa"] == 6000
+    assert finance_summary.json()["expenses_fcfa"] == 15000
+    assert finance_summary.json()["balance_fcfa"] == -9000
+    assert len(finance_summary.json()["monthly_income"]) == 12
+
+    manual_finance = await client.post(
+        "/api/v1/livestock/finance/transactions",
+        headers=headers,
+        json={
+            "transaction_type": "expense",
+            "category": "health",
+            "label": "Consultation vétérinaire",
+            "amount_fcfa": 8000,
+            "animal_id": animal["id"],
+            "transaction_date": date.today().isoformat(),
+        },
+    )
+    assert manual_finance.status_code == 201, manual_finance.text
+    assert manual_finance.json()["animal_name"] == animal["name"]
+    updated_finance_summary = await client.get(
+        f"/api/v1/livestock/finance/summary?year={date.today().year}",
+        headers=headers,
+    )
+    assert updated_finance_summary.json()["expenses_fcfa"] == 23000
 
     sold = await client.patch(
         f"/api/v1/livestock/animals/{animal['id']}/status?status=sold",

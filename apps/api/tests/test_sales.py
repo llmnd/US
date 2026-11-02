@@ -48,6 +48,103 @@ async def test_sales_orders_feed_real_dashboard_metrics(client: AsyncClient) -> 
 
 
 @pytest.mark.asyncio
+async def test_customers_can_be_created_listed_and_selected_for_orders(
+    client: AsyncClient,
+) -> None:
+    organization_id = await admin_session(client)
+    headers = {"X-Organization-ID": organization_id}
+    created_customer = await client.post(
+        "/api/v1/sales/customers",
+        headers=headers,
+        json={
+            "customer_type": "professional",
+            "name": "Aminata Diallo",
+            "company_name": "Marché Central",
+            "phone": "+221 77 123 45 67",
+            "email": "aminata@example.com",
+            "address": "Rue 10",
+            "city": "Dakar",
+            "notes": "Livraison le matin",
+        },
+    )
+    assert created_customer.status_code == 201
+    customer = created_customer.json()
+
+    listed = await client.get(
+        "/api/v1/sales/customers?search=Marché",
+        headers=headers,
+    )
+    assert listed.status_code == 200
+    assert listed.json()["total"] == 1
+    assert listed.json()["items"][0]["id"] == customer["id"]
+
+    order_response = await client.post(
+        "/api/v1/sales/orders",
+        headers=headers,
+        json={"customer_id": customer["id"], "amount_fcfa": 85000},
+    )
+    assert order_response.status_code == 201
+    order = order_response.json()
+    assert order["customer_id"] == customer["id"]
+    assert order["customer_name"] == "Aminata Diallo"
+    assert order["customer_phone"] == "+221 77 123 45 67"
+    assert order["customer_email"] == "aminata@example.com"
+    assert order["delivery_address"] == "Rue 10"
+
+
+@pytest.mark.asyncio
+async def test_customers_can_be_updated_and_deleted_without_changing_order_history(
+    client: AsyncClient,
+) -> None:
+    organization_id = await admin_session(client)
+    headers = {"X-Organization-ID": organization_id}
+    created = await client.post(
+        "/api/v1/sales/customers",
+        headers=headers,
+        json={"name": "Client initial", "phone": "771234567", "city": "Dakar"},
+    )
+    assert created.status_code == 201
+    customer_id = created.json()["id"]
+
+    order_response = await client.post(
+        "/api/v1/sales/orders",
+        headers=headers,
+        json={"customer_id": customer_id, "amount_fcfa": 12000},
+    )
+    assert order_response.status_code == 201
+
+    updated = await client.put(
+        f"/api/v1/sales/customers/{customer_id}",
+        headers=headers,
+        json={
+            "customer_type": "professional",
+            "name": "Client modifié",
+            "company_name": "Entreprise Mamari",
+            "phone": "779876543",
+            "email": "client@example.com",
+            "address": "Rue 5",
+            "city": "Thiès",
+            "notes": "Compte professionnel",
+        },
+    )
+    assert updated.status_code == 200
+    assert updated.json()["name"] == "Client modifié"
+    assert updated.json()["phone"] == "779876543"
+
+    deleted = await client.delete(f"/api/v1/sales/customers/{customer_id}", headers=headers)
+    assert deleted.status_code == 204
+    assert (
+        await client.delete(f"/api/v1/sales/customers/{customer_id}", headers=headers)
+    ).status_code == 404
+
+    orders = await client.get("/api/v1/sales/orders", headers=headers)
+    historical_order = orders.json()["items"][0]
+    assert historical_order["customer_id"] is None
+    assert historical_order["customer_name"] == "Client initial"
+    assert historical_order["customer_phone"] == "771234567"
+
+
+@pytest.mark.asyncio
 async def test_empty_dashboard_does_not_invent_business_figures(
     client: AsyncClient,
 ) -> None:

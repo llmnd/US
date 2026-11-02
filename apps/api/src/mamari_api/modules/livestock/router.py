@@ -7,7 +7,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from fastapi.responses import FileResponse
-from sqlalchemy import func, or_, select
+from sqlalchemy import case, extract, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -22,6 +22,7 @@ from mamari_api.modules.identity.dependencies import (
 from mamari_api.modules.livestock.models import (
     LivestockAnimal,
     LivestockFacility,
+    LivestockFinanceTransaction,
     LivestockGroup,
     LivestockRecord,
 )
@@ -30,10 +31,15 @@ from mamari_api.modules.livestock.schemas import (
     CreateAnimalRequest,
     CreateFacilityRequest,
     CreateGroupRequest,
+    CreateLivestockFinanceTransactionRequest,
     CreateRecordRequest,
     FacilityResponse,
     GroupResponse,
+    LivestockFinanceSummaryResponse,
+    LivestockFinanceTransactionPageResponse,
+    LivestockFinanceTransactionResponse,
     LivestockOverviewResponse,
+    MonthlyLivestockFinanceResponse,
     MonthlyProductionTotal,
     RecordResponse,
     UpcomingCareResponse,
@@ -47,6 +53,10 @@ CanManageLivestockDep = Annotated[
 ]
 
 MAX_PHOTO_BYTES = 5 * 1024 * 1024
+MONTH_LABELS = (
+    "Jan", "Fév", "Mar", "Avr", "Mai", "Juin",
+    "Juil", "Août", "Sep", "Oct", "Nov", "Déc",
+)
 PHOTO_TYPES = {
     "image/jpeg": (".jpg", lambda data: data.startswith(b"\xff\xd8\xff")),
     "image/png": (".png", lambda data: data.startswith(b"\x89PNG\r\n\x1a\n")),
@@ -151,7 +161,7 @@ async def _record_response(session: AsyncSession, record: LivestockRecord) -> Re
     animal_name = None
     group_name = None
     facility_name = None
-    finance_transaction_created = False
+    finance_transaction_created = record.amount_fcfa > 0
     if record.animal_id is not None:
         animal_result = await session.execute(
             select(LivestockAnimal.name, LivestockAnimal.tag_number)
@@ -177,14 +187,6 @@ async def _record_response(session: AsyncSession, record: LivestockRecord) -> Re
                 LivestockFacility.organization_id == record.organization_id,
             )
         )
-        if record.amount_fcfa > 0:
-            farm_id = await session.scalar(
-                select(LivestockFacility.farm_id).where(
-                    LivestockFacility.id == record.facility_id,
-                    LivestockFacility.organization_id == record.organization_id,
-                )
-            )
-            finance_transaction_created = farm_id is not None
     return RecordResponse(
         id=record.id,
         record_type=record.record_type,
@@ -208,6 +210,57 @@ async def _record_response(session: AsyncSession, record: LivestockRecord) -> Re
     )
 
 
+async def _livestock_finance_response(
+    session: AsyncSession,
+    transaction: LivestockFinanceTransaction,
+) -> LivestockFinanceTransactionResponse:
+    animal_name = None
+    group_name = None
+    facility_name = None
+    if transaction.animal_id is not None:
+        animal_result = await session.execute(
+            select(LivestockAnimal.name, LivestockAnimal.tag_number).where(
+                LivestockAnimal.id == transaction.animal_id,
+                LivestockAnimal.organization_id == transaction.organization_id,
+            )
+        )
+        animal = animal_result.one_or_none()
+        if animal is not None:
+            animal_name = animal.name or animal.tag_number
+    if transaction.group_id is not None:
+        group_name = await session.scalar(
+            select(LivestockGroup.name).where(
+                LivestockGroup.id == transaction.group_id,
+                LivestockGroup.organization_id == transaction.organization_id,
+            )
+        )
+    if transaction.facility_id is not None:
+        facility_name = await session.scalar(
+            select(LivestockFacility.name).where(
+                LivestockFacility.id == transaction.facility_id,
+                LivestockFacility.organization_id == transaction.organization_id,
+            )
+        )
+    return LivestockFinanceTransactionResponse(
+        id=transaction.id,
+        transaction_type=transaction.transaction_type,
+        category=transaction.category,
+        label=transaction.label,
+        amount_fcfa=transaction.amount_fcfa,
+        transaction_date=transaction.transaction_date,
+        animal_id=transaction.animal_id,
+        animal_name=animal_name,
+        group_id=transaction.group_id,
+        group_name=group_name,
+        facility_id=transaction.facility_id,
+        facility_name=facility_name,
+        quantity=transaction.quantity,
+        unit=transaction.unit,
+        notes=transaction.notes,
+        created_at=transaction.created_at,
+    )
+
+
 @router.get("/overview", response_model=LivestockOverviewResponse)
 async def read_livestock_overview(
     session: SessionDep,
@@ -222,8 +275,31 @@ async def read_livestock_overview(
             LivestockAnimal.status == "active",
         )
     )
+    animal_breakdown = await session.execute(
+        select(
+            func.count(func.distinct(LivestockAnimal.species)),
+            func.coalesce(
+                func.sum(case((LivestockAnimal.sex == "female", 1), else_=0)),
+                0,
+            ),
+            func.coalesce(
+                func.sum(case((LivestockAnimal.sex == "male", 1), else_=0)),
+                0,
+            ),
+        ).where(
+            LivestockAnimal.organization_id == organization_id,
+            LivestockAnimal.status == "active",
+        )
+    )
+    species_count, female_animal_count, male_animal_count = animal_breakdown.one()
     group_count = await session.scalar(
         select(func.count()).select_from(LivestockGroup).where(
+            LivestockGroup.organization_id == organization_id,
+            LivestockGroup.is_active.is_(True),
+        )
+    )
+    group_head_count = await session.scalar(
+        select(func.coalesce(func.sum(LivestockGroup.head_count), 0)).where(
             LivestockGroup.organization_id == organization_id,
             LivestockGroup.is_active.is_(True),
         )
@@ -241,6 +317,30 @@ async def read_livestock_overview(
             LivestockRecord.is_resolved.is_(False),
             LivestockRecord.next_due_date.is_not(None),
             LivestockRecord.next_due_date <= today,
+        )
+    )
+    health_record_count = await session.scalar(
+        select(func.count()).select_from(LivestockRecord).where(
+            LivestockRecord.organization_id == organization_id,
+            LivestockRecord.record_type == "health",
+        )
+    )
+    care_due_soon_count = await session.scalar(
+        select(func.count()).select_from(LivestockRecord).where(
+            LivestockRecord.organization_id == organization_id,
+            LivestockRecord.record_type == "health",
+            LivestockRecord.is_resolved.is_(False),
+            LivestockRecord.next_due_date > today,
+            LivestockRecord.next_due_date <= week_end,
+        )
+    )
+    upcoming_care_count = await session.scalar(
+        select(func.count()).select_from(LivestockRecord).where(
+            LivestockRecord.organization_id == organization_id,
+            LivestockRecord.record_type == "health",
+            LivestockRecord.is_resolved.is_(False),
+            LivestockRecord.next_due_date.is_not(None),
+            LivestockRecord.next_due_date <= week_end,
         )
     )
     upcoming_records = await session.execute(
@@ -266,6 +366,11 @@ async def read_livestock_overview(
         .limit(8)
     )
     upcoming_rows = upcoming_records.all()
+    production_month_start = date(today.year, today.month, 1)
+    if today.month == 12:
+        production_month_end = date(today.year + 1, 1, 1)
+    else:
+        production_month_end = date(today.year, today.month + 1, 1)
     production_totals = await session.execute(
         select(
             func.coalesce(func.sum(LivestockRecord.quantity), 0),
@@ -274,21 +379,101 @@ async def read_livestock_overview(
         .where(
             LivestockRecord.organization_id == organization_id,
             LivestockRecord.record_type == "production",
-            LivestockRecord.event_date >= date(today.year, today.month, 1),
+            LivestockRecord.event_date >= production_month_start,
+            LivestockRecord.event_date < production_month_end,
         )
         .group_by(LivestockRecord.unit)
         .order_by(LivestockRecord.unit)
     )
+    production_month_count = await session.scalar(
+        select(func.count()).select_from(LivestockRecord).where(
+            LivestockRecord.organization_id == organization_id,
+            LivestockRecord.record_type == "production",
+            LivestockRecord.event_date >= production_month_start,
+            LivestockRecord.event_date < production_month_end,
+        )
+    )
+    reproduction_month_count = await session.scalar(
+        select(func.count()).select_from(LivestockRecord).where(
+            LivestockRecord.organization_id == organization_id,
+            LivestockRecord.record_type == "reproduction",
+            LivestockRecord.event_date >= production_month_start,
+            LivestockRecord.event_date < production_month_end,
+        )
+    )
+    reproduction_totals = await session.execute(
+        select(
+            func.coalesce(func.sum(LivestockRecord.quantity), 0),
+            LivestockRecord.unit,
+        )
+        .where(
+            LivestockRecord.organization_id == organization_id,
+            LivestockRecord.record_type == "reproduction",
+            LivestockRecord.event_date >= production_month_start,
+            LivestockRecord.event_date < production_month_end,
+            LivestockRecord.quantity.is_not(None),
+        )
+        .group_by(LivestockRecord.unit)
+        .order_by(LivestockRecord.unit)
+    )
+    feed_totals = await session.execute(
+        select(
+            func.coalesce(func.sum(LivestockRecord.quantity), 0),
+            LivestockRecord.unit,
+        )
+        .where(
+            LivestockRecord.organization_id == organization_id,
+            LivestockRecord.record_type == "feed",
+            LivestockRecord.event_date >= production_month_start,
+            LivestockRecord.event_date < production_month_end,
+        )
+        .group_by(LivestockRecord.unit)
+        .order_by(LivestockRecord.unit)
+    )
+    feed_month_count = await session.scalar(
+        select(func.count()).select_from(LivestockRecord).where(
+            LivestockRecord.organization_id == organization_id,
+            LivestockRecord.record_type == "feed",
+            LivestockRecord.event_date >= production_month_start,
+            LivestockRecord.event_date < production_month_end,
+        )
+    )
+    feed_month_cost = await session.scalar(
+        select(func.coalesce(func.sum(LivestockRecord.amount_fcfa), 0)).where(
+            LivestockRecord.organization_id == organization_id,
+            LivestockRecord.record_type == "feed",
+            LivestockRecord.event_date >= production_month_start,
+            LivestockRecord.event_date < production_month_end,
+        )
+    )
     return LivestockOverviewResponse(
         animal_count=animal_count or 0,
+        female_animal_count=female_animal_count or 0,
+        male_animal_count=male_animal_count or 0,
+        species_count=species_count or 0,
         group_count=group_count or 0,
+        group_head_count=group_head_count or 0,
         facility_count=facility_count or 0,
+        health_record_count=health_record_count or 0,
         health_follow_up_count=health_follow_up_count or 0,
-        upcoming_care_count=len(upcoming_rows),
+        upcoming_care_count=upcoming_care_count or 0,
+        care_due_soon_count=care_due_soon_count or 0,
+        production_month_count=production_month_count or 0,
         production_month_totals=[
             MonthlyProductionTotal(quantity=quantity or Decimal("0"), unit=unit)
             for quantity, unit in production_totals.all()
         ],
+        reproduction_month_count=reproduction_month_count or 0,
+        reproduction_month_totals=[
+            MonthlyProductionTotal(quantity=quantity or Decimal("0"), unit=unit)
+            for quantity, unit in reproduction_totals.all()
+        ],
+        feed_month_count=feed_month_count or 0,
+        feed_month_totals=[
+            MonthlyProductionTotal(quantity=quantity or Decimal("0"), unit=unit)
+            for quantity, unit in feed_totals.all()
+        ],
+        feed_month_cost_fcfa=feed_month_cost or 0,
         upcoming_care=[
             UpcomingCareResponse(
                 id=record.id,
@@ -654,6 +839,200 @@ async def read_animal_photo(
     return FileResponse(path)
 
 
+@router.post(
+    "/finance/transactions",
+    response_model=LivestockFinanceTransactionResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_livestock_finance_transaction(
+    data: CreateLivestockFinanceTransactionRequest,
+    session: SessionDep,
+    context: CanManageLivestockDep,
+) -> LivestockFinanceTransactionResponse:
+    facility_id = data.facility_id
+    if data.animal_id is not None:
+        animal = await session.scalar(
+            select(LivestockAnimal).where(
+                LivestockAnimal.id == data.animal_id,
+                LivestockAnimal.organization_id == context.organization.id,
+            )
+        )
+        if animal is None:
+            raise HTTPException(status_code=404, detail="Animal introuvable.")
+        if facility_id is not None and animal.facility_id != facility_id:
+            raise HTTPException(
+                status_code=422,
+                detail="Le bâtiment ne correspond pas à cet animal.",
+            )
+        facility_id = animal.facility_id
+    elif data.group_id is not None:
+        group = await session.scalar(
+            select(LivestockGroup).where(
+                LivestockGroup.id == data.group_id,
+                LivestockGroup.organization_id == context.organization.id,
+            )
+        )
+        if group is None:
+            raise HTTPException(status_code=404, detail="Lot introuvable.")
+        if facility_id is not None and group.facility_id != facility_id:
+            raise HTTPException(status_code=422, detail="Le bâtiment ne correspond pas à ce lot.")
+        facility_id = group.facility_id
+    elif facility_id is not None:
+        facility_exists = await session.scalar(
+            select(LivestockFacility.id).where(
+                LivestockFacility.id == facility_id,
+                LivestockFacility.organization_id == context.organization.id,
+            )
+        )
+        if facility_exists is None:
+            raise HTTPException(status_code=404, detail="Bâtiment introuvable.")
+
+    transaction = LivestockFinanceTransaction(
+        organization_id=context.organization.id,
+        created_by_id=context.user.id,
+        facility_id=facility_id,
+        **data.model_dump(exclude={"facility_id"}),
+    )
+    session.add(transaction)
+    await session.commit()
+    await session.refresh(transaction)
+    return await _livestock_finance_response(session, transaction)
+
+
+@router.get(
+    "/finance/transactions",
+    response_model=LivestockFinanceTransactionPageResponse,
+)
+async def list_livestock_finance_transactions(
+    session: SessionDep,
+    context: CurrentOrganizationDep,
+    page: Annotated[int, Query(ge=1)] = 1,
+    page_size: Annotated[int, Query(ge=1, le=100)] = 100,
+    year: Annotated[int, Query(ge=2000, le=2100)] = date.today().year,
+    transaction_type: Annotated[
+        str | None, Query(alias="type", pattern="^(income|expense)$")
+    ] = None,
+) -> LivestockFinanceTransactionPageResponse:
+    filters = [
+        LivestockFinanceTransaction.organization_id == context.organization.id,
+        LivestockFinanceTransaction.transaction_date >= date(year, 1, 1),
+        LivestockFinanceTransaction.transaction_date < date(year + 1, 1, 1),
+    ]
+    if transaction_type is not None:
+        filters.append(LivestockFinanceTransaction.transaction_type == transaction_type)
+    total = await session.scalar(
+        select(func.count()).select_from(LivestockFinanceTransaction).where(*filters)
+    )
+    rows = await session.scalars(
+        select(LivestockFinanceTransaction)
+        .where(*filters)
+        .order_by(
+            LivestockFinanceTransaction.transaction_date.desc(),
+            LivestockFinanceTransaction.created_at.desc(),
+        )
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    )
+    return LivestockFinanceTransactionPageResponse(
+        items=[await _livestock_finance_response(session, item) for item in rows],
+        total=total or 0,
+        page=page,
+        page_size=page_size,
+    )
+
+
+@router.get("/finance/summary", response_model=LivestockFinanceSummaryResponse)
+async def read_livestock_finance_summary(
+    session: SessionDep,
+    context: CurrentOrganizationDep,
+    year: Annotated[int, Query(ge=2000, le=2100)] = date.today().year,
+) -> LivestockFinanceSummaryResponse:
+    filters = [
+        LivestockFinanceTransaction.organization_id == context.organization.id,
+        LivestockFinanceTransaction.transaction_date >= date(year, 1, 1),
+        LivestockFinanceTransaction.transaction_date < date(year + 1, 1, 1),
+    ]
+    totals = await session.execute(
+        select(
+            func.coalesce(
+                func.sum(
+                    case(
+                        (
+                            LivestockFinanceTransaction.transaction_type == "income",
+                            LivestockFinanceTransaction.amount_fcfa,
+                        ),
+                        else_=0,
+                    )
+                ),
+                0,
+            ),
+            func.coalesce(
+                func.sum(
+                    case(
+                        (
+                            LivestockFinanceTransaction.transaction_type == "expense",
+                            LivestockFinanceTransaction.amount_fcfa,
+                        ),
+                        else_=0,
+                    )
+                ),
+                0,
+            ),
+        ).where(*filters)
+    )
+    income, expenses = totals.one()
+    monthly_rows = await session.execute(
+        select(
+            extract("month", LivestockFinanceTransaction.transaction_date),
+            func.sum(
+                case(
+                    (
+                        LivestockFinanceTransaction.transaction_type == "income",
+                        LivestockFinanceTransaction.amount_fcfa,
+                    ),
+                    else_=0,
+                )
+            ),
+            func.sum(
+                case(
+                    (
+                        LivestockFinanceTransaction.transaction_type == "expense",
+                        LivestockFinanceTransaction.amount_fcfa,
+                    ),
+                    else_=0,
+                )
+            ),
+        )
+        .where(*filters)
+        .group_by(extract("month", LivestockFinanceTransaction.transaction_date))
+    )
+    incomes = [0] * 12
+    expenses_by_month = [0] * 12
+    for month_number, monthly_income, monthly_expenses in monthly_rows:
+        month_index = int(month_number) - 1
+        incomes[month_index] = int(monthly_income or 0)
+        expenses_by_month[month_index] = int(monthly_expenses or 0)
+
+    def monthly_response(amounts: list[int]) -> list[MonthlyLivestockFinanceResponse]:
+        return [
+            MonthlyLivestockFinanceResponse(
+                month=month,
+                month_number=index + 1,
+                amount_fcfa=amount,
+            )
+            for index, (month, amount) in enumerate(zip(MONTH_LABELS, amounts, strict=True))
+        ]
+
+    return LivestockFinanceSummaryResponse(
+        year=year,
+        income_fcfa=int(income),
+        expenses_fcfa=int(expenses),
+        balance_fcfa=int(income) - int(expenses),
+        monthly_income=monthly_response(incomes),
+        monthly_expenses=monthly_response(expenses_by_month),
+    )
+
+
 @router.get("/records", response_model=list[RecordResponse])
 async def list_records(
     session: SessionDep,
@@ -732,6 +1111,26 @@ async def create_record(
         **data.model_dump(),
     )
     session.add(record)
+    await session.flush()
+    if data.amount_fcfa > 0:
+        session.add(
+            LivestockFinanceTransaction(
+                organization_id=context.organization.id,
+                animal_id=data.animal_id,
+                group_id=data.group_id,
+                facility_id=subject_facility_id,
+                source_record_id=record.id,
+                created_by_id=context.user.id,
+                transaction_type="income" if data.record_type == "production" else "expense",
+                category="input" if data.record_type == "feed" else data.record_type,
+                label=data.title,
+                amount_fcfa=data.amount_fcfa,
+                transaction_date=data.event_date,
+                quantity=data.quantity,
+                unit=data.unit,
+                notes=data.notes,
+            )
+        )
     if data.amount_fcfa > 0 and subject_facility_id is not None:
         farm_id = await session.scalar(
             select(LivestockFacility.farm_id).where(

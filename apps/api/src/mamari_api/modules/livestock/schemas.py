@@ -150,7 +150,7 @@ class RecordResponse(BaseModel):
 
 class CreateLivestockFinanceTransactionRequest(BaseModel):
     transaction_type: LivestockFinanceType
-    category: ShortText
+    category: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=32)]
     label: Annotated[str, StringConstraints(strip_whitespace=True, min_length=2, max_length=160)]
     amount_fcfa: Annotated[int, Field(gt=0, le=9_000_000_000_000_000)]
     transaction_date: date = Field(default_factory=date.today)
@@ -226,9 +226,21 @@ class UpcomingCareResponse(BaseModel):
 
 class LivestockOverviewResponse(BaseModel):
     animal_count: int
+    female_animal_count: int
+    male_animal_count: int
+    species_count: int
     group_count: int
+    group_head_count: int
     facility_count: int
+    health_record_count: int
     health_follow_up_count: int
     upcoming_care_count: int
+    care_due_soon_count: int
+    production_month_count: int
     production_month_totals: list[MonthlyProductionTotal]
+    reproduction_month_count: int
+    reproduction_month_totals: list[MonthlyProductionTotal]
+    feed_month_count: int
+    feed_month_totals: list[MonthlyProductionTotal]
+    feed_month_cost_fcfa: int
     upcoming_care: list[UpcomingCareResponse]

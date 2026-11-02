@@ -213,6 +213,7 @@ class CreateFinanceTransactionRequest(BaseModel):
 
 class FinanceTransactionResponse(BaseModel):
     id: uuid.UUID
+    customer_id: uuid.UUID | None
     farm_id: uuid.UUID
     farm_name: str
     campaign_id: uuid.UUID | None
@@ -253,13 +254,21 @@ class FinanceSummaryResponse(BaseModel):
 
 
 class CampaignSaleRequest(BaseModel):
-    customer_name: Annotated[
-        str, StringConstraints(strip_whitespace=True, min_length=2, max_length=160)
-    ]
+    customer_id: uuid.UUID | None = None
+    customer_name: (
+        Annotated[str, StringConstraints(strip_whitespace=True, min_length=2, max_length=160)]
+        | None
+    ) = None
     quantity_kg: QuantityKg
     unit_price_fcfa_per_kg: Annotated[Decimal, Field(gt=0, max_digits=14, decimal_places=2)]
     transaction_date: date = Field(default_factory=date.today)
     notes: HarvestNotes | None = None
+
+    @model_validator(mode="after")
+    def validate_customer(self) -> "CampaignSaleRequest":
+        if self.customer_id is None and self.customer_name is None:
+            raise ValueError("Sélectionnez un client ou indiquez son nom.")
+        return self
 
 
 class CampaignSimulationResponse(BaseModel):

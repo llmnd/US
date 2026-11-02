@@ -57,6 +57,7 @@ async def test_public_store_checkout_creates_order_and_reserves_stock(
     )
     assert checkout.status_code == 201
     order = checkout.json()
+    assert order["customer_id"]
     assert order["customer_name"] == "Aminata Diallo"
     assert order["customer_phone"] == "+221 77 123 45 67"
     assert order["customer_email"] == "aminata@example.com"
@@ -74,6 +75,10 @@ async def test_public_store_checkout_creates_order_and_reserves_stock(
     ]
 
     await admin_session(client)
+    customer_page = await client.get("/api/v1/sales/customers", headers=headers)
+    assert customer_page.status_code == 200
+    assert customer_page.json()["total"] == 1
+    assert customer_page.json()["items"][0]["id"] == order["customer_id"]
     sales_orders = await client.get("/api/v1/sales/orders", headers=headers)
     assert sales_orders.status_code == 200
     assert sales_orders.json()["items"][0]["id"] == order["id"]

@@ -11,6 +11,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import selectinload
 
 from mamari_api.core.config import get_settings
+from mamari_api.modules.agriculture.models import FinanceTransaction
 from mamari_api.modules.identity.dependencies import (
     CurrentMembership,
     SessionDep,
@@ -18,14 +19,24 @@ from mamari_api.modules.identity.dependencies import (
     require_roles,
 )
 from mamari_api.modules.identity.models import Organization
-from mamari_api.modules.sales.models import OrderStatus, Product, SalesOrder, SalesOrderItem
+from mamari_api.modules.sales.models import (
+    Customer,
+    OrderStatus,
+    Product,
+    SalesOrder,
+    SalesOrderItem,
+)
 from mamari_api.modules.sales.schemas import (
+    CreateCustomerRequest,
     CreateOrderRequest,
     CreateStoreOrderRequest,
+    CustomerPageResponse,
+    CustomerResponse,
     ProductResponse,
     SalesOrderPageResponse,
     SalesOrderResponse,
     StoreProductPageResponse,
+    UpdateCustomerRequest,
     UpdateOrderStatusRequest,
 )
 
@@ -44,6 +55,143 @@ PRODUCT_PHOTO_TYPES = {
         lambda data: data.startswith(b"RIFF") and data[8:12] == b"WEBP",
     ),
 }
+
+
+@router.get(
+    "/sales/customers",
+    response_model=CustomerPageResponse,
+    summary="Lister les clients de l'organisation",
+)
+async def list_customers(
+    session: SessionDep,
+    context: CurrentOrganizationDep,
+    page: Annotated[int, Query(ge=1)] = 1,
+    page_size: Annotated[int, Query(ge=1, le=100)] = 20,
+    search: Annotated[str | None, Query(min_length=2, max_length=100)] = None,
+) -> CustomerPageResponse:
+    filters = [Customer.organization_id == context.organization.id]
+    if search:
+        normalized_search = f"%{search.strip()}%"
+        filters.append(
+            or_(
+                Customer.name.ilike(normalized_search),
+                Customer.company_name.ilike(normalized_search),
+                Customer.phone.ilike(normalized_search),
+                Customer.email.ilike(normalized_search),
+            )
+        )
+    total = await session.scalar(select(func.count()).select_from(Customer).where(*filters))
+    result = await session.scalars(
+        select(Customer)
+        .where(*filters)
+        .order_by(Customer.name, Customer.created_at.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    )
+    return CustomerPageResponse(
+        items=list(result.all()),
+        total=total or 0,
+        page=page,
+        page_size=page_size,
+    )
+
+
+@router.post(
+    "/sales/customers",
+    response_model=CustomerResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Créer une fiche client",
+)
+async def create_customer(
+    data: CreateCustomerRequest,
+    session: SessionDep,
+    context: CanManageSalesDep,
+) -> Customer:
+    customer = Customer(
+        organization_id=context.organization.id,
+        customer_type=data.customer_type,
+        name=data.name,
+        company_name=data.company_name,
+        phone=data.phone,
+        email=str(data.email) if data.email else None,
+        address=data.address,
+        city=data.city,
+        notes=data.notes,
+    )
+    session.add(customer)
+    await session.commit()
+    await session.refresh(customer)
+    return customer
+
+
+@router.put(
+    "/sales/customers/{customer_id}",
+    response_model=CustomerResponse,
+    summary="Modifier une fiche client",
+)
+async def update_customer(
+    customer_id: uuid.UUID,
+    data: UpdateCustomerRequest,
+    session: SessionDep,
+    context: CanManageSalesDep,
+) -> Customer:
+    customer = await session.scalar(
+        select(Customer).where(
+            Customer.id == customer_id,
+            Customer.organization_id == context.organization.id,
+        )
+    )
+    if customer is None:
+        raise HTTPException(status_code=404, detail="Client introuvable.")
+    customer.customer_type = data.customer_type
+    customer.name = data.name
+    customer.company_name = data.company_name
+    customer.phone = data.phone
+    customer.email = str(data.email) if data.email else None
+    customer.address = data.address
+    customer.city = data.city
+    customer.notes = data.notes
+    await session.commit()
+    await session.refresh(customer)
+    return customer
+
+
+@router.delete(
+    "/sales/customers/{customer_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Supprimer une fiche client",
+)
+async def delete_customer(
+    customer_id: uuid.UUID,
+    session: SessionDep,
+    context: CanManageSalesDep,
+) -> None:
+    customer = await session.scalar(
+        select(Customer).where(
+            Customer.id == customer_id,
+            Customer.organization_id == context.organization.id,
+        )
+    )
+    if customer is None:
+        raise HTTPException(status_code=404, detail="Client introuvable.")
+    await session.execute(
+        update(SalesOrder)
+        .where(
+            SalesOrder.customer_id == customer.id,
+            SalesOrder.organization_id == context.organization.id,
+        )
+        .values(customer_id=None)
+    )
+    await session.execute(
+        update(FinanceTransaction)
+        .where(
+            FinanceTransaction.customer_id == customer.id,
+            FinanceTransaction.organization_id == context.organization.id,
+        )
+        .values(customer_id=None)
+    )
+    await session.delete(customer)
+    await session.commit()
 
 
 def _product_photo_path(organization_id: uuid.UUID, filename: str) -> Path:
@@ -372,6 +520,30 @@ async def create_store_order(
     if organization is None:
         raise HTTPException(status_code=404, detail="La boutique Mamari est indisponible.")
 
+    customer = await session.scalar(
+        select(Customer).where(
+            Customer.organization_id == organization.id,
+            Customer.phone == data.customer_phone,
+        )
+    )
+    if customer is None:
+        customer = Customer(
+            organization_id=organization.id,
+            customer_type="individual",
+            name=data.customer_name,
+            phone=data.customer_phone,
+            email=str(data.customer_email) if data.customer_email else None,
+            address=data.delivery_address,
+        )
+        session.add(customer)
+        await session.flush()
+    else:
+        customer.name = data.customer_name
+        if data.customer_email:
+            customer.email = str(data.customer_email)
+        if data.delivery_address:
+            customer.address = data.delivery_address
+
     quantities: dict[uuid.UUID, int] = {}
     for item in data.items:
         quantities[item.product_id] = quantities.get(item.product_id, 0) + item.quantity
@@ -444,6 +616,7 @@ async def create_store_order(
         organization_id=organization.id,
         created_by_id=None,
         reference=f"CMD-{date.today().year}-{order_id.hex[:8].upper()}",
+        customer_id=customer.id,
         customer_name=data.customer_name,
         customer_phone=data.customer_phone,
         customer_email=str(data.customer_email) if data.customer_email else None,
@@ -460,9 +633,7 @@ async def create_store_order(
         await session.rollback()
         raise
     saved_order = await session.scalar(
-        select(SalesOrder)
-        .options(selectinload(SalesOrder.items))
-        .where(SalesOrder.id == order.id)
+        select(SalesOrder).options(selectinload(SalesOrder.items)).where(SalesOrder.id == order.id)
     )
     if saved_order is None:
         raise HTTPException(status_code=500, detail="La commande enregistrée est introuvable.")
@@ -480,13 +651,30 @@ async def create_order(
     session: SessionDep,
     context: CanManageSalesDep,
 ) -> SalesOrder:
+    customer = None
+    if data.customer_id is not None:
+        customer = await session.scalar(
+            select(Customer).where(
+                Customer.id == data.customer_id,
+                Customer.organization_id == context.organization.id,
+            )
+        )
+        if customer is None:
+            raise HTTPException(status_code=404, detail="Client introuvable.")
+    customer_name = customer.name if customer else data.customer_name
+    if customer_name is None:
+        raise HTTPException(status_code=422, detail="Sélectionnez un client.")
     order_id = uuid.uuid4()
     order = SalesOrder(
         id=order_id,
         organization_id=context.organization.id,
         created_by_id=context.user.id,
         reference=f"CMD-{date.today().year}-{order_id.hex[:8].upper()}",
-        customer_name=data.customer_name,
+        customer_id=customer.id if customer else None,
+        customer_name=customer_name,
+        customer_phone=customer.phone if customer else None,
+        customer_email=customer.email if customer else None,
+        delivery_address=customer.address if customer else None,
         order_date=data.order_date,
         amount_fcfa=data.amount_fcfa,
         status=OrderStatus.CONFIRMED.value,

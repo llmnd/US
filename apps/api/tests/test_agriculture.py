@@ -198,17 +198,29 @@ async def test_campaign_planning_simulation_start_close_and_sale(
     )
     assert closed.status_code == 200
     assert closed.json()["status"] == "closed"
+    customer = await client.post(
+        "/api/v1/sales/customers",
+        headers=headers,
+        json={
+            "name": "Marché Central",
+            "phone": "771234567",
+            "company_name": "Marché Central",
+            "city": "Dakar",
+        },
+    )
+    assert customer.status_code == 201
     sale = await client.post(
         f"/api/v1/agriculture/campaigns/{campaign['id']}/sales",
         headers=headers,
         json={
-            "customer_name": "Marché Central",
+            "customer_id": customer.json()["id"],
             "quantity_kg": 900,
             "unit_price_fcfa_per_kg": 1200,
         },
     )
     assert sale.status_code == 201, sale.text
     assert sale.json()["amount_fcfa"] == 1_080_000
+    assert sale.json()["customer_id"] == customer.json()["id"]
 
     summary = await client.get(
         f"/api/v1/agriculture/finance/summary?year={date.today().year}",

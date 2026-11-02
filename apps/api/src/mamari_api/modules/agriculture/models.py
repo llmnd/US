@@ -264,6 +264,9 @@ class FinanceTransaction(Base):
     quantity: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
     unit: Mapped[str | None] = mapped_column(String(24), nullable=True)
     customer_name: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    customer_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("sales_customers.id", ondelete="SET NULL"), nullable=True
+    )
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False

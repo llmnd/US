@@ -51,6 +51,7 @@ from mamari_api.modules.identity.dependencies import (
     get_current_membership,
     require_roles,
 )
+from mamari_api.modules.sales.models import Customer
 
 router = APIRouter(prefix="/agriculture")
 CurrentOrganizationDep = Annotated[CurrentMembership, Depends(get_current_membership)]
@@ -331,6 +332,7 @@ async def _finance_response(
         )
     return FinanceTransactionResponse(
         id=transaction.id,
+        customer_id=transaction.customer_id,
         farm_id=transaction.farm_id,
         farm_name=farm.name if farm else "",
         campaign_id=transaction.campaign_id,
@@ -886,11 +888,13 @@ async def archive_parcel(
     if parcel is None:
         raise HTTPException(status_code=404, detail="Parcelle introuvable.")
     active_campaign = await session.scalar(
-        select(Campaign.id).where(
+        select(Campaign.id)
+        .where(
             Campaign.organization_id == context.organization.id,
             Campaign.parcel_id == parcel.id,
             Campaign.status == CampaignStatus.ACTIVE.value,
-        ).limit(1)
+        )
+        .limit(1)
     )
     if active_campaign is not None:
         raise HTTPException(
@@ -1200,6 +1204,19 @@ async def sell_campaign_harvest(
     session: SessionDep,
     context: CanManageAgricultureDep,
 ) -> FinanceTransactionResponse:
+    customer = None
+    if data.customer_id is not None:
+        customer = await session.scalar(
+            select(Customer).where(
+                Customer.id == data.customer_id,
+                Customer.organization_id == context.organization.id,
+            )
+        )
+        if customer is None:
+            raise HTTPException(status_code=404, detail="Client introuvable.")
+    customer_name = customer.name if customer else data.customer_name
+    if customer_name is None:
+        raise HTTPException(status_code=422, detail="Sélectionnez un client.")
     row = await _get_campaign_rows(session, context.organization.id, campaign_id)
     if row is None:
         raise HTTPException(status_code=404, detail="Campagne introuvable.")
@@ -1231,12 +1248,13 @@ async def sell_campaign_harvest(
         created_by_id=context.user.id,
         transaction_type=FinanceType.INCOME.value,
         category="commercialization",
-        label=f"Vente {crop.name} · {data.customer_name}",
+        label=f"Vente {crop.name} · {customer_name}",
         amount_fcfa=amount,
         transaction_date=data.transaction_date,
         quantity=data.quantity_kg,
         unit="kg",
-        customer_name=data.customer_name,
+        customer_name=customer_name,
+        customer_id=customer.id if customer else None,
         notes=data.notes,
     )
     session.add(transaction)
