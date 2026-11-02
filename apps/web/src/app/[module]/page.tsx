@@ -7,6 +7,7 @@ import { OperationsPage } from "@/features/operations/operations-page";
 import { SalesPage } from "@/features/sales/sales-page";
 import { LivestockPage } from "@/features/livestock/livestock-page";
 import { ProductionPage } from "@/features/production/production-page";
+import { CustomersPage } from "@/features/customers/customers-page";
 
 const modules: Record<string, { title: string; description: string }> = {
   operations: {
@@ -32,6 +33,10 @@ const modules: Record<string, { title: string; description: string }> = {
   ventes: {
     title: "Ventes",
     description: "Gérez vos clients, commandes, factures et règlements.",
+  },
+  clients: {
+    title: "Clients",
+    description: "Centralisez les coordonnées des particuliers et professionnels de Mamari.",
   },
   finances: {
     title: "Finances",
@@ -73,6 +78,7 @@ export default async function ModulePage({
   if (!page) notFound();
   if (module === "operations") return <OperationsPage />;
   if (module === "ventes") return <SalesPage />;
+  if (module === "clients") return <CustomersPage />;
   if (module === "agriculture") return <AgriculturePage />;
   if (module === "elevage") return <LivestockPage />;
   if (module === "productions") return <ProductionPage />;

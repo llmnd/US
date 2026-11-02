@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useDeferredValue, useState, type FormEvent } from "react";
+import { useDeferredValue, useEffect, useRef, useState, type FormEvent } from "react";
 import {
   ChevronDown,
   ChevronLeft,
@@ -10,11 +10,14 @@ import {
   Search,
   ShoppingBasket,
 } from "lucide-react";
+import Link from "next/link";
 import {
   apiRequest,
   getApiErrorMessage,
   type UserProfile,
 } from "@/lib/api/client";
+import { CustomerSelect } from "@/features/customers/customer-select";
+import type { Customer } from "@/features/customers/customer-types";
 import {
   formatDate,
   formatFcfa,
@@ -38,6 +41,9 @@ export function SalesPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<OrderStatus | "all">("all");
   const [page, setPage] = useState(1);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [orderDialogOpen, setOrderDialogOpen] = useState(false);
+  const orderDialogRef = useRef<HTMLDialogElement>(null);
   const deferredSearch = useDeferredValue(search.trim());
   const profile = useQuery({
     queryKey: ["auth", "me"],
@@ -109,12 +115,15 @@ export function SalesPage() {
           "X-Organization-ID": membership.organization_id,
         },
         body: JSON.stringify({
-          customer_name: formData.get("customer_name")?.toString(),
+          customer_id: formData.get("customer_id")?.toString(),
           order_date: formData.get("order_date")?.toString(),
           amount_fcfa: Number(formData.get("amount_fcfa")),
         }),
       });
       form.reset();
+      setSelectedCustomer(null);
+      setFormError(null);
+      orderDialogRef.current?.close();
       setPage(1);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["sales", "orders"] }),
@@ -132,6 +141,13 @@ export function SalesPage() {
   const ordersData = orders.data;
   const totalPages = Math.ceil((ordersData?.total ?? 0) / (ordersData?.page_size ?? 20));
 
+  useEffect(() => {
+    const dialog = orderDialogRef.current;
+    if (!dialog) return;
+    if (orderDialogOpen && !dialog.open) dialog.showModal();
+    else if (!orderDialogOpen && dialog.open) dialog.close();
+  }, [orderDialogOpen]);
+
   return (
     <div className="dashboard-content">
       <section className="page-heading" aria-labelledby="sales-title">
@@ -142,52 +158,69 @@ export function SalesPage() {
             Enregistrez les commandes clients et suivez leur avancement.
           </p>
         </div>
-        <div className="date-chip">{ordersData?.total ?? 0} commande(s)</div>
+        <div className="sales-heading-actions">
+          <div className="date-chip">{ordersData?.total ?? 0} commande(s)</div>
+          {canManageSales ? (
+            <button className="button-primary" onClick={() => setOrderDialogOpen(true)} type="button">
+              <Plus size={16} /> Nouvelle commande
+            </button>
+          ) : null}
+        </div>
       </section>
 
+      {formMessage ? <p className="admin-success sales-feedback" role="status">{formMessage}</p> : null}
       {canManageSales ? (
-        <section className="panel sales-create-panel" aria-labelledby="create-order-title">
-          <div className="panel-header">
-            <div>
-              <h2 className="panel-title" id="create-order-title">
-                <Plus size={16} aria-hidden="true" /> Enregistrer une commande
-              </h2>
-              <p className="panel-subtitle">La référence est générée automatiquement.</p>
+        <dialog
+          aria-labelledby="create-order-title"
+          className="parcel-edit-dialog sales-order-dialog"
+          onClose={() => setOrderDialogOpen(false)}
+          onClick={(event) => {
+            if (event.target === event.currentTarget) orderDialogRef.current?.close();
+          }}
+          ref={orderDialogRef}
+        >
+          <div className="parcel-edit-dialog-content">
+            <div className="parcel-edit-dialog-heading">
+              <div>
+                <h2 id="create-order-title">Nouvelle commande</h2>
+                <p>Choisissez un client et indiquez le montant de la commande.</p>
+              </div>
+              <button
+                aria-label="Fermer"
+                className="parcel-edit-dialog-close"
+                onClick={() => orderDialogRef.current?.close()}
+                type="button"
+              >
+                ×
+              </button>
             </div>
+            <form className="sales-order-form sales-order-dialog-form" onSubmit={handleSubmit}>
+              <CustomerSelect
+                organizationId={membership?.organization_id ?? ""}
+                selectedCustomer={selectedCustomer}
+                onChange={setSelectedCustomer}
+              />
+              <Link className="text-action" href="/clients">Créer une fiche client</Link>
+              <label className="auth-field">
+                <span>Date de commande</span>
+                <input name="order_date" defaultValue={today} required type="date" />
+              </label>
+              <label className="auth-field">
+                <span>Montant (FCFA)</span>
+                <input min="1" name="amount_fcfa" placeholder="485000" required type="number" />
+              </label>
+              {formError ? <p className="auth-error" role="alert">{formError}</p> : null}
+              <div className="parcel-edit-dialog-actions">
+                <button className="button-secondary" onClick={() => orderDialogRef.current?.close()} type="button">
+                  Annuler
+                </button>
+                <button className="button-primary" disabled={isSubmitting || !selectedCustomer} type="submit">
+                  {isSubmitting ? "Enregistrement…" : "Enregistrer la commande"}
+                </button>
+              </div>
+            </form>
           </div>
-          <form className="sales-order-form" onSubmit={handleSubmit}>
-            <label className="auth-field">
-              <span>Nom du client</span>
-              <input
-                autoComplete="organization"
-                maxLength={160}
-                minLength={2}
-                name="customer_name"
-                placeholder="Ex. Marché Central"
-                required
-              />
-            </label>
-            <label className="auth-field">
-              <span>Date de commande</span>
-              <input name="order_date" defaultValue={today} required type="date" />
-            </label>
-            <label className="auth-field">
-              <span>Montant (FCFA)</span>
-              <input
-                min="1"
-                name="amount_fcfa"
-                placeholder="485000"
-                required
-                type="number"
-              />
-            </label>
-            <button className="button-primary" disabled={isSubmitting} type="submit">
-              {isSubmitting ? "Enregistrement…" : "Enregistrer la commande"}
-            </button>
-            {formError ? <p className="auth-error" role="alert">{formError}</p> : null}
-            {formMessage ? <p className="admin-success" role="status">{formMessage}</p> : null}
-          </form>
-        </section>
+        </dialog>
       ) : null}
 
       {orders.isError ? (

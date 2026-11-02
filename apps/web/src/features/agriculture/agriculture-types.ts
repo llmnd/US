@@ -106,6 +106,7 @@ export interface CampaignPage {
 
 export interface FinanceTransaction {
   id: string;
+  customer_id: string | null;
   farm_id: string;
   farm_name: string;
   campaign_id: string | null;

@@ -55,6 +55,8 @@ import type {
   ParcelPage,
 } from "@/features/agriculture/agriculture-types";
 import { formatDate, formatFcfa } from "@/features/sales/sales-types";
+import { CustomerSelect } from "@/features/customers/customer-select";
+import type { Customer } from "@/features/customers/customer-types";
 
 const pageSize = 100;
 const tabs = [
@@ -118,6 +120,11 @@ function FeedbackMessage({ feedback }: { feedback: Feedback }) {
       {feedback.message}
     </p>
   );
+}
+
+function closeFormDisclosure(form: HTMLFormElement) {
+  const disclosure = form.closest("details");
+  if (disclosure) disclosure.open = false;
 }
 
 function PrivatePhoto({
@@ -288,6 +295,7 @@ export function AgriculturePage() {
   const [parcelFeedback, setParcelFeedback] = useState<Feedback>(null);
   const [selectedFarmForEdit, setSelectedFarmForEdit] = useState<Farm | null>(null);
   const [selectedParcelForEdit, setSelectedParcelForEdit] = useState<Parcel | null>(null);
+  const [campaignCustomers, setCampaignCustomers] = useState<Record<string, Customer | null>>({});
   const [campaignFeedback, setCampaignFeedback] = useState<Feedback>(null);
   const [financeFeedback, setFinanceFeedback] = useState<Feedback>(null);
   const [farmSubmitting, setFarmSubmitting] = useState(false);
@@ -465,6 +473,7 @@ export function AgriculturePage() {
         body: formData,
       });
       form.reset();
+      closeFormDisclosure(form);
       setFarmPhotoReset((value) => value + 1);
       setFarmFilter("active");
       setSelectedFarmId(farm.id);
@@ -514,6 +523,7 @@ export function AgriculturePage() {
         }
       }
       form.reset();
+      closeFormDisclosure(form);
       setParcelPhotoReset((value) => value + 1);
       setParcelPage(1);
       await refreshAgriculture();
@@ -540,6 +550,7 @@ export function AgriculturePage() {
         body: JSON.stringify({ name: data.get("crop_name") }),
       });
       form.reset();
+      closeFormDisclosure(form);
       await queryClient.invalidateQueries({ queryKey: ["agriculture", "crops"] });
       setParcelFeedback({ kind: "success", message: `Culture « ${crop.name} » ajoutée au catalogue.` });
     } catch (error) {
@@ -579,6 +590,7 @@ export function AgriculturePage() {
         }),
       });
       form.reset();
+      closeFormDisclosure(form);
       await refreshAgriculture();
       setCampaignFeedback({ kind: "success", message: `Campagne « ${campaign.name} » planifiée.` });
     } catch (error) {
@@ -642,6 +654,7 @@ export function AgriculturePage() {
         }),
       });
       form.reset();
+      closeFormDisclosure(form);
       await refreshAgriculture();
       setCampaignFeedback({
         kind: "success",
@@ -666,7 +679,7 @@ export function AgriculturePage() {
           method: "POST",
           headers: { "Content-Type": "application/json", ...organizationHeaders },
           body: JSON.stringify({
-            customer_name: data.get("customer_name"),
+            customer_id: data.get("customer_id"),
             quantity_kg: Number(data.get("quantity_kg")),
             unit_price_fcfa_per_kg: Number(data.get("unit_price")),
             transaction_date: data.get("transaction_date"),
@@ -675,6 +688,8 @@ export function AgriculturePage() {
         },
       );
       form.reset();
+      closeFormDisclosure(form);
+      setCampaignCustomers((current) => ({ ...current, [campaign.id]: null }));
       await refreshAgriculture();
       setCampaignFeedback({
         kind: "success",
@@ -712,6 +727,7 @@ export function AgriculturePage() {
         },
       );
       form.reset();
+      closeFormDisclosure(form);
       await refreshAgriculture();
       setFinanceFeedback({
         kind: "success",
@@ -1158,7 +1174,7 @@ export function AgriculturePage() {
           </div>
           <FeedbackMessage feedback={campaignFeedback} />
           {campaignFilter === "active" && canManage && activeFarms.length && campaignParcels.data?.items.length ? (
-            <details className="panel campaign-planner" open>
+            <details className="panel campaign-planner">
               <summary><span className="agriculture-add-icon"><Plus size={17} /></span><span><strong>Planifier une campagne</strong><small>Définissez vos hypothèses avant de la lancer</small></span><ChevronRight size={16} /></summary>
               <form className="campaign-form-grid" onSubmit={handleCampaignSubmit}>
                 <Field label="Nom de la campagne"><input maxLength={120} minLength={2} name="name" placeholder="Ex. Maïs · Hivernage 2026" required /></Field>
@@ -1217,11 +1233,18 @@ export function AgriculturePage() {
                     <details className="campaign-sale-form">
                       <summary><ArrowUpRight size={14} />Commercialiser une récolte</summary>
                       <form className="agriculture-inline-form" onSubmit={(event) => void handleSaleSubmit(event, campaign)}>
-                        <Field label="Client"><input maxLength={160} minLength={2} name="customer_name" placeholder="Nom du client" required /></Field>
+                        <CustomerSelect
+                          organizationId={organizationId ?? ""}
+                          selectedCustomer={campaignCustomers[campaign.id] ?? null}
+                          onChange={(customer) => setCampaignCustomers((current) => ({
+                            ...current,
+                            [campaign.id]: customer,
+                          }))}
+                        />
                         <Field label="Quantité (kg)"><input min="0.01" name="quantity_kg" placeholder="500" required step="0.01" type="number" /></Field>
                         <Field label="Prix unitaire (FCFA/kg)"><input min="0.01" name="unit_price" placeholder="450" required step="0.01" type="number" /></Field>
                         <Field label="Date de vente"><input defaultValue={today} name="transaction_date" required type="date" /></Field>
-                        <button className="button-primary" type="submit">Enregistrer la vente</button>
+                        <button className="button-primary" disabled={!campaignCustomers[campaign.id]} type="submit">Enregistrer la vente</button>
                       </form>
                     </details>
                   ) : null}
