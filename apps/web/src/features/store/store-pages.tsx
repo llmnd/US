@@ -6,23 +6,26 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowRight,
   ArrowLeft,
+  ArrowUp,
   Check,
   ChevronRight,
   Leaf,
   LoaderCircle,
   Minus,
   Plus,
+  Search,
   ShieldCheck,
   ShoppingBag,
   Sprout,
   Tractor,
+  Trash2,
   Wheat,
   Truck,
   Sun,
   CalendarDays,
   Users,
 } from "lucide-react";
-import { useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { apiRequest, getApiErrorMessage } from "@/lib/api/client";
 import { formatFcfa } from "@/features/sales/sales-types";
 import type { StoreOrder, StoreProduct, StoreProductPage } from "./store-types";
@@ -32,42 +35,104 @@ import { useProductPhoto } from "./use-product-photo";
 const storeProductsQueryKey = ["store", "products"];
 
 /* ------------------------------------------------------------------ */
+/*  RÉVÉLATION AU SCROLL                                               */
+/*  Les éléments portant [data-reveal] apparaissent en douceur.        */
+/*  Sans IntersectionObserver ou avec « réduire les animations »,      */
+/*  tout reste visible.                                                */
+/* ------------------------------------------------------------------ */
+function useReveal() {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const root = ref.current;
+    if (!root) return;
+    const items = Array.from(root.querySelectorAll<HTMLElement>("[data-reveal]"));
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (!("IntersectionObserver" in window) || reduceMotion) {
+      items.forEach((item) => item.classList.add("is-visible"));
+      return;
+    }
+    const viewportHeight = window.innerHeight;
+    items.forEach((item) => {
+      if (item.getBoundingClientRect().top < viewportHeight * 0.92) item.classList.add("is-visible");
+    });
+    root.classList.add("reveal-ready");
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("is-visible");
+            observer.unobserve(entry.target);
+          }
+        });
+      },
+      { threshold: 0.12, rootMargin: "0px 0px -8% 0px" },
+    );
+    items.filter((item) => !item.classList.contains("is-visible")).forEach((item) => observer.observe(item));
+    return () => observer.disconnect();
+  }, []);
+  return ref;
+}
+
+/* ------------------------------------------------------------------ */
 /*  HEADER                                                             */
 /* ------------------------------------------------------------------ */
 function PublicHeader() {
   const { cart } = useShopCart();
   const cartCount = Object.values(cart).reduce((total, quantity) => total + quantity, 0);
+  const [scrolled, setScrolled] = useState(false);
+  const [showTop, setShowTop] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => {
+      setScrolled(window.scrollY > 24);
+      setShowTop(window.scrollY > 700);
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   return (
-    <header className="public-header">
-      <Link className="public-brand" href="/" aria-label="Mamari, accueil">
-        <Image
-          alt=""
-          className="public-brand-logo"
-          height={76}
-          priority
-          src="/icon.png"
-          width={78}
-        />
-      </Link>
-      <nav className="public-navigation" aria-label="Navigation principale">
-        <span className="public-nav-links">
-          <Link href="/#activites">Nos activités</Link>
-          <Link href="/qui-sommes-nous">Qui sommes-nous ?</Link>
-          <Link href="/produits">La boutique</Link>
-        </span>
-        <span className="public-nav-actions">
-          <Link className="public-cart-link" href="/panier" aria-label={`Panier${cartCount ? `, ${cartCount} article(s)` : ""}`}>
-            <ShoppingBag size={17} />
-            <span>Panier</span>
-            {cartCount ? <span className="public-cart-count">{cartCount}</span> : null}
-          </Link>
-          <Link className="public-login-link" href="/dashboard">
-            Espace équipe <ArrowRight size={14} />
-          </Link>
-        </span>
-      </nav>
-    </header>
+    <>
+      <div className="public-progress" aria-hidden="true" />
+      <header className={`public-header${scrolled ? " is-scrolled" : ""}`}>
+        <Link className="public-brand" href="/" aria-label="Mamari, accueil">
+          <Image
+            alt=""
+            className="public-brand-logo"
+            height={76}
+            priority
+            src="/icon.png"
+            width={78}
+          />
+        </Link>
+        <nav className="public-navigation" aria-label="Navigation principale">
+          <span className="public-nav-links">
+            <Link href="/#activites">Nos activités</Link>
+            <Link href="/qui-sommes-nous">Qui sommes-nous ?</Link>
+            <Link href="/produits">La boutique</Link>
+          </span>
+          <span className="public-nav-actions">
+            <Link className="public-cart-link" href="/panier" aria-label={`Panier${cartCount ? `, ${cartCount} article(s)` : ""}`}>
+              <ShoppingBag size={17} />
+              <span>Panier</span>
+              {cartCount ? <span className="public-cart-count" key={cartCount}>{cartCount}</span> : null}
+            </Link>
+            <Link className="public-login-link" href="/dashboard">
+              Espace équipe <ArrowRight size={14} />
+            </Link>
+          </span>
+        </nav>
+      </header>
+      <button
+        className={`public-top-button${showTop ? " is-visible" : ""}`}
+        type="button"
+        aria-label="Retour en haut de la page"
+        tabIndex={showTop ? 0 : -1}
+        onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+      >
+        <ArrowUp size={18} />
+      </button>
+    </>
   );
 }
 
@@ -138,17 +203,25 @@ function ProductImage({
 
 /* ------------------------------------------------------------------ */
 /*  PRODUCT CARD                                                       */
+/*  Avec onAdd : bouton « Ajouter », puis stepper − / + dès que le     */
+/*  produit est dans le panier.                                        */
 /* ------------------------------------------------------------------ */
 function StoreProductCard({
   product,
+  quantity = 0,
   onAdd,
+  onRemove,
 }: {
   product: StoreProduct;
+  quantity?: number;
   onAdd?: (product: StoreProduct) => void;
+  onRemove?: (product: StoreProduct) => void;
 }) {
   const unavailable = product.stock_quantity < 1;
+  const lowStock = !unavailable && product.stock_quantity <= 5;
   return (
-    <article className="store-product-card">
+    <article className={`store-product-card${unavailable ? " is-soldout" : ""}`}>
+      {lowStock ? <span className="store-stock-low">Plus que {product.stock_quantity}</span> : null}
       <ProductImage product={product} />
       <div className="store-product-copy">
         <div className="store-product-heading">
@@ -165,9 +238,26 @@ function StoreProductCard({
             <small> / {product.unit}</small>
           </span>
           {onAdd ? (
-            <button className="store-add-button" type="button" disabled={unavailable} onClick={() => onAdd(product)}>
-              <Plus size={16} /> Ajouter
-            </button>
+            quantity > 0 ? (
+              <div className="store-quantity" role="group" aria-label={`Quantité de ${product.name}`}>
+                <button type="button" aria-label={`Retirer une unité de ${product.name}`} onClick={() => onRemove?.(product)}>
+                  <Minus size={14} />
+                </button>
+                <span>{quantity}</span>
+                <button
+                  type="button"
+                  aria-label={`Ajouter une unité de ${product.name}`}
+                  disabled={quantity >= product.stock_quantity}
+                  onClick={() => onAdd(product)}
+                >
+                  <Plus size={14} />
+                </button>
+              </div>
+            ) : (
+              <button className="store-add-button" type="button" disabled={unavailable} onClick={() => onAdd(product)}>
+                <Plus size={16} /> Ajouter
+              </button>
+            )
           ) : (
             <Link className="store-card-link" href="/produits">
               Découvrir <ArrowRight size={14} />
@@ -180,9 +270,81 @@ function StoreProductCard({
 }
 
 /* ------------------------------------------------------------------ */
+/*  BANDEAU DÉFILANT & FAQ                                             */
+/* ------------------------------------------------------------------ */
+const marqueeWords = [
+  "Cultiver",
+  "Élever",
+  "Partager",
+  "Au rythme des saisons",
+  "Du champ à votre table",
+  "Le travail bien fait",
+];
+
+function Marquee() {
+  const items = [...marqueeWords, ...marqueeWords, ...marqueeWords, ...marqueeWords];
+  return (
+    <div className="public-marquee" aria-hidden="true">
+      <div className="public-marquee-track">
+        {items.map((word, index) => <span key={`${word}-${index}`}>{word}</span>)}
+      </div>
+    </div>
+  );
+}
+
+const faqItems = [
+  {
+    question: "Comment passer commande ?",
+    answer:
+      "Ajoutez vos produits au panier, renseignez vos coordonnées puis confirmez. Notre équipe vous recontacte pour valider votre commande.",
+  },
+  {
+    question: "Faut-il payer en ligne ?",
+    answer:
+      "Non, aucun paiement en ligne n’est demandé. Le règlement est organisé avec notre équipe au moment de la confirmation.",
+  },
+  {
+    question: "Comment se passe la livraison ?",
+    answer:
+      "Les modalités de livraison sont confirmées avec vous par téléphone, selon votre adresse et la disponibilité des produits.",
+  },
+  {
+    question: "Les produits sont-ils toujours disponibles ?",
+    answer:
+      "Les stocks sont mis à jour en continu. Un produit épuisé est signalé dans la boutique et les quantités sont limitées au stock disponible.",
+  },
+];
+
+function FaqSection() {
+  return (
+    <section className="public-section public-faq" data-reveal>
+      <div className="public-section-heading">
+        <div>
+          <p className="public-eyebrow">Bon à savoir</p>
+          <h2>Vos questions, nos réponses.</h2>
+        </div>
+        <p>Tout ce qu&apos;il faut savoir avant de passer commande.</p>
+      </div>
+      <div className="public-faq-list">
+        {faqItems.map((item) => (
+          <details className="public-faq-item" key={item.question}>
+            <summary>
+              <span>{item.question}</span>
+              <Plus size={18} aria-hidden="true" />
+            </summary>
+            <p>{item.answer}</p>
+          </details>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /*  HOME                                                               */
 /* ------------------------------------------------------------------ */
 export function PublicHomePage() {
+  const siteRef = useReveal();
   const products = useQuery({
     queryKey: storeProductsQueryKey,
     queryFn: () => apiRequest<StoreProductPage>("/store/products"),
@@ -198,7 +360,7 @@ export function PublicHomePage() {
   }
 
   return (
-    <div className="public-site">
+    <div className="public-site" ref={siteRef}>
       <PublicHeader />
       <main>
         {/* ---------- HERO ---------- */}
@@ -289,8 +451,10 @@ export function PublicHomePage() {
           </div>
         </section>
 
+        <Marquee />
+
         {/* ---------- ACTIVITÉS ---------- */}
-        <section className="public-section public-activities" id="activites">
+        <section className="public-section public-activities" id="activites" data-reveal>
           <div className="public-section-heading">
             <div>
               <p className="public-eyebrow">Ce qui nous anime</p>
@@ -321,7 +485,7 @@ export function PublicHomePage() {
         </section>
 
         {/* ---------- HISTOIRE ---------- */}
-        <section className="public-section public-story" id="histoire">
+        <section className="public-section public-story" id="histoire" data-reveal>
           <div className="public-story-copy">
             <p className="public-eyebrow">Qui sommes-nous ?</p>
             <h2>Une histoire qui se construit sur le terrain.</h2>
@@ -352,7 +516,7 @@ export function PublicHomePage() {
           </div>
         </section>
 
-        <section className="public-section public-home-history">
+        <section className="public-section public-home-history" data-reveal>
           <div className="public-home-history-copy">
             <p className="public-eyebrow">L&apos;aventure Mamari</p>
             <h2>Une aventure qui a pris racine.</h2>
@@ -391,7 +555,7 @@ export function PublicHomePage() {
         </section>
 
         {/* ---------- PRODUITS VEDETTES ---------- */}
-        <section className="public-section public-featured">
+        <section className="public-section public-featured" data-reveal>
           <div className="public-section-heading">
             <div>
               <p className="public-eyebrow">La boutique Mamari</p>
@@ -422,7 +586,7 @@ export function PublicHomePage() {
         </section>
 
         {/* ---------- DÉMARCHE ---------- */}
-        <section className="public-section public-process">
+        <section className="public-section public-process" data-reveal>
           <div className="public-section-heading">
             <div>
               <p className="public-eyebrow">Notre démarche</p>
@@ -459,7 +623,7 @@ export function PublicHomePage() {
         </section>
 
         {/* ---------- VISAGES DE MAMARI ---------- */}
-        <section className="public-section public-home-gallery">
+        <section className="public-section public-home-gallery" data-reveal>
           <div className="public-section-heading">
             <div>
               <p className="public-eyebrow">Une aventure humaine</p>
@@ -485,8 +649,10 @@ export function PublicHomePage() {
           </div>
         </section>
 
+        <FaqSection />
+
         {/* ---------- BANNIÈRE CONTACT ---------- */}
-        <section className="public-contact-banner">
+        <section className="public-contact-banner" data-reveal>
           <div>
             <p className="public-eyebrow">L&apos;aventure Mamari</p>
             <h2>Une question ou une envie de collaborer ?</h2>
@@ -497,7 +663,7 @@ export function PublicHomePage() {
         </section>
 
         {/* ---------- NEWSLETTER ---------- */}
-        <section className="public-newsletter">
+        <section className="public-newsletter" data-reveal>
           <div className="public-newsletter-inner">
             <div>
               <p className="public-eyebrow">Rejoignez-nous</p>
@@ -536,8 +702,9 @@ export function PublicHomePage() {
 /*  ABOUT                                                              */
 /* ------------------------------------------------------------------ */
 export function AboutPage() {
+  const siteRef = useReveal();
   return (
-    <div className="public-site">
+    <div className="public-site" ref={siteRef}>
       <PublicHeader />
       <main className="public-about">
         <section className="public-about-hero">
@@ -575,7 +742,7 @@ export function AboutPage() {
           </figure>
         </section>
 
-        <section className="public-about-opening">
+        <section className="public-about-opening" data-reveal>
           <span aria-hidden="true">“</span>
           <p>
             Faire grandir Mamari, c&apos;est croire qu&apos;avec de la patience,
@@ -585,7 +752,7 @@ export function AboutPage() {
           <small>La conviction qui nous accompagne</small>
         </section>
 
-        <section className="public-about-human">
+        <section className="public-about-human" data-reveal>
           <div className="public-about-human-visual">
             <figure className="public-about-human-portrait">
               <Image
@@ -623,7 +790,7 @@ export function AboutPage() {
           </div>
         </section>
 
-        <section className="public-section public-about-values">
+        <section className="public-section public-about-values" data-reveal>
           <div className="public-section-heading">
             <div>
               <p className="public-eyebrow">Ce que nous voulons faire grandir</p>
@@ -650,7 +817,7 @@ export function AboutPage() {
           </div>
         </section>
 
-        <section className="public-about-closing">
+        <section className="public-about-closing" data-reveal>
           <div className="public-about-closing-copy">
             <p className="public-eyebrow">Et la suite s&apos;écrit ensemble</p>
             <h2>Merci de faire une place à Mamari dans votre histoire.</h2>
@@ -680,23 +847,84 @@ export function AboutPage() {
 
 /* ------------------------------------------------------------------ */
 /*  STORE PAGE                                                         */
+/*  Recherche, catégories, tri, filtre « en stock », stepper sur les   */
+/*  cartes et barre panier flottante.                                  */
 /* ------------------------------------------------------------------ */
+type SortKey = "featured" | "price-asc" | "price-desc" | "name";
+
+const sortLabels: Record<SortKey, string> = {
+  featured: "Notre sélection",
+  "price-asc": "Prix croissant",
+  "price-desc": "Prix décroissant",
+  name: "Nom A–Z",
+};
+
 export function StorePage() {
   const { cart, setCart } = useShopCart();
+  const [query, setQuery] = useState("");
+  const [category, setCategory] = useState("all");
+  const [sort, setSort] = useState<SortKey>("featured");
+  const [inStockOnly, setInStockOnly] = useState(false);
   const products = useQuery({
     queryKey: storeProductsQueryKey,
     queryFn: () => apiRequest<StoreProductPage>("/store/products"),
     retry: false,
   });
 
-  const availableProducts = products.data?.items ?? [];
+  const availableProducts = useMemo(() => products.data?.items ?? [], [products.data]);
+  const categories = useMemo(
+    () =>
+      Array.from(
+        new Set(availableProducts.map((product) => product.category).filter((value): value is string => Boolean(value))),
+      ).sort((a, b) => a.localeCompare(b, "fr")),
+    [availableProducts],
+  );
+  const visibleProducts = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    const filtered = availableProducts.filter(
+      (product) =>
+        (category === "all" || product.category === category)
+        && (!inStockOnly || product.stock_quantity > 0)
+        && (!needle
+          || `${product.name} ${product.description ?? ""} ${product.category ?? ""}`.toLowerCase().includes(needle)),
+    );
+    const sorted = [...filtered];
+    if (sort === "price-asc") sorted.sort((a, b) => a.price_fcfa - b.price_fcfa);
+    if (sort === "price-desc") sorted.sort((a, b) => b.price_fcfa - a.price_fcfa);
+    if (sort === "name") sorted.sort((a, b) => a.name.localeCompare(b.name, "fr"));
+    return sorted;
+  }, [availableProducts, category, inStockOnly, query, sort]);
+
   const cartCount = Object.values(cart).reduce((sum, quantity) => sum + quantity, 0);
+  const cartTotal = availableProducts.reduce(
+    (sum, product) => sum + product.price_fcfa * (cart[product.id] ?? 0),
+    0,
+  );
 
   function addProduct(product: StoreProduct) {
     setCart((current) => ({
       ...current,
       [product.id]: Math.min((current[product.id] ?? 0) + 1, product.stock_quantity),
     }));
+  }
+
+  function removeProduct(product: StoreProduct) {
+    setCart((current) => {
+      const next = (current[product.id] ?? 0) - 1;
+      if (next < 1) {
+        const remaining = { ...current };
+        delete remaining[product.id];
+        return remaining;
+      }
+      return { ...current, [product.id]: next };
+    });
+  }
+
+  function resetFilters() {
+    setQuery("");
+    setCategory("all");
+    setInStockOnly(false);
+    setSort("featured");
   }
 
   return (
@@ -724,11 +952,74 @@ export function StorePage() {
         ) : availableProducts.length ? (
           <div className="store-layout store-catalog-layout">
             <section aria-label="Produits disponibles" className="store-catalog store-catalog-full">
-              <div className="store-product-grid">
-                {availableProducts.map((product) => (
-                  <StoreProductCard key={product.id} product={product} onAdd={addProduct} />
-                ))}
+              <div className="store-toolbar">
+                <label className="store-search">
+                  <Search size={17} aria-hidden="true" />
+                  <span className="visually-hidden">Rechercher un produit</span>
+                  <input
+                    type="search"
+                    value={query}
+                    placeholder="Rechercher un produit…"
+                    onChange={(event) => setQuery(event.target.value)}
+                  />
+                </label>
+                {categories.length ? (
+                  <div className="store-chips" role="group" aria-label="Catégories">
+                    <button className="store-chip" type="button" aria-pressed={category === "all"} onClick={() => setCategory("all")}>
+                      Tout
+                    </button>
+                    {categories.map((value) => (
+                      <button
+                        className="store-chip"
+                        key={value}
+                        type="button"
+                        aria-pressed={category === value}
+                        onClick={() => setCategory(value)}
+                      >
+                        {value}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+                <div className="store-toolbar-end">
+                  <label className="store-toggle">
+                    <input type="checkbox" checked={inStockOnly} onChange={(event) => setInStockOnly(event.target.checked)} />
+                    <span>En stock</span>
+                  </label>
+                  <label className="store-sort">
+                    <span className="visually-hidden">Trier les produits</span>
+                    <select value={sort} onChange={(event) => setSort(event.target.value as SortKey)}>
+                      {(Object.keys(sortLabels) as SortKey[]).map((key) => (
+                        <option key={key} value={key}>{sortLabels[key]}</option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
               </div>
+              <p className="store-results-count" role="status">
+                {visibleProducts.length} produit{visibleProducts.length > 1 ? "s" : ""}
+              </p>
+              {visibleProducts.length ? (
+                <div className="store-product-grid">
+                  {visibleProducts.map((product) => (
+                    <StoreProductCard
+                      key={product.id}
+                      product={product}
+                      quantity={cart[product.id] ?? 0}
+                      onAdd={addProduct}
+                      onRemove={removeProduct}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="public-products-empty">
+                  <Search size={22} />
+                  <p>Aucun produit ne correspond à votre recherche.</p>
+                  <button className="store-reset" type="button" onClick={resetFilters}>
+                    Réinitialiser les filtres
+                  </button>
+                </div>
+              )}
             </section>
           </div>
         ) : (
@@ -738,6 +1029,19 @@ export function StorePage() {
           </div>
         )}
       </main>
+      {cartCount ? (
+        <Link className="store-cartbar" href="/panier">
+          <span className="store-cartbar-icon">
+            <ShoppingBag size={18} />
+            <span key={cartCount}>{cartCount}</span>
+          </span>
+          <span className="store-cartbar-copy">
+            <strong>Voir mon panier</strong>
+            <small>{formatFcfa(cartTotal)}</small>
+          </span>
+          <ArrowRight size={16} />
+        </Link>
+      ) : null}
       <PublicFooter />
     </div>
   );
@@ -803,6 +1107,14 @@ export function CartPage() {
         return remaining;
       }
       return { ...current, [product.id]: Math.min(next, product.stock_quantity) };
+    });
+  }
+
+  function removeLine(product: StoreProduct) {
+    setCart((current) => {
+      const remaining = { ...current };
+      delete remaining[product.id];
+      return remaining;
     });
   }
 
@@ -903,35 +1215,48 @@ export function CartPage() {
               <ShoppingBag size={22} />
             </div>
             <div className="checkout-cart-layout">
-              <ul className="checkout-cart-list">
-                {cartItems.map(({ product, quantity }) => (
-                  <li className="checkout-cart-item" key={product.id}>
-                    <ProductImage product={product} className="checkout-product-image" />
-                    <div className="checkout-cart-product-copy">
-                      {product.category ? <span className="store-product-category">{product.category}</span> : null}
-                      <h3>{product.name}</h3>
-                      <p>{formatFcfa(product.price_fcfa)} / {product.unit}</p>
-                    </div>
-                    <div className="store-quantity">
-                      <button type="button" aria-label={`Retirer une unité de ${product.name}`} onClick={() => changeQuantity(product, -1)}>
-                        <Minus size={13} />
-                      </button>
-                      <span>{quantity}</span>
+              <div className="checkout-cart-main">
+                <ul className="checkout-cart-list">
+                  {cartItems.map(({ product, quantity }) => (
+                    <li className="checkout-cart-item" key={product.id}>
+                      <ProductImage product={product} className="checkout-product-image" />
+                      <div className="checkout-cart-product-copy">
+                        {product.category ? <span className="store-product-category">{product.category}</span> : null}
+                        <h3>{product.name}</h3>
+                        <p>{formatFcfa(product.price_fcfa)} / {product.unit}</p>
+                      </div>
+                      <div className="store-quantity">
+                        <button type="button" aria-label={`Retirer une unité de ${product.name}`} onClick={() => changeQuantity(product, -1)}>
+                          <Minus size={13} />
+                        </button>
+                        <span>{quantity}</span>
+                        <button
+                          type="button"
+                          aria-label={`Ajouter une unité de ${product.name}`}
+                          disabled={quantity >= product.stock_quantity}
+                          onClick={() => changeQuantity(product, 1)}
+                        >
+                          <Plus size={13} />
+                        </button>
+                      </div>
+                      <strong className="checkout-line-total">
+                        {formatFcfa(product.price_fcfa * quantity)}
+                      </strong>
                       <button
+                        className="checkout-remove"
                         type="button"
-                        aria-label={`Ajouter une unité de ${product.name}`}
-                        disabled={quantity >= product.stock_quantity}
-                        onClick={() => changeQuantity(product, 1)}
+                        aria-label={`Retirer ${product.name} du panier`}
+                        onClick={() => removeLine(product)}
                       >
-                        <Plus size={13} />
+                        <Trash2 size={16} />
                       </button>
-                    </div>
-                    <strong className="checkout-line-total">
-                      {formatFcfa(product.price_fcfa * quantity)}
-                    </strong>
-                  </li>
-                ))}
-              </ul>
+                    </li>
+                  ))}
+                </ul>
+                <button className="checkout-clear" type="button" onClick={() => setCart({})}>
+                  Vider le panier
+                </button>
+              </div>
               <aside className="checkout-summary">
                 <h3>Résumé</h3>
                 {hasUnavailableItems ? (
