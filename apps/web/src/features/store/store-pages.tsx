@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import Lenis from "lenis";
 import {
   ArrowRight,
   ArrowLeft,
@@ -25,7 +26,7 @@ import {
   CalendarDays,
   Users,
 } from "lucide-react";
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { apiRequest, getApiErrorMessage } from "@/lib/api/client";
 import { formatFcfa } from "@/features/sales/sales-types";
 import type { StoreOrder, StoreProduct, StoreProductPage } from "./store-types";
@@ -42,15 +43,37 @@ function PublicHeader() {
   const cartCount = Object.values(cart).reduce((total, quantity) => total + quantity, 0);
   const [scrolled, setScrolled] = useState(false);
   const [showTop, setShowTop] = useState(false);
+  const lenisRef = useRef<Lenis | null>(null);
 
   useEffect(() => {
+    const lenis = new Lenis({
+      autoRaf: true,
+      anchors: { offset: -110 },
+      lerp: 0.1,
+      respectReducedMotion: true,
+      stopInertiaOnNavigate: true,
+    });
+    lenisRef.current = lenis;
+
     const onScroll = () => {
       setScrolled(window.scrollY > 24);
       setShowTop(window.scrollY > 700);
     };
     window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      lenis.destroy();
+      lenisRef.current = null;
+    };
   }, []);
+
+  function scrollToTop() {
+    if (lenisRef.current) {
+      lenisRef.current.scrollTo(0);
+    } else {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  }
 
   return (
     <>
@@ -88,7 +111,7 @@ function PublicHeader() {
         type="button"
         aria-label="Retour en haut de la page"
         tabIndex={showTop ? 0 : -1}
-        onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+        onClick={scrollToTop}
       >
         <ArrowUp size={18} />
       </button>
