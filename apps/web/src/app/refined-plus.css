@@ -31,10 +31,10 @@
 }
 
 /* une seule carte forte : le chiffre d’affaires */
-.metric-card:first-child { background: var(--green-dark); color: #f4f7f3; }
-.metric-card:first-child .metric-heading { color: #a9c4b3; }
-.metric-card:first-child .metric-icon { color: #7fa68f; }
-.metric-card:first-child .metric-foot { color: #8fb09c; }
+.metric-card:first-child { background: var(--green-dark); color: #fffaf1; }
+.metric-card:first-child .metric-heading { color: #e2d0b1; }
+.metric-card:first-child .metric-icon { color: #dcc59a; }
+.metric-card:first-child .metric-foot { color: #e2d0b1; }
 
 .page-heading { align-items: center; }
 
@@ -47,15 +47,15 @@
   border-radius: 28px;
   padding: 52px 56px;
   background:
-    radial-gradient(ellipse at 100% 0%, rgb(255 255 255 / 9%), transparent 55%),
+    radial-gradient(ellipse at 100% 0%, rgb(220 197 154 / 18%), transparent 55%),
     var(--green-dark);
 }
 .agriculture-hero-art { display: none; }
 .agriculture-hero-copy { max-width: 560px; }
-.agriculture-hero .eyebrow { color: #9dbfab; }
+.agriculture-hero .eyebrow { color: #e2d0b1; }
 .agriculture-hero .page-title { margin-top: 6px; color: #f6f8f4; font-size: clamp(34px, 4vw, 50px); }
-.agriculture-hero .page-description { max-width: 480px; color: #b4cbbb; font-size: 15px; }
-.agriculture-hero-stats { gap: 36px; margin-top: 28px; color: #a3c0af; font-size: 13px; }
+.agriculture-hero .page-description { max-width: 480px; color: #e2d8c8; font-size: 15px; }
+.agriculture-hero-stats { gap: 36px; margin-top: 28px; color: #dfcfb3; font-size: 13px; }
 .agriculture-hero-stats strong { margin-right: 6px; color: #fff; font-family: var(--serif); font-size: 30px; font-weight: 500; }
 
 /* ---------- Agriculture : navigation ---------- */
@@ -139,10 +139,10 @@ details[open] > summary > svg:last-child { transform: rotate(90deg); }
 }
 
 .farm-card-image-placeholder {
-  background: linear-gradient(150deg, #eef3ee, #f6f6f3);
-  color: #8fae9a;
+  background: linear-gradient(150deg, #f6f0e5, #f6f6f3);
+  color: #b8935a;
 }
-.farm-card-image-placeholder span { color: #8fa596; font-size: 12px; }
+.farm-card-image-placeholder span { color: #8a6939; font-size: 12px; }
 
 .farm-card-body { display: flex; min-width: 0; flex: 1; flex-direction: column; padding: 20px 18px 16px; }
 
@@ -194,7 +194,7 @@ details[open] > summary > svg:last-child { transform: rotate(90deg); }
 .parcel-card-heading { display: flex; min-width: 0; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .parcel-card-heading > div { display: grid; min-width: 0; gap: 9px; }
 .parcel-card-heading h3 { overflow: hidden; margin: 0; color: #25372a; font-family: var(--serif); font-size: 24px; font-weight: 500; letter-spacing: -0.3px; text-overflow: ellipsis; }
-.parcel-card-heading .crop-cell { width: fit-content; border-radius: 999px; background: #eef3ee; padding: 5px 10px; font-size: 11px; font-weight: 600; }
+.parcel-card-heading .crop-cell { width: fit-content; border-radius: 999px; background: var(--green-pale); padding: 5px 10px; font-size: 11px; font-weight: 600; }
 .parcel-card-heading .status-pill { flex: 0 0 auto; }
 .parcel-card-details { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; border-top: 1px solid var(--hair); padding-top: 15px; }
 .parcel-card-details > span { display: grid; min-width: 0; gap: 5px; }
@@ -381,14 +381,14 @@ details[open] > summary > svg:last-child { transform: rotate(90deg); }
 /* ---------- Élevage ---------- */
 .livestock-workspace { display: grid; width: min(100%, 1280px); gap: 28px; margin: 0 auto; padding: 48px 56px 88px; animation: page-in 500ms ease both; }
 
-.livestock-hero { position: relative; display: grid; gap: 30px; overflow: hidden; border-radius: 28px; padding: 52px 56px; background: radial-gradient(ellipse at 100% 0%, rgb(255 255 255 / 9%), transparent 55%), var(--green-dark); }
+.livestock-hero { position: relative; display: grid; gap: 30px; overflow: hidden; border-radius: 28px; padding: 52px 56px; background: radial-gradient(ellipse at 100% 0%, rgb(220 197 154 / 18%), transparent 55%), var(--green-dark); }
 .livestock-hero > div:first-child { position: relative; z-index: 1; max-width: 560px; }
-.livestock-hero .eyebrow { color: #9dbfab; }
+.livestock-hero .eyebrow { color: #e2d0b1; }
 .livestock-hero h1 { margin: 6px 0 0; color: #f6f8f4; font-family: var(--serif); font-size: clamp(36px, 4.2vw, 52px); font-weight: 500; letter-spacing: -0.8px; line-height: 1.05; }
-.livestock-hero p:not(.eyebrow) { max-width: 480px; margin: 12px 0 0; color: #b4cbbb; font-size: 15px; line-height: 1.6; }
+.livestock-hero p:not(.eyebrow) { max-width: 480px; margin: 12px 0 0; color: #e2d8c8; font-size: 15px; line-height: 1.6; }
 .livestock-hero-mark { position: absolute; top: 50%; right: 56px; color: rgb(255 255 255 / 9%); transform: translateY(-50%); }
 .livestock-hero-mark svg { width: 150px; height: 150px; }
-.livestock-hero-stats { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 36px; color: #a3c0af; font-size: 13px; }
+.livestock-hero-stats { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 36px; color: #dfcfb3; font-size: 13px; }
 .livestock-hero-stats strong { margin-right: 6px; color: #fff; font-family: var(--serif); font-size: 30px; font-weight: 500; }
 
 .livestock-kpi-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px; }
@@ -448,7 +448,7 @@ details[open] > summary > svg:last-child { transform: rotate(90deg); }
 .livestock-animal-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 22px; }
 .livestock-animal-card { overflow: hidden; padding: 10px; }
 .livestock-animal-image { display: block; width: 100%; height: 210px; border-radius: 18px; background-color: #f3f4f1; object-fit: cover; }
-.livestock-photo-placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; background: linear-gradient(150deg, #eef3ee, #f6f6f3); color: #8fae9a; font-size: 12px; }
+.livestock-photo-placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; background: linear-gradient(150deg, #f6f0e5, #f6f6f3); color: #b8935a; font-size: 12px; }
 .livestock-animal-body { padding: 20px 12px 10px; }
 .livestock-animal-title { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
 .livestock-animal-title p { margin: 0; color: var(--muted); font-size: 12px; }
@@ -628,7 +628,7 @@ details[open] > summary > svg:last-child { transform: rotate(90deg); }
 .operations-task:hover + .operations-task { box-shadow: none; }
 .operations-task-marker { width: 26px; height: 26px; margin-top: 2px; border: 1.5px solid #cdd7cf; color: #fff; }
 .operations-task-marker > span { width: 8px; height: 8px; background: #d5ddd6; }
-.operations-task.is-done .operations-task-marker { border-color: var(--green); background: var(--green); }
+.operations-task.is-done .operations-task-marker { border-color: #27754a; background: #27754a; }
 .operations-task-title-row { gap: 10px; }
 .operations-task-title-row h3 { font-size: 15px; font-weight: 600; letter-spacing: -0.1px; }
 .operations-task.is-done .operations-task-title-row h3 { color: #98a19b; }
@@ -639,7 +639,7 @@ details[open] > summary > svg:last-child { transform: rotate(90deg); }
 .priority-low { background: #f3f4f1; color: #98a19b; }
 .status-todo { background: #f3f4f1; color: #6b746d; }
 .status-in_progress { background: #edf2f8; color: #4f6f98; }
-.status-done { background: var(--green-pale); color: var(--green-dark); }
+.status-done { background: #eaf4ed; color: #27754a; }
 .status-archived { background: #f1f1f1; color: #818781; }
 .operations-task-description { margin: 8px 0 0; color: #5a645d; font-size: 13px; line-height: 1.6; }
 .operations-task-meta { gap: 6px 20px; margin-top: 12px; color: var(--muted); font-size: 12px; }

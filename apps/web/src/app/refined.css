@@ -7,9 +7,13 @@
   --muted: #8b928c;
   --line: transparent;
   --hair: #f0f1ed;
-  --green: #2f6b4f;
-  --green-dark: #1f3d2e;
-  --green-pale: #eef3ee;
+  --brand-gold: #b8935a;
+  --brand-gold-strong: #8a6939;
+  --brand-gold-deep: #63471f;
+  --brand-gold-pale: #f6f0e5;
+  --green: var(--brand-gold-strong);
+  --green-dark: var(--brand-gold-deep);
+  --green-pale: var(--brand-gold-pale);
   --serif: "Cormorant Garamond", Georgia, serif;
   --soft: 0 1px 2px rgb(20 30 22 / 4%), 0 8px 28px rgb(20 30 22 / 4%);
 }
@@ -168,7 +172,7 @@ body {
 }
 
 .chart-legend { font-size: 12px; color: var(--muted); }
-.legend-dot { background: var(--green); }
+.legend-dot { background: var(--brand-gold); }
 
 .revenue-chart { height: 290px; margin-top: 14px; }
 
@@ -178,13 +182,13 @@ body {
 .chart-month-labels { color: #a3aca5; font-size: 11px; }
 
 .revenue-chart-line {
-  stroke: var(--green);
+  stroke: var(--brand-gold);
   stroke-width: 2.25;
   vector-effect: non-scaling-stroke;
 }
 
 .revenue-chart-bar { fill: #a9c8b5; }
-.revenue-chart-bar:hover { fill: var(--green); }
+.revenue-chart-bar:hover { fill: var(--brand-gold); }
 
 .revenue-chart-point {
   fill: transparent;
@@ -193,7 +197,7 @@ body {
   transition: fill 120ms ease, stroke 120ms ease;
 }
 
-.revenue-chart-point:hover { fill: #fff; stroke: var(--green); }
+.revenue-chart-point:hover { fill: #fff; stroke: var(--brand-gold); }
 
 .chart-empty-message {
   border: 0;

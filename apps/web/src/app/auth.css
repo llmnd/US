@@ -175,7 +175,7 @@
   border-radius: 999px;
   background: #f5f4ef;
   padding: 0 15px;
-  color: #355640;
+  color: #765a31;
   font-size: 13px;
   font-weight: 600;
   transition: background 160ms ease, transform 160ms ease;
@@ -183,7 +183,7 @@
 
 .auth-home-link:hover {
   transform: translateY(-1px);
-  background: #e9eee5;
+  background: #f6f0e5;
 }
 
 .auth-content .auth-card {
@@ -283,8 +283,8 @@
 
 .auth-content .auth-field input:focus {
   background: #fff;
-  border-color: #c9d9c9;
-  box-shadow: 0 0 0 4px rgb(31 61 46 / 6%);
+  border-color: #b8935a;
+  box-shadow: 0 0 0 4px rgb(184 147 90 / 12%);
 }
 
 .auth-content .auth-error {
@@ -308,14 +308,14 @@
   margin-top: 10px;
   border: 0;
   border-radius: 999px;
-  background: linear-gradient(180deg, #244635 0%, #1a3325 100%);
+  background: linear-gradient(180deg, #8a6939 0%, #765a31 100%);
   color: #fff;
   cursor: pointer;
   font-size: 14.5px;
   font-weight: 500;
   letter-spacing: 0.2px;
   box-shadow:
-    0 1px 2px rgb(20 40 25 / 25%),
+    0 1px 2px rgb(70 48 20 / 22%),
     inset 0 1px 0 rgb(255 255 255 / 12%);
   transition:
     background 180ms ease,
@@ -324,9 +324,9 @@
 }
 
 .auth-content .auth-submit:hover:not(:disabled) {
-  background: linear-gradient(180deg, #1c3a2a 0%, #142a1d 100%);
+  background: linear-gradient(180deg, #765a31 0%, #63471f 100%);
   box-shadow:
-    0 6px 18px rgb(20 40 25 / 22%),
+    0 6px 18px rgb(70 48 20 / 22%),
     inset 0 1px 0 rgb(255 255 255 / 12%);
 }
 

@@ -7,9 +7,13 @@
   --ink: #1d2922;
   --muted: #78827b;
   --line: #e9ede9;
-  --green: #23734b;
-  --green-dark: #185b3a;
-  --green-pale: #eaf4ed;
+  --brand-gold: #b8935a;
+  --brand-gold-strong: #8a6939;
+  --brand-gold-deep: #63471f;
+  --brand-gold-pale: #f6f0e5;
+  --green: var(--brand-gold-strong);
+  --green-dark: var(--brand-gold-deep);
+  --green-pale: var(--brand-gold-pale);
 }
 
 * {
@@ -46,7 +50,7 @@ button {
 }
 
 ::selection {
-  background: #d7eadb;
+  background: #f2e7d3;
 }
 
 .app-shell {
@@ -307,7 +311,7 @@ button {
 
 .profile-dialog-close:focus-visible,
 .profile-dialog-action:focus-visible {
-  outline-color: #3d6849;
+  outline-color: var(--brand-gold);
 }
 
 .profile-dialog-identity {
@@ -687,11 +691,11 @@ button {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: #37815b;
+  background: var(--brand-gold);
 }
 
 .legend-dot.muted {
-  background: #c6d9ca;
+  background: #e6d4b5;
 }
 
 .revenue-panel {
@@ -811,7 +815,7 @@ button {
 
 .revenue-chart-line {
   fill: none;
-  stroke: #318158;
+  stroke: var(--brand-gold);
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-width: 3;
@@ -823,17 +827,17 @@ button {
 
 .revenue-chart-point {
   fill: white;
-  stroke: #318158;
+  stroke: var(--brand-gold);
   stroke-width: 2.5;
 }
 
 .revenue-chart-bar {
-  fill: #38835c;
+  fill: var(--brand-gold);
   transition: opacity 140ms ease;
 }
 
 .revenue-chart-bar:hover {
-  fill: #1d6845;
+  fill: #917040;
 }
 
 .chart-empty-message {
