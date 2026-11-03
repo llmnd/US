@@ -52,6 +52,10 @@ from mamari_api.modules.identity.dependencies import (
     require_roles,
 )
 from mamari_api.modules.sales.models import Customer
+from mamari_api.modules.stocks.service import (
+    get_or_create_production_item,
+    record_stock_movement,
+)
 
 router = APIRouter(prefix="/agriculture")
 CurrentOrganizationDep = Annotated[CurrentMembership, Depends(get_current_membership)]
@@ -1309,6 +1313,27 @@ async def create_harvest(
         notes=data.notes,
     )
     session.add(harvest)
+    stock_item = await get_or_create_production_item(
+        session,
+        organization_id=context.organization.id,
+        source="agriculture",
+        name=parcel.crop,
+        unit="kg",
+        location=parcel.name,
+    )
+    await record_stock_movement(
+        session,
+        organization_id=context.organization.id,
+        stock_item=stock_item,
+        movement_type="production",
+        direction="in",
+        quantity=data.quantity_kg,
+        movement_date=data.harvest_date,
+        created_by_id=context.user.id,
+        note=data.notes or f"Récolte enregistrée sur la parcelle {parcel.name}.",
+        reference_type="agriculture_harvest",
+        reference_id=harvest.id,
+    )
     await session.commit()
     await session.refresh(harvest)
     return HarvestResponse(

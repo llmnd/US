@@ -39,6 +39,8 @@ from mamari_api.modules.sales.schemas import (
     UpdateCustomerRequest,
     UpdateOrderStatusRequest,
 )
+from mamari_api.modules.stocks.models import StockItem
+from mamari_api.modules.stocks.service import record_stock_movement
 
 router = APIRouter()
 CurrentOrganizationDep = Annotated[CurrentMembership, Depends(get_current_membership)]
@@ -342,6 +344,29 @@ async def create_product(
         )
     session.add(product)
     try:
+        await session.flush()
+        stock_item = StockItem(
+            organization_id=context.organization.id,
+            product_id=product.id,
+            source="other",
+            name=product.name,
+            unit=product.unit,
+            location="Magasin",
+        )
+        session.add(stock_item)
+        await session.flush()
+        if stock_quantity:
+            await record_stock_movement(
+                session,
+                organization_id=context.organization.id,
+                stock_item=stock_item,
+                movement_type="opening",
+                direction="in",
+                quantity=stock_quantity,
+                movement_date=date.today(),
+                created_by_id=context.user.id,
+                note="Stock initial à la création du produit.",
+            )
         await session.commit()
         await session.refresh(product)
     except SQLAlchemyError:
@@ -373,10 +398,12 @@ async def update_product(
     remove_photo: Annotated[bool, Form()] = False,
 ) -> ProductResponse:
     product = await session.scalar(
-        select(Product).where(
+        select(Product)
+        .where(
             Product.id == product_id,
             Product.organization_id == context.organization.id,
         )
+        .with_for_update()
     )
     if product is None:
         raise HTTPException(status_code=404, detail="Produit introuvable.")
@@ -391,6 +418,7 @@ async def update_product(
         raise HTTPException(status_code=422, detail="Le nom et l’unité sont obligatoires.")
 
     previous_filename = product.photo_filename
+    previous_stock_quantity = product.stock_quantity
     new_photo_path = None
     if photo is not None:
         product.photo_filename, new_photo_path = await _store_product_photo(
@@ -404,12 +432,67 @@ async def update_product(
     product.category = category.strip() if category and category.strip() else None
     product.unit = unit
     product.price_fcfa = price_fcfa
-    product.stock_quantity = stock_quantity
     product.is_published = is_published
     product.is_active = is_active
     try:
+        stock_item = await session.scalar(
+            select(StockItem)
+            .where(
+                StockItem.organization_id == context.organization.id,
+                StockItem.product_id == product.id,
+            )
+            .with_for_update()
+        )
+        if stock_item is None:
+            stock_item = StockItem(
+                organization_id=context.organization.id,
+                product_id=product.id,
+                source="other",
+                name=name,
+                unit=unit,
+                location="Magasin",
+            )
+            session.add(stock_item)
+            await session.flush()
+            if previous_stock_quantity:
+                await record_stock_movement(
+                    session,
+                    organization_id=context.organization.id,
+                    stock_item=stock_item,
+                    movement_type="opening",
+                    direction="in",
+                    quantity=previous_stock_quantity,
+                    movement_date=date.today(),
+                    created_by_id=context.user.id,
+                    note="Reprise du stock existant du produit.",
+                )
+        stock_item.name = name
+        if stock_item.unit != unit:
+            raise HTTPException(
+                status_code=409,
+                detail="L’unité d’un produit lié au stock ne peut pas être changée.",
+            )
+        if stock_quantity != previous_stock_quantity:
+            await record_stock_movement(
+                session,
+                organization_id=context.organization.id,
+                stock_item=stock_item,
+                movement_type="adjustment",
+                direction="in" if stock_quantity > previous_stock_quantity else "out",
+                quantity=abs(stock_quantity - previous_stock_quantity),
+                movement_date=date.today(),
+                created_by_id=context.user.id,
+                note="Ajustement de stock depuis la fiche produit.",
+            )
+        else:
+            product.stock_quantity = previous_stock_quantity
         await session.commit()
         await session.refresh(product)
+    except HTTPException:
+        await session.rollback()
+        if new_photo_path is not None:
+            new_photo_path.unlink(missing_ok=True)
+        raise
     except SQLAlchemyError:
         await session.rollback()
         if new_photo_path is not None:
@@ -561,6 +644,7 @@ async def create_store_order(
             Product.is_active.is_(True),
             Product.is_published.is_(True),
         )
+        .order_by(Product.id)
         .with_for_update()
     )
     product_by_id = {product.id: product for product in products.all()}
@@ -580,28 +664,13 @@ async def create_store_order(
             detail="Le montant total de la commande est trop élevé.",
         )
 
+    order_id = uuid.uuid4()
     order_items: list[SalesOrderItem] = []
     for product_id, quantity in quantities.items():
         product = product_by_id[product_id]
-        stock_update = await session.execute(
-            update(Product)
-            .where(
-                Product.id == product_id,
-                Product.organization_id == organization.id,
-                Product.is_active.is_(True),
-                Product.is_published.is_(True),
-                Product.stock_quantity >= quantity,
-            )
-            .values(stock_quantity=Product.stock_quantity - quantity)
-        )
-        if stock_update.rowcount != 1:
-            await session.rollback()
-            raise HTTPException(
-                status_code=409,
-                detail=f"Le stock de « {product.name} » vient de changer.",
-            )
         order_items.append(
             SalesOrderItem(
+                id=uuid.uuid4(),
                 product_id=product.id,
                 product_name=product.name,
                 unit=product.unit,
@@ -610,7 +679,6 @@ async def create_store_order(
             )
         )
 
-    order_id = uuid.uuid4()
     order = SalesOrder(
         id=order_id,
         organization_id=organization.id,
@@ -628,7 +696,38 @@ async def create_store_order(
     )
     session.add(order)
     try:
+        await session.flush()
+        for item in order_items:
+            stock_item = await session.scalar(
+                select(StockItem)
+                .where(
+                    StockItem.organization_id == organization.id,
+                    StockItem.product_id == item.product_id,
+                )
+                .with_for_update()
+            )
+            if stock_item is None:
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"Le stock de « {item.product_name} » n’est pas initialisé.",
+                )
+            await record_stock_movement(
+                session,
+                organization_id=organization.id,
+                stock_item=stock_item,
+                movement_type="sale",
+                direction="out",
+                quantity=item.quantity,
+                movement_date=date.today(),
+                created_by_id=None,
+                note=f"Commande boutique {order.reference}.",
+                reference_type="store_order_item",
+                reference_id=item.id,
+            )
         await session.commit()
+    except HTTPException:
+        await session.rollback()
+        raise
     except SQLAlchemyError:
         await session.rollback()
         raise
@@ -650,7 +749,7 @@ async def create_order(
     data: CreateOrderRequest,
     session: SessionDep,
     context: CanManageSalesDep,
-) -> SalesOrder:
+) -> SalesOrderResponse:
     customer = None
     if data.customer_id is not None:
         customer = await session.scalar(
@@ -664,7 +763,51 @@ async def create_order(
     customer_name = customer.name if customer else data.customer_name
     if customer_name is None:
         raise HTTPException(status_code=422, detail="Sélectionnez un client.")
+    quantities: dict[uuid.UUID, int] = {}
+    for item in data.items:
+        quantities[item.product_id] = quantities.get(item.product_id, 0) + item.quantity
+    if any(quantity > 999 for quantity in quantities.values()):
+        raise HTTPException(
+            status_code=422,
+            detail="La quantité maximale par produit est dépassée.",
+        )
+    products = await session.scalars(
+        select(Product)
+        .where(
+            Product.organization_id == context.organization.id,
+            Product.id.in_(quantities),
+            Product.is_active.is_(True),
+        )
+        .order_by(Product.id)
+        .with_for_update()
+    )
+    product_by_id = {product.id: product for product in products.all()}
+    if len(product_by_id) != len(quantities):
+        raise HTTPException(
+            status_code=409,
+            detail="Un ou plusieurs produits du catalogue ne sont plus disponibles.",
+        )
+    amount_fcfa = sum(
+        product_by_id[product_id].price_fcfa * quantity
+        for product_id, quantity in quantities.items()
+    )
+    if amount_fcfa > 9_000_000_000_000_000:
+        raise HTTPException(
+            status_code=422,
+            detail="Le montant total de la commande est trop élevé.",
+        )
     order_id = uuid.uuid4()
+    order_items = [
+        SalesOrderItem(
+            id=uuid.uuid4(),
+            product_id=product_by_id[product_id].id,
+            product_name=product_by_id[product_id].name,
+            unit=product_by_id[product_id].unit,
+            quantity=quantity,
+            unit_price_fcfa=product_by_id[product_id].price_fcfa,
+        )
+        for product_id, quantity in quantities.items()
+    ]
     order = SalesOrder(
         id=order_id,
         organization_id=context.organization.id,
@@ -676,13 +819,53 @@ async def create_order(
         customer_email=customer.email if customer else None,
         delivery_address=customer.address if customer else None,
         order_date=data.order_date,
-        amount_fcfa=data.amount_fcfa,
+        amount_fcfa=amount_fcfa,
         status=OrderStatus.CONFIRMED.value,
+        items=order_items,
     )
     session.add(order)
-    await session.commit()
-    await session.refresh(order)
-    return order
+    try:
+        await session.flush()
+        for item in order_items:
+            stock_item = await session.scalar(
+                select(StockItem)
+                .where(
+                    StockItem.organization_id == context.organization.id,
+                    StockItem.product_id == item.product_id,
+                )
+                .with_for_update()
+            )
+            if stock_item is None:
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"Le stock de « {item.product_name} » n’est pas initialisé.",
+                )
+            await record_stock_movement(
+                session,
+                organization_id=context.organization.id,
+                stock_item=stock_item,
+                movement_type="sale",
+                direction="out",
+                quantity=item.quantity,
+                movement_date=data.order_date,
+                created_by_id=context.user.id,
+                note=f"Commande privée {order.reference}.",
+                reference_type="sales_order_item",
+                reference_id=item.id,
+            )
+        await session.commit()
+    except HTTPException:
+        await session.rollback()
+        raise
+    except SQLAlchemyError:
+        await session.rollback()
+        raise
+    saved_order = await session.scalar(
+        select(SalesOrder).options(selectinload(SalesOrder.items)).where(SalesOrder.id == order.id)
+    )
+    if saved_order is None:
+        raise HTTPException(status_code=500, detail="La commande enregistrée est introuvable.")
+    return SalesOrderResponse.model_validate(saved_order)
 
 
 @router.patch(
@@ -695,12 +878,15 @@ async def update_order_status(
     data: UpdateOrderStatusRequest,
     session: SessionDep,
     context: CanManageSalesDep,
-) -> SalesOrder:
+) -> SalesOrderResponse:
     order = await session.scalar(
-        select(SalesOrder).where(
+        select(SalesOrder)
+        .options(selectinload(SalesOrder.items))
+        .where(
             SalesOrder.id == order_id,
             SalesOrder.organization_id == context.organization.id,
         )
+        .with_for_update()
     )
     if order is None:
         raise HTTPException(status_code=404, detail="Commande introuvable.")
@@ -710,17 +896,44 @@ async def update_order_status(
             detail="Une commande annulée ne peut pas être réactivée.",
         )
     if data.status == OrderStatus.CANCELLED.value and order.status != OrderStatus.CANCELLED.value:
+        product_ids = sorted(
+            {item.product_id for item in order.items if item.product_id is not None}
+        )
+        if product_ids:
+            await session.scalars(
+                select(Product)
+                .where(
+                    Product.id.in_(product_ids),
+                    Product.organization_id == context.organization.id,
+                )
+                .order_by(Product.id)
+                .with_for_update()
+            )
         for item in order.items:
             if item.product_id is not None:
-                await session.execute(
-                    update(Product)
+                stock_item = await session.scalar(
+                    select(StockItem)
                     .where(
-                        Product.id == item.product_id,
-                        Product.organization_id == context.organization.id,
+                        StockItem.organization_id == context.organization.id,
+                        StockItem.product_id == item.product_id,
                     )
-                    .values(stock_quantity=Product.stock_quantity + item.quantity)
+                    .with_for_update()
                 )
+                if stock_item is not None:
+                    await record_stock_movement(
+                        session,
+                        organization_id=context.organization.id,
+                        stock_item=stock_item,
+                        movement_type="cancellation",
+                        direction="in",
+                        quantity=item.quantity,
+                        movement_date=date.today(),
+                        created_by_id=context.user.id,
+                        note=f"Annulation de la commande {order.reference}.",
+                        reference_type="order_cancelled_item",
+                        reference_id=item.id,
+                    )
     order.status = data.status
     await session.commit()
     await session.refresh(order)
-    return order
+    return SalesOrderResponse.model_validate(order)

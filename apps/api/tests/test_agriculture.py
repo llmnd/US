@@ -91,6 +91,13 @@ async def test_parcels_and_harvests_feed_real_dashboard_metrics(
     assert parcel_list.json()["total"] == 1
     assert harvest_list.status_code == 200
     assert harvest_list.json()["items"][0]["id"] == harvest["id"]
+    stock_items = await client.get(
+        "/api/v1/stocks/items?source=agriculture",
+        headers=headers,
+    )
+    assert stock_items.status_code == 200
+    assert stock_items.json()[0]["name"] == "Maïs"
+    assert stock_items.json()[0]["balance"] == "1250.750"
 
     overview = await client.get(
         f"/api/v1/dashboard/overview?year={date.today().year}",

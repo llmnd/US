@@ -6,6 +6,9 @@ const workspaceRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  experimental: {
+    cpus: 2,
+  },
   images: {
     qualities: [75, 90],
   },

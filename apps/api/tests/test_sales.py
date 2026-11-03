@@ -14,17 +14,45 @@ async def admin_session(client: AsyncClient) -> str:
     return response.json()["memberships"][0]["organization_id"]
 
 
+async def create_product(
+    client: AsyncClient,
+    headers: dict[str, str],
+    *,
+    name: str,
+    price_fcfa: int,
+    stock_quantity: int = 1,
+) -> str:
+    response = await client.post(
+        "/api/v1/sales/products",
+        headers=headers,
+        data={
+            "name": name,
+            "price_fcfa": str(price_fcfa),
+            "stock_quantity": str(stock_quantity),
+            "unit": "unité",
+        },
+    )
+    assert response.status_code == 201
+    return response.json()["id"]
+
+
 @pytest.mark.asyncio
 async def test_sales_orders_feed_real_dashboard_metrics(client: AsyncClient) -> None:
     organization_id = await admin_session(client)
     headers = {"X-Organization-ID": organization_id}
+    product_id = await create_product(
+        client,
+        headers,
+        name="Panier maraîcher",
+        price_fcfa=485000,
+    )
     created = await client.post(
         "/api/v1/sales/orders",
         headers=headers,
         json={
             "customer_name": "Marché Central",
             "order_date": date.today().isoformat(),
-            "amount_fcfa": 485000,
+            "items": [{"product_id": product_id, "quantity": 1}],
         },
     )
 
@@ -32,6 +60,7 @@ async def test_sales_orders_feed_real_dashboard_metrics(client: AsyncClient) -> 
     order = created.json()
     assert order["reference"].startswith(f"CMD-{date.today().year}-")
     assert order["status"] == "confirmed"
+    assert order["amount_fcfa"] == 485000
 
     overview = await client.get(
         f"/api/v1/dashboard/overview?year={date.today().year}",
@@ -78,10 +107,19 @@ async def test_customers_can_be_created_listed_and_selected_for_orders(
     assert listed.json()["total"] == 1
     assert listed.json()["items"][0]["id"] == customer["id"]
 
+    product_id = await create_product(
+        client,
+        headers,
+        name="Caisse de mangues",
+        price_fcfa=85000,
+    )
     order_response = await client.post(
         "/api/v1/sales/orders",
         headers=headers,
-        json={"customer_id": customer["id"], "amount_fcfa": 85000},
+        json={
+            "customer_id": customer["id"],
+            "items": [{"product_id": product_id, "quantity": 1}],
+        },
     )
     assert order_response.status_code == 201
     order = order_response.json()
@@ -105,11 +143,20 @@ async def test_customers_can_be_updated_and_deleted_without_changing_order_histo
     )
     assert created.status_code == 201
     customer_id = created.json()["id"]
+    product_id = await create_product(
+        client,
+        headers,
+        name="Sac de riz",
+        price_fcfa=12000,
+    )
 
     order_response = await client.post(
         "/api/v1/sales/orders",
         headers=headers,
-        json={"customer_id": customer_id, "amount_fcfa": 12000},
+        json={
+            "customer_id": customer_id,
+            "items": [{"product_id": product_id, "quantity": 1}],
+        },
     )
     assert order_response.status_code == 201
 
@@ -167,10 +214,19 @@ async def test_empty_dashboard_does_not_invent_business_figures(
 async def test_cancelled_order_is_excluded_from_revenue(client: AsyncClient) -> None:
     organization_id = await admin_session(client)
     headers = {"X-Organization-ID": organization_id}
+    product_id = await create_product(
+        client,
+        headers,
+        name="Huile locale",
+        price_fcfa=12000,
+    )
     created = await client.post(
         "/api/v1/sales/orders",
         headers=headers,
-        json={"customer_name": "Client A", "amount_fcfa": 12000},
+        json={
+            "customer_name": "Client A",
+            "items": [{"product_id": product_id, "quantity": 1}],
+        },
     )
     order_id = created.json()["id"]
 
@@ -199,13 +255,20 @@ async def test_sales_orders_are_searchable_filterable_and_paginated(
 ) -> None:
     organization_id = await admin_session(client)
     headers = {"X-Organization-ID": organization_id}
+    product_id = await create_product(
+        client,
+        headers,
+        name="Avocat",
+        price_fcfa=1000,
+        stock_quantity=3,
+    )
     for index in range(3):
         created = await client.post(
             "/api/v1/sales/orders",
             headers=headers,
             json={
                 "customer_name": f"Marché {index}",
-                "amount_fcfa": 1000 + index,
+                "items": [{"product_id": product_id, "quantity": 1}],
             },
         )
         assert created.status_code == 201
@@ -242,10 +305,17 @@ async def test_sales_data_requires_membership_and_valid_input(client: AsyncClien
     assert forbidden.status_code == 403
 
     organization_id = await admin_session(client)
+    headers = {"X-Organization-ID": organization_id}
+    amount_only = await client.post(
+        "/api/v1/sales/orders",
+        headers=headers,
+        json={"customer_name": "Client", "amount_fcfa": 5000},
+    )
+    assert amount_only.status_code == 422
     invalid = await client.post(
         "/api/v1/sales/orders",
-        headers={"X-Organization-ID": organization_id},
-        json={"customer_name": "A", "amount_fcfa": -1},
+        headers=headers,
+        json={"customer_name": "A", "items": []},
     )
     assert invalid.status_code == 422
 
@@ -265,6 +335,12 @@ async def test_reader_can_view_but_cannot_create_orders(client: AsyncClient) -> 
         },
     )
     assert user.status_code == 201
+    product_id = await create_product(
+        client,
+        headers,
+        name="Thé local",
+        price_fcfa=5000,
+    )
     client.cookies.clear()
     assert (
         await client.post(
@@ -277,6 +353,9 @@ async def test_reader_can_view_but_cannot_create_orders(client: AsyncClient) -> 
     create = await client.post(
         "/api/v1/sales/orders",
         headers=headers,
-        json={"customer_name": "Client B", "amount_fcfa": 5000},
+        json={
+            "customer_name": "Client B",
+            "items": [{"product_id": product_id, "quantity": 1}],
+        },
     )
     assert create.status_code == 403

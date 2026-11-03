@@ -9,6 +9,7 @@ import {
   Plus,
   Search,
   ShoppingBasket,
+  Trash2,
 } from "lucide-react";
 import Link from "next/link";
 import {
@@ -29,6 +30,20 @@ import {
 
 const statuses = ["pending", "confirmed", "preparing", "delivered", "cancelled"] as const;
 
+interface CatalogProduct {
+  id: string;
+  name: string;
+  unit: string;
+  price_fcfa: number;
+  stock_quantity: number;
+  is_active: boolean;
+}
+
+interface OrderLineDraft {
+  product_id: string;
+  quantity: number;
+}
+
 function isOrderStatus(value: string): value is OrderStatus {
   return statuses.some((status) => status === value);
 }
@@ -43,6 +58,7 @@ export function SalesPage() {
   const [page, setPage] = useState(1);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [orderDialogOpen, setOrderDialogOpen] = useState(false);
+  const [orderLines, setOrderLines] = useState<OrderLineDraft[]>([{ product_id: "", quantity: 1 }]);
   const orderDialogRef = useRef<HTMLDialogElement>(null);
   const deferredSearch = useDeferredValue(search.trim());
   const profile = useQuery({
@@ -51,6 +67,17 @@ export function SalesPage() {
     retry: false,
   });
   const membership = profile.data?.memberships[0];
+  const products = useQuery({
+    queryKey: ["sales", "products", membership?.organization_id],
+    queryFn: () => {
+      if (!membership) throw new Error("Aucune organisation active n’est associée au compte.");
+      return apiRequest<CatalogProduct[]>("/sales/products", {
+        headers: { "X-Organization-ID": membership.organization_id },
+      });
+    },
+    enabled: Boolean(membership && orderDialogOpen),
+    retry: false,
+  });
   const orders = useQuery({
     queryKey: [
       "sales",
@@ -117,11 +144,15 @@ export function SalesPage() {
         body: JSON.stringify({
           customer_id: formData.get("customer_id")?.toString(),
           order_date: formData.get("order_date")?.toString(),
-          amount_fcfa: Number(formData.get("amount_fcfa")),
+          items: orderLines.map((line) => ({
+            product_id: line.product_id,
+            quantity: Number(line.quantity),
+          })),
         }),
       });
       form.reset();
       setSelectedCustomer(null);
+      setOrderLines([{ product_id: "", quantity: 1 }]);
       setFormError(null);
       orderDialogRef.current?.close();
       setPage(1);
@@ -140,6 +171,13 @@ export function SalesPage() {
   const today = new Date().toISOString().slice(0, 10);
   const ordersData = orders.data;
   const totalPages = Math.ceil((ordersData?.total ?? 0) / (ordersData?.page_size ?? 20));
+  const availableProducts = (products.data ?? []).filter(
+    (product) => product.is_active && product.stock_quantity > 0,
+  );
+  const orderTotal = orderLines.reduce((total, line) => {
+    const product = availableProducts.find((item) => item.id === line.product_id);
+    return total + (product?.price_fcfa ?? 0) * line.quantity;
+  }, 0);
 
   useEffect(() => {
     const dialog = orderDialogRef.current;
@@ -161,7 +199,15 @@ export function SalesPage() {
         <div className="sales-heading-actions">
           <div className="date-chip">{ordersData?.total ?? 0} commande(s)</div>
           {canManageSales ? (
-            <button className="button-primary" onClick={() => setOrderDialogOpen(true)} type="button">
+            <button
+              className="button-primary"
+              onClick={() => {
+                setOrderLines([{ product_id: "", quantity: 1 }]);
+                setFormError(null);
+                setOrderDialogOpen(true);
+              }}
+              type="button"
+            >
               <Plus size={16} /> Nouvelle commande
             </button>
           ) : null}
@@ -183,7 +229,7 @@ export function SalesPage() {
             <div className="parcel-edit-dialog-heading">
               <div>
                 <h2 id="create-order-title">Nouvelle commande</h2>
-                <p>Choisissez un client et indiquez le montant de la commande.</p>
+                <p>Choisissez les produits du catalogue. Le montant est calculé automatiquement.</p>
               </div>
               <button
                 aria-label="Fermer"
@@ -201,13 +247,81 @@ export function SalesPage() {
                 onChange={setSelectedCustomer}
               />
               <Link className="text-action" href="/clients">Créer une fiche client</Link>
+              <div className="sales-order-lines">
+                <div className="sales-order-lines-heading">
+                  <strong>Produits commandés</strong>
+                  <button
+                    className="text-action"
+                    onClick={() => setOrderLines((lines) => [...lines, { product_id: "", quantity: 1 }])}
+                    type="button"
+                  >
+                    <Plus size={14} /> Ajouter une ligne
+                  </button>
+                </div>
+                {products.isError ? (
+                  <p className="auth-error" role="alert">{getApiErrorMessage(products.error)}</p>
+                ) : null}
+                {products.isPending ? <p className="stocks-loading" role="status">Chargement du catalogue…</p> : null}
+                {!products.isPending && !availableProducts.length ? (
+                  <p className="stocks-form-help">Aucun produit actif avec un stock disponible dans le catalogue.</p>
+                ) : null}
+                {orderLines.map((line, index) => {
+                  const selectedProduct = availableProducts.find((product) => product.id === line.product_id);
+                  return (
+                    <div className="sales-order-line" key={index}>
+                      <label className="auth-field">
+                        <span>Produit</span>
+                        <select
+                          onChange={(event) => {
+                            const product_id = event.currentTarget.value;
+                            setOrderLines((lines) => lines.map((item, lineIndex) =>
+                              lineIndex === index ? { ...item, product_id } : item,
+                            ));
+                          }}
+                          required
+                          value={line.product_id}
+                        >
+                          <option value="">Choisir dans le catalogue</option>
+                          {availableProducts.map((product) => (
+                            <option key={product.id} value={product.id}>
+                              {product.name} · {formatFcfa(product.price_fcfa)} · stock {product.stock_quantity} {product.unit}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="auth-field">
+                        <span>Quantité</span>
+                        <input
+                          max={selectedProduct?.stock_quantity}
+                          min="1"
+                          onChange={(event) => {
+                            const quantity = Number(event.currentTarget.value);
+                            setOrderLines((lines) => lines.map((item, lineIndex) =>
+                              lineIndex === index ? { ...item, quantity } : item,
+                            ));
+                          }}
+                          required
+                          type="number"
+                          value={line.quantity}
+                        />
+                      </label>
+                      <button
+                        aria-label="Supprimer cette ligne"
+                        className="sales-order-line-remove"
+                        disabled={orderLines.length === 1}
+                        onClick={() => setOrderLines((lines) => lines.filter((_, lineIndex) => lineIndex !== index))}
+                        type="button"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  );
+                })}
+                <div className="sales-order-total"><span>Total calculé</span><strong>{formatFcfa(orderTotal)}</strong></div>
+              </div>
               <label className="auth-field">
                 <span>Date de commande</span>
                 <input name="order_date" defaultValue={today} required type="date" />
-              </label>
-              <label className="auth-field">
-                <span>Montant (FCFA)</span>
-                <input min="1" name="amount_fcfa" placeholder="485000" required type="number" />
               </label>
               {formError ? <p className="auth-error" role="alert">{formError}</p> : null}
               <div className="parcel-edit-dialog-actions">

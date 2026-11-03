@@ -118,6 +118,15 @@ async def test_livestock_groups_animals_care_production_feed_and_finance(
         },
     )
     assert eggs_response.status_code == 201, eggs_response.text
+    stock_items = await client.get(
+        "/api/v1/stocks/items?source=elevage",
+        headers=headers,
+    )
+    assert stock_items.status_code == 200
+    stock_by_name = {item["name"]: item for item in stock_items.json()}
+    assert stock_by_name["Lait"]["balance"] == "8.500"
+    assert stock_by_name["Œufs"]["balance"] == "12.000"
+    assert stock_by_name["Lait"]["location"] == facility["name"]
 
     birth_response = await client.post(
         "/api/v1/livestock/records",
@@ -166,20 +175,17 @@ async def test_livestock_groups_animals_care_production_feed_and_finance(
     assert overview.json()["upcoming_care"][0]["overdue"] is True
     assert overview.json()["production_month_count"] == 2
     production_totals = {
-        row["unit"]: float(row["quantity"])
-        for row in overview.json()["production_month_totals"]
+        row["unit"]: float(row["quantity"]) for row in overview.json()["production_month_totals"]
     }
     assert production_totals == {"litres": 8.5, "œufs": 12}
     assert overview.json()["reproduction_month_count"] == 1
     reproduction_totals = {
-        row["unit"]: float(row["quantity"])
-        for row in overview.json()["reproduction_month_totals"]
+        row["unit"]: float(row["quantity"]) for row in overview.json()["reproduction_month_totals"]
     }
     assert reproduction_totals == {"œufs": 5}
     assert overview.json()["feed_month_count"] == 1
     feed_totals = {
-        row["unit"]: float(row["quantity"])
-        for row in overview.json()["feed_month_totals"]
+        row["unit"]: float(row["quantity"]) for row in overview.json()["feed_month_totals"]
     }
     assert feed_totals == {"kg": 25}
     assert overview.json()["feed_month_cost_fcfa"] == 15000
@@ -227,6 +233,19 @@ async def test_livestock_groups_animals_care_production_feed_and_finance(
     records = await client.get("/api/v1/livestock/records?type=feed", headers=headers)
     assert records.status_code == 200
     assert records.json()[0]["group_name"] == group["name"]
+
+    first_production = await client.get(
+        "/api/v1/livestock/records?type=production&limit=1&offset=0",
+        headers=headers,
+    )
+    second_production = await client.get(
+        "/api/v1/livestock/records?type=production&limit=1&offset=1",
+        headers=headers,
+    )
+    assert first_production.status_code == 200, first_production.text
+    assert second_production.status_code == 200, second_production.text
+    assert len(first_production.json()) == len(second_production.json()) == 1
+    assert first_production.json()[0]["id"] != second_production.json()[0]["id"]
 
     transactions = await client.get(
         f"/api/v1/agriculture/finance/transactions?year={date.today().year}",

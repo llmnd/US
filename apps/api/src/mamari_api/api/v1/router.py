@@ -8,6 +8,7 @@ from mamari_api.modules.livestock.router import router as livestock_router
 from mamari_api.modules.operations.router import router as operations_router
 from mamari_api.modules.organizations.router import router as organizations_router
 from mamari_api.modules.sales.router import router as sales_router
+from mamari_api.modules.stocks.router import router as stocks_router
 
 api_router = APIRouter()
 api_router.include_router(health_router, tags=["health"])
@@ -18,3 +19,4 @@ api_router.include_router(agriculture_router, tags=["agriculture"])
 api_router.include_router(operations_router, tags=["operations"])
 api_router.include_router(livestock_router, tags=["livestock"])
 api_router.include_router(sales_router, tags=["sales"])
+api_router.include_router(stocks_router, tags=["stocks"])

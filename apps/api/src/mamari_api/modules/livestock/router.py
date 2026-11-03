@@ -44,6 +44,10 @@ from mamari_api.modules.livestock.schemas import (
     RecordResponse,
     UpcomingCareResponse,
 )
+from mamari_api.modules.stocks.service import (
+    get_or_create_production_item,
+    record_stock_movement,
+)
 
 router = APIRouter(prefix="/livestock")
 CurrentOrganizationDep = Annotated[CurrentMembership, Depends(get_current_membership)]
@@ -54,8 +58,18 @@ CanManageLivestockDep = Annotated[
 
 MAX_PHOTO_BYTES = 5 * 1024 * 1024
 MONTH_LABELS = (
-    "Jan", "Fév", "Mar", "Avr", "Mai", "Juin",
-    "Juil", "Août", "Sep", "Oct", "Nov", "Déc",
+    "Jan",
+    "Fév",
+    "Mar",
+    "Avr",
+    "Mai",
+    "Juin",
+    "Juil",
+    "Août",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Déc",
 )
 PHOTO_TYPES = {
     "image/jpeg": (".jpg", lambda data: data.startswith(b"\xff\xd8\xff")),
@@ -164,8 +178,7 @@ async def _record_response(session: AsyncSession, record: LivestockRecord) -> Re
     finance_transaction_created = record.amount_fcfa > 0
     if record.animal_id is not None:
         animal_result = await session.execute(
-            select(LivestockAnimal.name, LivestockAnimal.tag_number)
-            .where(
+            select(LivestockAnimal.name, LivestockAnimal.tag_number).where(
                 LivestockAnimal.id == record.animal_id,
                 LivestockAnimal.organization_id == record.organization_id,
             )
@@ -270,7 +283,9 @@ async def read_livestock_overview(
     today = date.today()
     week_end = today + timedelta(days=7)
     animal_count = await session.scalar(
-        select(func.count()).select_from(LivestockAnimal).where(
+        select(func.count())
+        .select_from(LivestockAnimal)
+        .where(
             LivestockAnimal.organization_id == organization_id,
             LivestockAnimal.status == "active",
         )
@@ -293,7 +308,9 @@ async def read_livestock_overview(
     )
     species_count, female_animal_count, male_animal_count = animal_breakdown.one()
     group_count = await session.scalar(
-        select(func.count()).select_from(LivestockGroup).where(
+        select(func.count())
+        .select_from(LivestockGroup)
+        .where(
             LivestockGroup.organization_id == organization_id,
             LivestockGroup.is_active.is_(True),
         )
@@ -305,13 +322,17 @@ async def read_livestock_overview(
         )
     )
     facility_count = await session.scalar(
-        select(func.count()).select_from(LivestockFacility).where(
+        select(func.count())
+        .select_from(LivestockFacility)
+        .where(
             LivestockFacility.organization_id == organization_id,
             LivestockFacility.is_active.is_(True),
         )
     )
     health_follow_up_count = await session.scalar(
-        select(func.count()).select_from(LivestockRecord).where(
+        select(func.count())
+        .select_from(LivestockRecord)
+        .where(
             LivestockRecord.organization_id == organization_id,
             LivestockRecord.record_type == "health",
             LivestockRecord.is_resolved.is_(False),
@@ -320,13 +341,17 @@ async def read_livestock_overview(
         )
     )
     health_record_count = await session.scalar(
-        select(func.count()).select_from(LivestockRecord).where(
+        select(func.count())
+        .select_from(LivestockRecord)
+        .where(
             LivestockRecord.organization_id == organization_id,
             LivestockRecord.record_type == "health",
         )
     )
     care_due_soon_count = await session.scalar(
-        select(func.count()).select_from(LivestockRecord).where(
+        select(func.count())
+        .select_from(LivestockRecord)
+        .where(
             LivestockRecord.organization_id == organization_id,
             LivestockRecord.record_type == "health",
             LivestockRecord.is_resolved.is_(False),
@@ -335,7 +360,9 @@ async def read_livestock_overview(
         )
     )
     upcoming_care_count = await session.scalar(
-        select(func.count()).select_from(LivestockRecord).where(
+        select(func.count())
+        .select_from(LivestockRecord)
+        .where(
             LivestockRecord.organization_id == organization_id,
             LivestockRecord.record_type == "health",
             LivestockRecord.is_resolved.is_(False),
@@ -386,7 +413,9 @@ async def read_livestock_overview(
         .order_by(LivestockRecord.unit)
     )
     production_month_count = await session.scalar(
-        select(func.count()).select_from(LivestockRecord).where(
+        select(func.count())
+        .select_from(LivestockRecord)
+        .where(
             LivestockRecord.organization_id == organization_id,
             LivestockRecord.record_type == "production",
             LivestockRecord.event_date >= production_month_start,
@@ -394,7 +423,9 @@ async def read_livestock_overview(
         )
     )
     reproduction_month_count = await session.scalar(
-        select(func.count()).select_from(LivestockRecord).where(
+        select(func.count())
+        .select_from(LivestockRecord)
+        .where(
             LivestockRecord.organization_id == organization_id,
             LivestockRecord.record_type == "reproduction",
             LivestockRecord.event_date >= production_month_start,
@@ -431,7 +462,9 @@ async def read_livestock_overview(
         .order_by(LivestockRecord.unit)
     )
     feed_month_count = await session.scalar(
-        select(func.count()).select_from(LivestockRecord).where(
+        select(func.count())
+        .select_from(LivestockRecord)
+        .where(
             LivestockRecord.organization_id == organization_id,
             LivestockRecord.record_type == "feed",
             LivestockRecord.event_date >= production_month_start,
@@ -1042,6 +1075,7 @@ async def list_records(
         Query(alias="type", pattern="^(health|reproduction|production|feed)$"),
     ] = None,
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
+    offset: Annotated[int, Query(ge=0)] = 0,
 ) -> list[RecordResponse]:
     filters = [LivestockRecord.organization_id == context.organization.id]
     if record_type:
@@ -1050,6 +1084,7 @@ async def list_records(
         select(LivestockRecord)
         .where(*filters)
         .order_by(LivestockRecord.event_date.desc(), LivestockRecord.created_at.desc())
+        .offset(offset)
         .limit(limit)
     )
     return [await _record_response(session, record) for record in records]
@@ -1112,6 +1147,41 @@ async def create_record(
     )
     session.add(record)
     await session.flush()
+    if data.record_type == "production" and data.quantity is not None and data.unit is not None:
+        facility_name = None
+        if subject_facility_id is not None:
+            facility_name = await session.scalar(
+                select(LivestockFacility.name).where(
+                    LivestockFacility.id == subject_facility_id,
+                    LivestockFacility.organization_id == context.organization.id,
+                )
+            )
+        production_name = {
+            "milk": "Lait",
+            "eggs": "Œufs",
+            "weight": "Poids / viande",
+        }.get(data.category, data.title)
+        stock_item = await get_or_create_production_item(
+            session,
+            organization_id=context.organization.id,
+            source="elevage",
+            name=production_name,
+            unit=data.unit,
+            location=facility_name or "Élevage",
+        )
+        await record_stock_movement(
+            session,
+            organization_id=context.organization.id,
+            stock_item=stock_item,
+            movement_type="production",
+            direction="in",
+            quantity=data.quantity,
+            movement_date=data.event_date,
+            created_by_id=context.user.id,
+            note=data.notes or data.title,
+            reference_type="livestock_production",
+            reference_id=record.id,
+        )
     if data.amount_fcfa > 0:
         session.add(
             LivestockFinanceTransaction(

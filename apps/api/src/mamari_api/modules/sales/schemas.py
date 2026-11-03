@@ -12,11 +12,16 @@ CustomerName = Annotated[
 ]
 
 
+class StoreOrderItemRequest(BaseModel):
+    product_id: uuid.UUID
+    quantity: Annotated[int, Field(ge=1, le=999)]
+
+
 class CreateOrderRequest(BaseModel):
     customer_id: uuid.UUID | None = None
     customer_name: CustomerName | None = None
     order_date: date = Field(default_factory=date.today)
-    amount_fcfa: Annotated[int, Field(gt=0, le=9_000_000_000_000_000)]
+    items: Annotated[list["StoreOrderItemRequest"], Field(min_length=1, max_length=50)]
 
     @model_validator(mode="after")
     def validate_customer(self) -> "CreateOrderRequest":
@@ -116,11 +121,6 @@ class ProductResponse(BaseModel):
 class StoreProductPageResponse(BaseModel):
     organization_name: str
     items: list[ProductResponse]
-
-
-class StoreOrderItemRequest(BaseModel):
-    product_id: uuid.UUID
-    quantity: Annotated[int, Field(ge=1, le=999)]
 
 
 class CreateStoreOrderRequest(BaseModel):

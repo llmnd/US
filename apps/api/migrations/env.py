@@ -13,6 +13,7 @@ from mamari_api.modules.identity import models as identity_models  # noqa: F401
 from mamari_api.modules.livestock import models as livestock_models  # noqa: F401
 from mamari_api.modules.operations import models as operations_models  # noqa: F401
 from mamari_api.modules.sales import models as sales_models  # noqa: F401
+from mamari_api.modules.stocks import models as stocks_models  # noqa: F401
 
 config = context.config
 config.set_main_option(
