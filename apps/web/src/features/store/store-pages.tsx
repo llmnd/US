@@ -25,7 +25,7 @@ import {
   CalendarDays,
   Users,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { apiRequest, getApiErrorMessage } from "@/lib/api/client";
 import { formatFcfa } from "@/features/sales/sales-types";
 import type { StoreOrder, StoreProduct, StoreProductPage } from "./store-types";
@@ -33,45 +33,6 @@ import { useShopCart } from "./use-shop-cart";
 import { useProductPhoto } from "./use-product-photo";
 
 const storeProductsQueryKey = ["store", "products"];
-
-/* ------------------------------------------------------------------ */
-/*  RÉVÉLATION AU SCROLL                                               */
-/*  Les éléments portant [data-reveal] apparaissent en douceur.        */
-/*  Sans IntersectionObserver ou avec « réduire les animations »,      */
-/*  tout reste visible.                                                */
-/* ------------------------------------------------------------------ */
-function useReveal() {
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const root = ref.current;
-    if (!root) return;
-    const items = Array.from(root.querySelectorAll<HTMLElement>("[data-reveal]"));
-    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (!("IntersectionObserver" in window) || reduceMotion) {
-      items.forEach((item) => item.classList.add("is-visible"));
-      return;
-    }
-    const viewportHeight = window.innerHeight;
-    items.forEach((item) => {
-      if (item.getBoundingClientRect().top < viewportHeight * 0.92) item.classList.add("is-visible");
-    });
-    root.classList.add("reveal-ready");
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add("is-visible");
-            observer.unobserve(entry.target);
-          }
-        });
-      },
-      { threshold: 0.12, rootMargin: "0px 0px -8% 0px" },
-    );
-    items.filter((item) => !item.classList.contains("is-visible")).forEach((item) => observer.observe(item));
-    return () => observer.disconnect();
-  }, []);
-  return ref;
-}
 
 /* ------------------------------------------------------------------ */
 /*  HEADER                                                             */
@@ -93,7 +54,6 @@ function PublicHeader() {
 
   return (
     <>
-      <div className="public-progress" aria-hidden="true" />
       <header className={`public-header${scrolled ? " is-scrolled" : ""}`}>
         <Link className="public-brand" href="/" aria-label="Mamari, accueil">
           <Image
@@ -115,7 +75,7 @@ function PublicHeader() {
             <Link className="public-cart-link" href="/panier" aria-label={`Panier${cartCount ? `, ${cartCount} article(s)` : ""}`}>
               <ShoppingBag size={17} />
               <span>Panier</span>
-              {cartCount ? <span className="public-cart-count" key={cartCount}>{cartCount}</span> : null}
+              {cartCount ? <span className="public-cart-count">{cartCount}</span> : null}
             </Link>
             <Link className="public-login-link" href="/dashboard">
               Espace équipe <ArrowRight size={14} />
@@ -270,28 +230,8 @@ function StoreProductCard({
 }
 
 /* ------------------------------------------------------------------ */
-/*  BANDEAU DÉFILANT & FAQ                                             */
+/*  FAQ                                                                */
 /* ------------------------------------------------------------------ */
-const marqueeWords = [
-  "Cultiver",
-  "Élever",
-  "Partager",
-  "Au rythme des saisons",
-  "Du champ à votre table",
-  "Le travail bien fait",
-];
-
-function Marquee() {
-  const items = [...marqueeWords, ...marqueeWords, ...marqueeWords, ...marqueeWords];
-  return (
-    <div className="public-marquee" aria-hidden="true">
-      <div className="public-marquee-track">
-        {items.map((word, index) => <span key={`${word}-${index}`}>{word}</span>)}
-      </div>
-    </div>
-  );
-}
-
 const faqItems = [
   {
     question: "Comment passer commande ?",
@@ -317,7 +257,7 @@ const faqItems = [
 
 function FaqSection() {
   return (
-    <section className="public-section public-faq" data-reveal>
+    <section className="public-section public-faq">
       <div className="public-section-heading">
         <div>
           <p className="public-eyebrow">Bon à savoir</p>
@@ -344,7 +284,6 @@ function FaqSection() {
 /*  HOME                                                               */
 /* ------------------------------------------------------------------ */
 export function PublicHomePage() {
-  const siteRef = useReveal();
   const products = useQuery({
     queryKey: storeProductsQueryKey,
     queryFn: () => apiRequest<StoreProductPage>("/store/products"),
@@ -360,7 +299,7 @@ export function PublicHomePage() {
   }
 
   return (
-    <div className="public-site" ref={siteRef}>
+    <div className="public-site">
       <PublicHeader />
       <main>
         {/* ---------- HERO ---------- */}
@@ -451,10 +390,8 @@ export function PublicHomePage() {
           </div>
         </section>
 
-        <Marquee />
-
         {/* ---------- ACTIVITÉS ---------- */}
-        <section className="public-section public-activities" id="activites" data-reveal>
+        <section className="public-section public-activities" id="activites">
           <div className="public-section-heading">
             <div>
               <p className="public-eyebrow">Ce qui nous anime</p>
@@ -465,27 +402,38 @@ export function PublicHomePage() {
               chaque activité participe à une même ambition.
             </p>
           </div>
-          <div className="public-activity-grid">
-            <article className="public-activity-card">
-              <span><Wheat size={21} /></span>
-              <h3>Agriculture</h3>
-              <p>Des parcelles suivies avec attention et des cultures au rythme des saisons.</p>
+          <div className="public-bento">
+            <article className="public-bento-tile public-bento-agri">
+              <Image alt="" fill quality={85} sizes="(max-width: 900px) 100vw, 50vw" src="/images/mamari-survey.png" />
+              <div className="public-bento-copy">
+                <span><Wheat size={21} /></span>
+                <h3>Agriculture</h3>
+                <p>Des parcelles suivies avec attention et des cultures au rythme des saisons.</p>
+              </div>
             </article>
-            <article className="public-activity-card">
-              <span><Sprout size={21} /></span>
-              <h3>Élevage</h3>
-              <p>Des élevages conduits avec soin, au cœur d&apos;une exploitation vivante.</p>
+            <article className="public-bento-tile public-bento-livestock">
+              <Image alt="" fill quality={85} sizes="(max-width: 900px) 50vw, 25vw" src="/images/mamari-hero-cows.png" />
+              <div className="public-bento-copy">
+                <span><Sprout size={21} /></span>
+                <h3>Élevage</h3>
+                <p>Des élevages conduits avec soin, au cœur d&apos;une exploitation vivante.</p>
+              </div>
             </article>
-            <article className="public-activity-card">
+            <article className="public-bento-tile public-bento-products">
               <span><Tractor size={21} /></span>
               <h3>Productions</h3>
               <p>Des produits sélectionnés et préparés pour rejoindre votre quotidien.</p>
             </article>
+            <Link className="public-bento-tile public-bento-shop" href="/produits">
+              <small>La boutique</small>
+              <strong>Découvrir les produits</strong>
+              <span><ArrowRight size={20} /></span>
+            </Link>
           </div>
         </section>
 
         {/* ---------- HISTOIRE ---------- */}
-        <section className="public-section public-story" id="histoire" data-reveal>
+        <section className="public-section public-story" id="histoire">
           <div className="public-story-copy">
             <p className="public-eyebrow">Qui sommes-nous ?</p>
             <h2>Une histoire qui se construit sur le terrain.</h2>
@@ -516,7 +464,7 @@ export function PublicHomePage() {
           </div>
         </section>
 
-        <section className="public-section public-home-history" data-reveal>
+        <section className="public-section public-home-history">
           <div className="public-home-history-copy">
             <p className="public-eyebrow">L&apos;aventure Mamari</p>
             <h2>Une aventure qui a pris racine.</h2>
@@ -555,7 +503,7 @@ export function PublicHomePage() {
         </section>
 
         {/* ---------- PRODUITS VEDETTES ---------- */}
-        <section className="public-section public-featured" data-reveal>
+        <section className="public-section public-featured">
           <div className="public-section-heading">
             <div>
               <p className="public-eyebrow">La boutique Mamari</p>
@@ -586,7 +534,7 @@ export function PublicHomePage() {
         </section>
 
         {/* ---------- DÉMARCHE ---------- */}
-        <section className="public-section public-process" data-reveal>
+        <section className="public-section public-process">
           <div className="public-section-heading">
             <div>
               <p className="public-eyebrow">Notre démarche</p>
@@ -623,7 +571,7 @@ export function PublicHomePage() {
         </section>
 
         {/* ---------- VISAGES DE MAMARI ---------- */}
-        <section className="public-section public-home-gallery" data-reveal>
+        <section className="public-section public-home-gallery">
           <div className="public-section-heading">
             <div>
               <p className="public-eyebrow">Une aventure humaine</p>
@@ -652,7 +600,7 @@ export function PublicHomePage() {
         <FaqSection />
 
         {/* ---------- BANNIÈRE CONTACT ---------- */}
-        <section className="public-contact-banner" data-reveal>
+        <section className="public-contact-banner">
           <div>
             <p className="public-eyebrow">L&apos;aventure Mamari</p>
             <h2>Une question ou une envie de collaborer ?</h2>
@@ -663,7 +611,7 @@ export function PublicHomePage() {
         </section>
 
         {/* ---------- NEWSLETTER ---------- */}
-        <section className="public-newsletter" data-reveal>
+        <section className="public-newsletter">
           <div className="public-newsletter-inner">
             <div>
               <p className="public-eyebrow">Rejoignez-nous</p>
@@ -702,9 +650,8 @@ export function PublicHomePage() {
 /*  ABOUT                                                              */
 /* ------------------------------------------------------------------ */
 export function AboutPage() {
-  const siteRef = useReveal();
   return (
-    <div className="public-site" ref={siteRef}>
+    <div className="public-site">
       <PublicHeader />
       <main className="public-about">
         <section className="public-about-hero">
@@ -742,7 +689,7 @@ export function AboutPage() {
           </figure>
         </section>
 
-        <section className="public-about-opening" data-reveal>
+        <section className="public-about-opening">
           <span aria-hidden="true">“</span>
           <p>
             Faire grandir Mamari, c&apos;est croire qu&apos;avec de la patience,
@@ -752,7 +699,7 @@ export function AboutPage() {
           <small>La conviction qui nous accompagne</small>
         </section>
 
-        <section className="public-about-human" data-reveal>
+        <section className="public-about-human">
           <div className="public-about-human-visual">
             <figure className="public-about-human-portrait">
               <Image
@@ -790,7 +737,7 @@ export function AboutPage() {
           </div>
         </section>
 
-        <section className="public-section public-about-values" data-reveal>
+        <section className="public-section public-about-values">
           <div className="public-section-heading">
             <div>
               <p className="public-eyebrow">Ce que nous voulons faire grandir</p>
@@ -817,7 +764,7 @@ export function AboutPage() {
           </div>
         </section>
 
-        <section className="public-about-closing" data-reveal>
+        <section className="public-about-closing">
           <div className="public-about-closing-copy">
             <p className="public-eyebrow">Et la suite s&apos;écrit ensemble</p>
             <h2>Merci de faire une place à Mamari dans votre histoire.</h2>
@@ -1033,7 +980,7 @@ export function StorePage() {
         <Link className="store-cartbar" href="/panier">
           <span className="store-cartbar-icon">
             <ShoppingBag size={18} />
-            <span key={cartCount}>{cartCount}</span>
+            <span>{cartCount}</span>
           </span>
           <span className="store-cartbar-copy">
             <strong>Voir mon panier</strong>

@@ -621,82 +621,86 @@
   .public-site *::after { transition: none !important; animation: none !important; }
 }
 /* ==========================================================================
-   À COLLER À LA FIN DE public.css
-   Nouveautés : barre de progression, en-tête qui se compacte, bouton retour en haut,
-   bandeau défilant, révélation au scroll, FAQ, recherche et filtres boutique,
-   stepper sur les cartes, barre panier flottante, suppression de ligne au panier.
+   À COLLER À LA FIN DE public.css — REMPLACE le bloc « public-append » précédent
+   Aucune animation automatique, aucun carrousel : tout est statique.
+   Nouveautés : mosaïque d'activités (bento), sceau du hero, produit à la une,
+   chiffres en relief, FAQ, recherche et filtres boutique, stepper, barre panier.
    ========================================================================== */
 
 .public-site ::selection { background: var(--p-gold-soft); color: var(--p-forest-deep); }
 .public-site :focus-visible { outline: 2px solid var(--p-gold); outline-offset: 3px; }
 .public-site [id] { scroll-margin-top: 110px; }
 
-/* ---------- Progression de lecture ---------- */
-.public-progress { position: fixed; z-index: 60; top: 0; right: 0; left: 0; height: 3px; transform: scaleX(0); transform-origin: left; background: linear-gradient(90deg, var(--p-gold), var(--p-gold-soft)); pointer-events: none; }
-@supports (animation-timeline: scroll()) {
-  .public-progress { animation: p-progress linear both; animation-timeline: scroll(root); }
-  @keyframes p-progress { to { transform: scaleX(1); } }
-}
-
-/* ---------- En-tête qui se compacte ---------- */
-.public-header { transition: min-height 260ms ease, background 260ms ease, box-shadow 260ms ease; }
-.public-header.is-scrolled { min-height: 62px; background: rgb(255 255 255 / 90%); box-shadow: var(--p-shadow-lg); }
-.public-brand-logo { transition: width 260ms ease, height 260ms ease; }
-.public-header.is-scrolled .public-brand-logo { width: 44px; height: 42px; }
-.public-cart-count { animation: p-pop 420ms cubic-bezier(0.3, 1.6, 0.5, 1); }
-@keyframes p-pop { from { transform: scale(0.5); } to { transform: scale(1); } }
+/* ---------- En-tête : ombre renforcée après défilement ---------- */
+.public-header.is-scrolled { background: rgb(255 255 255 / 90%); box-shadow: var(--p-shadow-lg); }
 
 /* ---------- Retour en haut ---------- */
-.public-top-button { position: fixed; z-index: 40; right: 22px; bottom: 22px; display: grid; width: 48px; height: 48px; place-items: center; border: 0; border-radius: 50%; background: var(--p-forest); color: #fff; cursor: pointer; box-shadow: var(--p-shadow-lg); opacity: 0; pointer-events: none; transform: translateY(14px) scale(0.9); transition: opacity 240ms ease, transform 240ms ease, background 160ms ease; }
-.public-top-button.is-visible { opacity: 1; pointer-events: auto; transform: none; }
-.public-top-button.is-visible:hover { transform: translateY(-3px); background: var(--p-forest-deep); }
+.public-top-button { position: fixed; z-index: 40; right: 22px; bottom: 22px; display: none; width: 48px; height: 48px; place-items: center; border: 0; border-radius: 50%; background: var(--p-forest); color: #fff; cursor: pointer; box-shadow: var(--p-shadow-lg); }
+.public-top-button.is-visible { display: grid; }
+.public-top-button:hover { background: var(--p-forest-deep); }
 
-/* ---------- Hero : entrée, flottement, surlignage ---------- */
+/* ---------- Hero ---------- */
 .public-hero-copy h1 em { background: linear-gradient(transparent 78%, rgb(184 147 90 / 34%) 78%, rgb(184 147 90 / 34%) 92%, transparent 92%); padding: 0 0.06em; }
-@media (prefers-reduced-motion: no-preference) {
-  .public-hero-copy > * { animation: p-rise 900ms cubic-bezier(0.2, 0.7, 0.2, 1) both; }
-  .public-hero-copy > :nth-child(2) { animation-delay: 100ms; }
-  .public-hero-copy > :nth-child(3) { animation-delay: 200ms; }
-  .public-hero-copy > :nth-child(4) { animation-delay: 300ms; }
-  .public-hero-copy > :nth-child(5) { animation-delay: 400ms; }
-  .public-hero-image { animation: p-float 9s ease-in-out infinite; }
-  .public-hero-image-pasture { animation-duration: 10s; animation-delay: -2s; }
-  .public-hero-image-cows { animation-duration: 11s; animation-delay: -4s; }
-  .public-hero-image-chickens { animation-duration: 8.5s; animation-delay: -6s; }
+
+/* ---------- Mosaïque d'activités (remplace les trois cartes) ---------- */
+.public-bento { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: repeat(2, 270px); gap: 16px; }
+.public-bento-tile { position: relative; display: flex; flex-direction: column; justify-content: flex-end; overflow: hidden; border-radius: 32px; background: #fff; box-shadow: var(--p-shadow); isolation: isolate; }
+.public-bento-tile > img { z-index: -2; object-fit: cover; }
+.public-bento-tile h3 { margin: 0 0 8px; font-size: 38px; letter-spacing: -0.02em; line-height: 1; }
+.public-bento-tile p { max-width: 340px; margin: 0; font-size: 15px; line-height: 1.65; }
+.public-bento-tile > span:first-child,
+.public-bento-copy > span { display: grid; width: 52px; height: 52px; margin-bottom: auto; place-items: center; border-radius: 50%; background: rgb(255 255 255 / 16%); color: #fff; backdrop-filter: blur(8px); }
+
+.public-bento-agri { grid-column: 1 / 3; grid-row: 1 / 3; border-radius: 180px 32px 32px 32px; }
+.public-bento-livestock { grid-column: 3 / 4; grid-row: 1 / 3; border-radius: 999px 999px 32px 32px; text-align: center; }
+.public-bento-agri::after,
+.public-bento-livestock::after { position: absolute; z-index: -1; inset: 0; background: linear-gradient(transparent 30%, rgb(32 21 8 / 82%)); content: ""; }
+.public-bento-copy { display: flex; height: 100%; flex-direction: column; justify-content: flex-end; padding: 34px; color: #fff; }
+.public-bento-copy p { color: rgb(255 255 255 / 86%); }
+.public-bento-agri .public-bento-copy { padding-left: clamp(34px, 6vw, 72px); }
+.public-bento-livestock .public-bento-copy { align-items: center; padding: 30px 24px 34px; }
+.public-bento-livestock .public-bento-copy > span { margin-bottom: auto; }
+.public-bento-livestock .public-bento-copy p { font-size: 14px; }
+.public-bento-livestock h3 { font-size: 34px; }
+
+.public-bento-products { grid-column: 4 / 5; grid-row: 1 / 2; padding: 28px; background: linear-gradient(160deg, var(--p-forest), var(--p-forest-deep)); color: #fff; }
+.public-bento-products p { color: rgb(255 255 255 / 82%); font-size: 14px; }
+.public-bento-products h3 { font-size: 34px; }
+
+.public-bento-shop { grid-column: 4 / 5; grid-row: 2 / 3; padding: 28px; background: var(--p-sand); color: var(--p-ink); transition: background 200ms ease, color 200ms ease; }
+.public-bento-shop small { color: var(--p-gold); font-size: 12px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; }
+.public-bento-shop strong { margin: 6px 0 18px; font-family: var(--p-serif); font-size: 34px; font-weight: 500; letter-spacing: -0.02em; line-height: 1.02; }
+.public-bento-shop > span { display: grid; width: 48px; height: 48px; place-items: center; border-radius: 50%; background: var(--p-forest); color: #fff; }
+.public-bento-shop small { margin-bottom: auto; }
+.public-bento-shop:hover { background: var(--p-forest-deep); color: #fff; }
+.public-bento-shop:hover small { color: var(--p-gold-soft); }
+.public-bento-shop:hover > span { background: var(--p-gold-soft); color: var(--p-forest-deep); }
+
+/* ---------- Démarche : chiffres en relief ---------- */
+.public-process-grid > article { padding-top: 34px; }
+.public-process-number { position: absolute; z-index: -1; top: -18px; left: 50%; transform: translateX(-50%); color: transparent; font-family: var(--p-serif); font-size: 110px; font-weight: 500; letter-spacing: 0; line-height: 1; -webkit-text-stroke: 1.2px var(--p-gold-soft); }
+
+/* ---------- Produits du moment : une grande carte + deux compactes ---------- */
+@media (min-width: 1000px) {
+  .public-featured .store-product-grid { grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); grid-auto-rows: auto; }
+  .public-featured .store-product-card:first-child { grid-row: 1 / span 2; }
+  .public-featured .store-product-card:first-child .store-product-image { flex: 1; height: auto; min-height: 400px; }
+  .public-featured .store-product-card:first-child h3 { font-size: 34px; }
+  .public-featured .store-product-card:not(:first-child) { flex-direction: row; }
+  .public-featured .store-product-card:not(:first-child) .store-product-image { flex: 0 0 40%; height: auto; min-height: 0; }
 }
-@keyframes p-rise { from { opacity: 0; transform: translateY(22px); } to { opacity: 1; transform: none; } }
-@keyframes p-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-7px); } }
-
-/* reflet sur les boutons principaux */
-.public-primary-link { position: relative; overflow: hidden; isolation: isolate; }
-.public-primary-link::before { position: absolute; z-index: -1; inset: 0; background: linear-gradient(110deg, transparent 30%, rgb(255 255 255 / 30%) 50%, transparent 70%); content: ""; transform: translateX(-130%); transition: transform 700ms ease; }
-.public-primary-link:hover::before { transform: translateX(130%); }
-
-/* ---------- Bandeau défilant ---------- */
-.public-marquee { overflow: hidden; margin-top: clamp(56px, 7vw, 96px); padding: 22px 0; -webkit-mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent); mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent); }
-.public-marquee-track { display: flex; width: max-content; animation: p-marquee 60s linear infinite; }
-.public-marquee:hover .public-marquee-track { animation-play-state: paused; }
-.public-marquee-track > span { display: inline-flex; align-items: center; gap: 36px; padding-right: 36px; color: var(--p-forest); font-family: var(--p-serif); font-size: clamp(36px, 5.2vw, 68px); font-style: italic; font-weight: 500; letter-spacing: -0.02em; white-space: nowrap; }
-.public-marquee-track > span::after { width: 11px; height: 11px; flex: 0 0 auto; transform: rotate(45deg); background: var(--p-gold); content: ""; }
-.public-marquee-track > span:nth-child(3n + 2) { color: transparent; -webkit-text-stroke: 1.2px var(--p-forest); }
-@keyframes p-marquee { to { transform: translateX(-50%); } }
-
-/* ---------- Révélation au scroll ---------- */
-.reveal-ready [data-reveal] { opacity: 0; transform: translateY(36px); transition: opacity 800ms cubic-bezier(0.2, 0.7, 0.2, 1), transform 800ms cubic-bezier(0.2, 0.7, 0.2, 1); }
-.reveal-ready [data-reveal].is-visible { opacity: 1; transform: none; }
 
 /* ---------- FAQ ---------- */
 .public-faq { display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr); align-items: start; gap: clamp(32px, 6vw, 96px); }
 .public-faq .public-section-heading { flex-direction: column; align-items: flex-start; margin-bottom: 0; }
 .public-faq-list { display: grid; gap: 12px; }
-.public-faq-item { border-radius: 28px; background: #fff; box-shadow: var(--p-shadow); transition: box-shadow 200ms ease; }
+.public-faq-item { border-radius: 28px; background: #fff; box-shadow: var(--p-shadow); }
 .public-faq-item[open] { box-shadow: var(--p-shadow-lg); }
 .public-faq-item > summary { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 24px 28px; cursor: pointer; font-family: var(--p-serif); font-size: 27px; font-weight: 500; letter-spacing: -0.01em; line-height: 1.15; list-style: none; }
 .public-faq-item > summary::-webkit-details-marker { display: none; }
-.public-faq-item > summary svg { width: 40px; height: 40px; flex: 0 0 auto; box-sizing: border-box; border-radius: 50%; background: var(--p-sage); padding: 11px; color: var(--p-forest); transition: transform 260ms ease, background 200ms ease, color 200ms ease; }
+.public-faq-item > summary svg { width: 40px; height: 40px; flex: 0 0 auto; box-sizing: border-box; border-radius: 50%; background: var(--p-sage); padding: 11px; color: var(--p-forest); }
 .public-faq-item[open] > summary svg { transform: rotate(45deg); background: var(--p-forest); color: #fff; }
 .public-faq-item > p { max-width: 640px; margin: 0; padding: 0 28px 28px; color: var(--p-muted); font-size: 16px; line-height: 1.75; }
-.public-faq-item[open] > p { animation: p-rise 380ms ease both; }
 
 /* ---------- Pied de page : signature géante ---------- */
 .public-footer { overflow: hidden; }
@@ -704,13 +708,13 @@
 
 /* ---------- Boutique : recherche, filtres, tri ---------- */
 .store-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 14px 18px; margin-bottom: 18px; }
-.store-search { display: flex; min-height: 52px; min-width: min(100%, 280px); max-width: 420px; flex: 1 1 280px; align-items: center; gap: 10px; border-radius: 999px; background: #fff; padding: 0 20px; color: var(--p-soft); box-shadow: var(--p-shadow); transition: box-shadow 160ms ease; }
+.store-search { display: flex; min-height: 52px; min-width: min(100%, 280px); max-width: 420px; flex: 1 1 280px; align-items: center; gap: 10px; border-radius: 999px; background: #fff; padding: 0 20px; color: var(--p-soft); box-shadow: var(--p-shadow); }
 .store-search:focus-within { box-shadow: 0 0 0 2px rgb(138 105 57 / 38%), var(--p-shadow); }
 .store-search input { width: 100%; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--p-ink); font: inherit; font-size: 15px; }
 .store-chips { display: flex; flex: 2 1 320px; gap: 8px; overflow-x: auto; padding: 6px 2px; scrollbar-width: none; }
 .store-chips::-webkit-scrollbar { display: none; }
-.store-chip { min-height: 44px; flex: 0 0 auto; border: 0; border-radius: 999px; background: #fff; padding: 0 20px; color: var(--p-muted); cursor: pointer; font: inherit; font-size: 14px; font-weight: 500; box-shadow: var(--p-shadow); transition: background 160ms ease, color 160ms ease, transform 160ms ease; }
-.store-chip:hover { transform: translateY(-1px); color: var(--p-forest); }
+.store-chip { min-height: 44px; flex: 0 0 auto; border: 0; border-radius: 999px; background: #fff; padding: 0 20px; color: var(--p-muted); cursor: pointer; font: inherit; font-size: 14px; font-weight: 500; box-shadow: var(--p-shadow); }
+.store-chip:hover { color: var(--p-forest); }
 .store-chip[aria-pressed="true"] { background: var(--p-forest); color: #fff; }
 .store-toolbar-end { display: flex; align-items: center; gap: 12px; margin-left: auto; }
 .store-toggle { display: inline-flex; min-height: 44px; align-items: center; gap: 9px; border-radius: 999px; background: #fff; padding: 0 18px; color: var(--p-muted); cursor: pointer; font-size: 14px; box-shadow: var(--p-shadow); }
@@ -727,40 +731,47 @@
 .store-product-bottom .store-quantity button { width: 36px; height: 36px; }
 .store-product-bottom .store-quantity > span { min-width: 22px; font-size: 16px; }
 
-/* barre panier flottante */
-.store-cartbar { position: fixed; z-index: 45; bottom: 22px; left: 50%; display: flex; max-width: calc(100% - 28px); align-items: center; gap: 16px; min-height: 66px; border-radius: 999px; background: var(--p-forest-deep); padding: 8px 24px 8px 10px; color: #fff; box-shadow: var(--p-shadow-lg); transform: translateX(-50%); animation: p-bar-in 480ms cubic-bezier(0.2, 0.9, 0.3, 1.15) both; transition: background 160ms ease; }
+/* barre panier */
+.store-cartbar { position: fixed; z-index: 45; bottom: 22px; left: 50%; display: flex; max-width: calc(100% - 28px); min-height: 66px; align-items: center; gap: 16px; transform: translateX(-50%); border-radius: 999px; background: var(--p-forest-deep); padding: 8px 24px 8px 10px; color: #fff; box-shadow: var(--p-shadow-lg); }
 .store-cartbar:hover { background: #4f3817; }
 .store-cartbar-icon { position: relative; display: grid; width: 48px; height: 48px; flex: 0 0 auto; place-items: center; border-radius: 50%; background: rgb(255 255 255 / 12%); }
-.store-cartbar-icon > span { position: absolute; top: -4px; right: -4px; display: grid; min-width: 22px; height: 22px; place-items: center; border-radius: 999px; background: var(--p-gold-soft); padding: 0 6px; color: var(--p-forest-deep); font-size: 11px; font-weight: 700; animation: p-pop 420ms cubic-bezier(0.3, 1.6, 0.5, 1); }
+.store-cartbar-icon > span { position: absolute; top: -4px; right: -4px; display: grid; min-width: 22px; height: 22px; place-items: center; border-radius: 999px; background: var(--p-gold-soft); padding: 0 6px; color: var(--p-forest-deep); font-size: 11px; font-weight: 700; }
 .store-cartbar-copy { display: grid; line-height: 1.25; }
 .store-cartbar-copy strong { font-size: 15px; font-weight: 600; }
 .store-cartbar-copy small { color: var(--p-gold-soft); font-size: 13px; }
-@keyframes p-bar-in { from { opacity: 0; transform: translate(-50%, 28px); } to { opacity: 1; transform: translate(-50%, 0); } }
 
 /* ---------- Panier : suppression et vidage ---------- */
 .checkout-cart-item { grid-template-columns: 100px minmax(0, 1fr) auto auto auto; }
-.checkout-remove { display: grid; width: 40px; height: 40px; place-items: center; border: 0; border-radius: 50%; background: transparent; color: var(--p-soft); cursor: pointer; transition: background 160ms ease, color 160ms ease; }
+.checkout-remove { display: grid; width: 40px; height: 40px; place-items: center; border: 0; border-radius: 50%; background: transparent; color: var(--p-soft); cursor: pointer; }
 .checkout-remove:hover { background: #fdf2ef; color: #b34d3e; }
 .checkout-clear { margin-top: 20px; border: 0; background: transparent; padding: 0; color: var(--p-soft); cursor: pointer; font: inherit; font-size: 14px; text-decoration: underline; text-underline-offset: 4px; }
 .checkout-clear:hover { color: #b34d3e; }
 
 /* ---------- Responsive ---------- */
 @media (max-width: 900px) {
+  .public-bento { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: none; grid-auto-rows: minmax(300px, auto); }
+  .public-bento-agri { grid-column: 1 / -1; grid-row: auto; min-height: 400px; border-radius: 140px 32px 32px 32px; }
+  .public-bento-livestock { grid-column: 1 / 2; grid-row: auto; min-height: 400px; }
+  .public-bento-products { grid-column: 2 / 3; grid-row: auto; }
+  .public-bento-shop { grid-column: 1 / -1; grid-row: auto; min-height: 190px; }
   .public-faq { grid-template-columns: minmax(0, 1fr); }
   .store-toolbar-end { width: 100%; justify-content: space-between; margin-left: 0; }
 }
 
 @media (max-width: 600px) {
-  .public-header.is-scrolled { min-height: 56px; }
+  .public-bento { grid-template-columns: minmax(0, 1fr); }
+  .public-bento-agri,
+  .public-bento-livestock,
+  .public-bento-products,
+  .public-bento-shop { grid-column: 1 / -1; }
+  .public-bento-agri { min-height: 380px; border-radius: 110px 28px 28px 28px; }
+  .public-bento-livestock { min-height: 420px; }
+  .public-bento-tile h3 { font-size: 32px; }
+  .public-process-number { font-size: 88px; }
   .public-top-button { right: 14px; bottom: 92px; width: 44px; height: 44px; }
   .public-faq-item > summary { padding: 20px 22px; font-size: 23px; }
   .public-faq-item > p { padding: 0 22px 24px; }
   .store-search { max-width: none; }
   .checkout-cart-item { grid-template-columns: 72px minmax(0, 1fr) auto; }
   .checkout-remove { grid-column: 3; grid-row: 1; align-self: start; justify-self: end; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .public-marquee-track { animation: none; }
-  .reveal-ready [data-reveal] { opacity: 1; transform: none; }
 }
