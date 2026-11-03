@@ -21,6 +21,7 @@ from mamari_api.modules.identity.schemas import (
     OrganizationMemberResponse,
     OrganizationResponse,
     OrganizationUserResponse,
+    UpdateOrganizationRequest,
     UpdateOrganizationUserRequest,
 )
 from mamari_api.modules.identity.service import create_organization_user
@@ -79,6 +80,46 @@ async def read_current_organization(context: CurrentOrganizationDep) -> Organiza
         id=context.organization.id,
         name=context.organization.name,
         slug=context.organization.slug,
+        description=context.organization.description,
+        legal_form=context.organization.legal_form,
+        phone=context.organization.phone,
+        email=context.organization.email,
+        address=context.organization.address,
+        website=context.organization.website,
+        facebook_url=context.organization.facebook_url,
+        tiktok_url=context.organization.tiktok_url,
+        role=context.membership.role,
+        created_at=context.organization.created_at,
+    )
+
+
+@router.patch(
+    "/current",
+    response_model=OrganizationResponse,
+    summary="Modifier la fiche de l’entreprise",
+)
+async def update_current_organization(
+    data: UpdateOrganizationRequest,
+    session: SessionDep,
+    context: CanManageMembersDep,
+) -> OrganizationResponse:
+    changes = data.model_dump(exclude_unset=True, mode="json")
+    for field, value in changes.items():
+        setattr(context.organization, field, value)
+    await session.commit()
+    await session.refresh(context.organization)
+    return OrganizationResponse(
+        id=context.organization.id,
+        name=context.organization.name,
+        slug=context.organization.slug,
+        description=context.organization.description,
+        legal_form=context.organization.legal_form,
+        phone=context.organization.phone,
+        email=context.organization.email,
+        address=context.organization.address,
+        website=context.organization.website,
+        facebook_url=context.organization.facebook_url,
+        tiktok_url=context.organization.tiktok_url,
         role=context.membership.role,
         created_at=context.organization.created_at,
     )

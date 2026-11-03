@@ -2,7 +2,10 @@ from fastapi import APIRouter
 
 from mamari_api.modules.agriculture.router import router as agriculture_router
 from mamari_api.modules.dashboard.router import router as dashboard_router
+from mamari_api.modules.communication.router import router as communication_router
+from mamari_api.modules.finances.router import router as finances_router
 from mamari_api.modules.health.router import router as health_router
+from mamari_api.modules.human_resources.router import router as human_resources_router
 from mamari_api.modules.identity.router import router as identity_router
 from mamari_api.modules.livestock.router import router as livestock_router
 from mamari_api.modules.operations.router import router as operations_router
@@ -20,3 +23,6 @@ api_router.include_router(operations_router, tags=["operations"])
 api_router.include_router(livestock_router, tags=["livestock"])
 api_router.include_router(sales_router, tags=["sales"])
 api_router.include_router(stocks_router, tags=["stocks"])
+api_router.include_router(finances_router, tags=["finances"])
+api_router.include_router(human_resources_router, tags=["human-resources"])
+api_router.include_router(communication_router, tags=["communication"])

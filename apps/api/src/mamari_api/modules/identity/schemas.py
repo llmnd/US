@@ -2,7 +2,14 @@ import uuid
 from datetime import datetime
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, StringConstraints, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    EmailStr,
+    HttpUrl,
+    StringConstraints,
+    model_validator,
+)
 
 Password = Annotated[str, StringConstraints(min_length=6, max_length=128)]
 Phone = Annotated[str, StringConstraints(strip_whitespace=True, min_length=6, max_length=32)]
@@ -85,8 +92,46 @@ class OrganizationResponse(BaseModel):
     id: uuid.UUID
     name: str
     slug: str
+    description: str | None
+    legal_form: str | None
+    phone: str | None
+    email: str | None
+    address: str | None
+    website: str | None
+    facebook_url: str | None
+    tiktok_url: str | None
     role: Literal["owner", "admin", "manager", "operator", "reader"]
     created_at: datetime
+
+
+class UpdateOrganizationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: Annotated[
+        str, StringConstraints(strip_whitespace=True, min_length=2, max_length=160)
+    ] | None = None
+    description: Annotated[
+        str, StringConstraints(strip_whitespace=True, max_length=2000)
+    ] | None = None
+    legal_form: Annotated[
+        str, StringConstraints(strip_whitespace=True, max_length=120)
+    ] | None = None
+    phone: Phone | None = None
+    email: EmailStr | None = None
+    address: Annotated[
+        str, StringConstraints(strip_whitespace=True, max_length=500)
+    ] | None = None
+    website: HttpUrl | None = None
+    facebook_url: HttpUrl | None = None
+    tiktok_url: HttpUrl | None = None
+
+    @model_validator(mode="after")
+    def require_update_field(self) -> "UpdateOrganizationRequest":
+        if not self.model_fields_set:
+            raise ValueError("Renseignez au moins une information à modifier.")
+        if "name" in self.model_fields_set and self.name is None:
+            raise ValueError("Le nom de l’entreprise ne peut pas être vide.")
+        return self
 
 
 class MessageResponse(BaseModel):
