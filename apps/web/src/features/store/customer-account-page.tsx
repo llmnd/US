@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
@@ -67,7 +67,9 @@ const orderProgressMessages = {
 export function CustomerAccountPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const profileDialogRef = useRef<HTMLDialogElement>(null);
   const [page, setPage] = useState(1);
+  const [profileDialogOpen, setProfileDialogOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<OrderStatus | "all">("all");
   const profile = useQuery({
     queryKey: ["auth", "me"],
@@ -100,6 +102,20 @@ export function CustomerAccountPage() {
     },
   });
   const totalPages = Math.ceil((orders.data?.total ?? 0) / pageSize);
+  const customerName = profile.data?.full_name ?? "Mon compte";
+  const customerInitials = customerName
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part.charAt(0))
+    .join("")
+    .toLocaleUpperCase("fr");
+
+  useEffect(() => {
+    const dialog = profileDialogRef.current;
+    if (!dialog) return;
+    if (profileDialogOpen && !dialog.open) dialog.showModal();
+    else if (!profileDialogOpen && dialog.open) dialog.close();
+  }, [profileDialogOpen]);
 
   return (
     <main className="customer-account-page">
@@ -108,143 +124,186 @@ export function CustomerAccountPage() {
           <ArrowLeft size={15} /> Retour à la boutique
         </Link>
         <button
-          className="button-secondary"
-          disabled={logout.isPending}
-          onClick={() => logout.mutate()}
+          aria-controls="customer-profile-dialog"
+          aria-expanded={profileDialogOpen}
+          aria-haspopup="dialog"
+          className="customer-account-user"
+          onClick={() => setProfileDialogOpen(true)}
           type="button"
         >
-          <LogOut size={15} /> {logout.isPending ? "Déconnexion…" : "Se déconnecter"}
+          <span className="customer-account-avatar" aria-hidden="true">{customerInitials}</span>
+          <span className="customer-account-user-copy">
+            <strong>{customerName}</strong>
+          </span>
         </button>
-      </header>
-
-      <section className="customer-account-heading">
-        <p className="public-eyebrow">Votre espace client</p>
-        <h1>Bonjour{profile.data ? `, ${profile.data.full_name.split(/\s+/)[0]}` : ""}.</h1>
-        <p>Consultez vos achats et suivez le traitement de vos commandes.</p>
-      </section>
-
-      <section className="customer-profile-card" aria-labelledby="customer-profile-title">
-        <div>
-          <p className="public-eyebrow">Votre profil</p>
-          <h2 id="customer-profile-title">{profile.data?.full_name ?? "Mon compte"}</h2>
-          <p>Protégez votre compte en mettant régulièrement à jour votre mot de passe.</p>
-        </div>
-        <ChangePasswordForm />
-      </section>
-
-      {logout.isError ? <p className="auth-error" role="alert">{getApiErrorMessage(logout.error)}</p> : null}
-      {orders.isError ? (
-        <div className="dashboard-error" role="alert">
-          <p>{getApiErrorMessage(orders.error)}</p>
-          <button className="button-secondary" type="button" onClick={() => void orders.refetch()}>
-            Réessayer
+        <div className="customer-account-actions">
+          <button
+            className="button-secondary"
+            disabled={logout.isPending}
+            onClick={() => logout.mutate()}
+            type="button"
+          >
+            <LogOut size={15} /> {logout.isPending ? "Déconnexion…" : "Se déconnecter"}
           </button>
         </div>
-      ) : orders.isPending ? (
-        <p className="store-loading" role="status">Chargement de vos commandes…</p>
-      ) : orders.data && (orders.data.total > 0 || statusFilter !== "all") ? (
-        <>
-          <section className="customer-orders-section" aria-label="Vos commandes">
-            <div className="customer-orders-toolbar">
-              <div>
-                <h2>Mes commandes</h2>
-                <p>{orders.data?.total ?? 0} commande(s){statusFilter !== "all" ? ` · ${statusFilters.find((item) => item.value === statusFilter)?.label.toLowerCase()}` : ""}</p>
-              </div>
-              <label className="customer-orders-filter">
-                <span>Filtrer par statut</span>
-                <select
-                  onChange={(event) => {
-                    const selectedFilter = statusFilters.find(
-                      (filter) => filter.value === event.target.value,
-                    );
-                    if (!selectedFilter) return;
-                    setStatusFilter(selectedFilter.value);
-                    setPage(1);
-                  }}
-                  value={statusFilter}
-                >
-                  {statusFilters.map((filter) => (
-                    <option key={filter.value} value={filter.value}>{filter.label}</option>
-                  ))}
-                </select>
-              </label>
+      </header>
+
+      <dialog
+        aria-labelledby="customer-profile-dialog-title"
+        className="customer-profile-dialog"
+        id="customer-profile-dialog"
+        onClose={() => setProfileDialogOpen(false)}
+        onClick={(event) => {
+          if (event.target === event.currentTarget) setProfileDialogOpen(false);
+        }}
+        ref={profileDialogRef}
+      >
+        <section className="customer-profile-dialog-card">
+          <header className="customer-profile-dialog-header">
+            <div>
+              <p className="public-eyebrow">Mon compte</p>
+              <h2 id="customer-profile-dialog-title">Profil et sécurité</h2>
             </div>
-            {orders.data?.items.length ? (
+            <button
+              aria-label="Fermer le profil"
+              autoFocus
+              className="customer-profile-dialog-close"
+              onClick={() => setProfileDialogOpen(false)}
+              type="button"
+            >
+              <X size={18} />
+            </button>
+          </header>
+          <div className="customer-profile-dialog-identity">
+            <span className="customer-account-avatar" aria-hidden="true">{customerInitials}</span>
+            <strong>{customerName}</strong>
+          </div>
+          <div className="customer-profile-dialog-password">
+            <h3>Sécurité du compte</h3>
+            <ChangePasswordForm />
+          </div>
+        </section>
+      </dialog>
+
+      {logout.isError ? <p className="auth-error" role="alert">{getApiErrorMessage(logout.error)}</p> : null}
+      <section className="customer-orders-section" aria-label="Vos commandes">
+        <div className="customer-orders-toolbar">
+          <div>
+            <h1>Mes commandes</h1>
+            <p>
+              {orders.data ? `${orders.data.total} commande(s)` : "Suivez vos achats et leur avancement"}
+              {statusFilter !== "all"
+                ? ` · ${statusFilters.find((item) => item.value === statusFilter)?.label.toLowerCase()}`
+                : ""}
+            </p>
+          </div>
+          <label className="customer-orders-filter">
+            <span>Filtrer par statut</span>
+            <select
+              onChange={(event) => {
+                const selectedFilter = statusFilters.find(
+                  (filter) => filter.value === event.target.value,
+                );
+                if (!selectedFilter) return;
+                setStatusFilter(selectedFilter.value);
+                setPage(1);
+              }}
+              value={statusFilter}
+            >
+              {statusFilters.map((filter) => (
+                <option key={filter.value} value={filter.value}>{filter.label}</option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        {orders.isError ? (
+          <div className="dashboard-error" role="alert">
+            <p>{getApiErrorMessage(orders.error)}</p>
+            <button className="button-secondary" type="button" onClick={() => void orders.refetch()}>
+              Réessayer
+            </button>
+          </div>
+        ) : orders.isPending ? (
+          <p className="store-loading" role="status">Chargement de vos commandes…</p>
+        ) : orders.data && (orders.data.total > 0 || statusFilter !== "all") ? (
+          <>
+            {orders.data.items.length ? (
               <section className="customer-order-list" aria-label="Commandes de cette page">
-            {orders.data.items.map((order) => {
-              const currentStep = orderProgressSteps.findIndex((step) => step.status === order.status);
-              return (
-                <article className="customer-order-card" key={order.id}>
-                  <div className="customer-order-heading">
-                    <div>
-                      <span className="public-eyebrow">Commande {order.reference}</span>
-                      <time dateTime={order.order_date}>{formatDate(order.order_date)}</time>
-                    </div>
-                    <span className={`status-pill ${statusClassNames[order.status]}`}>
-                      {orderStatusLabels[order.status]}
-                    </span>
-                  </div>
-                  {order.status === "cancelled" ? (
-                    <div className="customer-order-cancelled" role="status">
-                      <span><X size={16} /></span>
-                      <div>
-                        <strong>Commande annulée</strong>
-                        <p>Cette commande ne sera pas préparée. Contactez notre équipe si vous avez besoin d’aide.</p>
-                      </div>
-                    </div>
-                  ) : (
-                    <section className="customer-order-progress" aria-label={`Progression de la commande ${order.reference}`}>
-                      <ol>
-                        {orderProgressSteps.map(({ label, description, icon: Icon }, index) => {
-                          const isComplete = index < currentStep;
-                          const isCurrent = index === currentStep;
-                          return (
-                            <li
-                              className={`customer-progress-step${isComplete ? " is-complete" : ""}${isCurrent ? " is-current" : ""}`}
-                              key={label}
-                              aria-current={isCurrent ? "step" : undefined}
-                            >
-                              <span className="customer-progress-marker">
-                                {isComplete ? <Check size={15} strokeWidth={2.5} /> : <Icon size={16} />}
-                              </span>
-                              <span className="customer-progress-copy">
-                                <strong>{label}</strong>
-                                <small>{description}</small>
-                              </span>
-                            </li>
-                          );
-                        })}
-                      </ol>
-                      <p className="customer-order-status-note">
-                        <PackageCheck size={17} />
-                        {orderProgressMessages[order.status]}
-                      </p>
-                    </section>
-                  )}
-                  <ul className="customer-order-items customer-order-product-list">
-                    {order.items.map((item) => (
-                      <li key={`${order.id}-${item.product_id ?? item.product_name}`}>
-                        <OrderProductImage
-                          name={item.product_name}
-                          photoPath={item.product_id ? productById.get(item.product_id)?.photo_url ?? null : null}
-                        />
-                        <span className="customer-order-product-copy">
-                          <strong>{item.quantity} × {item.product_name}</strong>
-                          <small>{item.unit}</small>
+                {orders.data.items.map((order) => {
+                  const currentStep = orderProgressSteps.findIndex((step) => step.status === order.status);
+                  return (
+                    <article className="customer-order-card" key={order.id}>
+                      <div className="customer-order-heading">
+                        <div>
+                          <span className="public-eyebrow">Commande {order.reference}</span>
+                          <time dateTime={order.order_date}>{formatDate(order.order_date)}</time>
+                        </div>
+                        <span className={`status-pill ${statusClassNames[order.status]}`}>
+                          {orderStatusLabels[order.status]}
                         </span>
-                        <strong className="customer-order-product-price">
-                          {formatFcfa(item.quantity * item.unit_price_fcfa)}
-                        </strong>
-                      </li>
-                    ))}
-                  </ul>
-                  <div className="customer-order-total">
-                    <span>Montant estimé</span>
-                    <strong>{formatFcfa(order.amount_fcfa)}</strong>
-                  </div>
-                </article>
-              );
-            })}
+                      </div>
+                      {order.status === "cancelled" ? (
+                        <div className="customer-order-cancelled" role="status">
+                          <span><X size={16} /></span>
+                          <div>
+                            <strong>Commande annulée</strong>
+                            <p>Cette commande ne sera pas préparée. Contactez notre équipe si vous avez besoin d’aide.</p>
+                          </div>
+                        </div>
+                      ) : (
+                        <section className="customer-order-progress" aria-label={`Progression de la commande ${order.reference}`}>
+                          <ol>
+                            {orderProgressSteps.map(({ label, description, icon: Icon }, index) => {
+                              const isComplete = index < currentStep;
+                              const isCurrent = index === currentStep;
+                              return (
+                                <li
+                                  className={`customer-progress-step${isComplete ? " is-complete" : ""}${isCurrent ? " is-current" : ""}`}
+                                  key={label}
+                                  aria-current={isCurrent ? "step" : undefined}
+                                >
+                                  <span className="customer-progress-marker">
+                                    {isComplete ? <Check size={15} strokeWidth={2.5} /> : <Icon size={16} />}
+                                  </span>
+                                  <span className="customer-progress-copy">
+                                    <strong>{label}</strong>
+                                    <small>{description}</small>
+                                  </span>
+                                </li>
+                              );
+                            })}
+                          </ol>
+                          <p className="customer-order-status-note">
+                            <PackageCheck size={17} />
+                            {orderProgressMessages[order.status]}
+                          </p>
+                        </section>
+                      )}
+                      <ul className="customer-order-items customer-order-product-list">
+                        {order.items.map((item) => (
+                          <li key={`${order.id}-${item.product_id ?? item.product_name}`}>
+                            <OrderProductImage
+                              name={item.product_name}
+                              photoPath={item.product_id ? productById.get(item.product_id)?.photo_url ?? null : null}
+                            />
+                            <span className="customer-order-product-copy">
+                              <strong>{item.quantity} × {item.product_name}</strong>
+                              <small>{item.unit}</small>
+                            </span>
+                            <strong className="customer-order-product-price">
+                              {formatFcfa(item.quantity * item.unit_price_fcfa)}
+                            </strong>
+                          </li>
+                        ))}
+                      </ul>
+                      <div className="customer-order-total">
+                        <span>Montant estimé</span>
+                        <strong>{formatFcfa(order.amount_fcfa)}</strong>
+                      </div>
+                    </article>
+                  );
+                })}
               </section>
             ) : (
               <div className="customer-orders-filter-empty">
@@ -252,39 +311,39 @@ export function CustomerAccountPage() {
                 <p>Aucune commande avec ce statut.</p>
               </div>
             )}
-          {totalPages > 1 ? (
-            <nav className="customer-orders-pagination" aria-label="Pages des commandes">
-              <button
-                className="button-secondary"
-                disabled={page <= 1}
-                onClick={() => setPage((current) => current - 1)}
-                type="button"
-              >
-                <ArrowLeft size={15} /> Précédent
-              </button>
-              <span>Page {page} sur {totalPages}</span>
-              <button
-                className="button-secondary"
-                disabled={page >= totalPages}
-                onClick={() => setPage((current) => current + 1)}
-                type="button"
-              >
-                Suivant <ArrowRight size={15} />
-              </button>
-            </nav>
-          ) : null}
-          </section>
-        </>
-      ) : (
-        <section className="customer-account-empty">
-          <ShoppingBag size={25} />
-          <h2>Pas encore de commande</h2>
-          <p>Vos prochaines commandes et leur avancement apparaîtront ici.</p>
-          <Link className="button-primary" href="/produits">
-            Découvrir la boutique <ArrowRight size={15} />
-          </Link>
-        </section>
-      )}
+            {totalPages > 1 ? (
+              <nav className="customer-orders-pagination" aria-label="Pages des commandes">
+                <button
+                  className="button-secondary"
+                  disabled={page <= 1}
+                  onClick={() => setPage((current) => current - 1)}
+                  type="button"
+                >
+                  <ArrowLeft size={15} /> Précédent
+                </button>
+                <span>Page {page} sur {totalPages}</span>
+                <button
+                  className="button-secondary"
+                  disabled={page >= totalPages}
+                  onClick={() => setPage((current) => current + 1)}
+                  type="button"
+                >
+                  Suivant <ArrowRight size={15} />
+                </button>
+              </nav>
+            ) : null}
+          </>
+        ) : (
+          <div className="customer-account-empty">
+            <ShoppingBag size={25} />
+            <h2>Pas encore de commande</h2>
+            <p>Vos prochaines commandes et leur avancement apparaîtront ici.</p>
+            <Link className="button-primary" href="/produits">
+              Découvrir la boutique <ArrowRight size={15} />
+            </Link>
+          </div>
+        )}
+      </section>
     </main>
   );
 }

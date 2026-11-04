@@ -866,19 +866,19 @@
 .customer-checkout-auth .auth-switch { margin: 0; }
 
 .customer-account-page {
-  width: min(100% - 36px, 960px);
+  width: min(100% - 36px, 1120px);
   min-height: 100vh;
   margin: 0 auto;
-  padding: 28px 0 64px;
+  padding: 20px 0 56px;
   color: var(--p-forest);
 }
 
 .customer-account-header {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 56px;
+  gap: 20px;
+  margin-bottom: 28px;
 }
 
 .customer-account-header .button-secondary,
@@ -889,43 +889,181 @@
   gap: 8px;
 }
 
-.customer-account-heading { margin-bottom: 28px; }
-.customer-account-heading h1 { margin: 12px 0; font-size: clamp(36px, 6vw, 54px); }
-.customer-account-heading > p:last-child { color: var(--p-muted); font-size: 16px; }
+.customer-account-user {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 12px;
+  justify-self: start;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  padding: 5px 12px 5px 5px;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  transition: background 160ms ease;
+}
 
-.customer-profile-card {
-  display: grid;
-  grid-template-columns: minmax(190px, 0.8fr) minmax(0, 1.2fr);
-  gap: 24px;
-  margin-bottom: 32px;
-  border: 1px solid var(--p-hair);
-  border-radius: 24px;
+.customer-account-user:hover {
   background: #fff;
-  padding: clamp(18px, 4vw, 28px);
-  box-shadow: var(--p-shadow);
 }
 
-.customer-profile-card h2 {
-  margin: 10px 0 6px;
+.customer-account-user:focus-visible {
+  outline: 2px solid var(--p-gold);
+  outline-offset: 2px;
+}
+
+.customer-account-avatar {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid var(--p-gold-soft);
+  border-radius: 50%;
+  background: var(--p-sage);
   color: var(--p-forest);
-  font-size: 25px;
+  font-size: 13px;
+  font-weight: 700;
 }
 
-.customer-profile-card > div > p:last-child {
-  margin: 0;
-  color: var(--p-muted);
-  font-size: 14px;
+.customer-account-user-copy {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
 }
 
-.customer-profile-card .password-change-form label {
+.customer-account-user-copy strong {
+  overflow: hidden;
+  color: var(--p-forest);
+  font-size: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.customer-account-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.customer-profile-dialog {
+  width: min(460px, calc(100vw - 32px));
+  max-width: none;
+  max-height: calc(100dvh - 32px);
+  overflow: auto;
+  margin: auto;
+  border: 0;
+  border-radius: 22px;
+  background: transparent;
+  padding: 0;
   color: var(--p-forest);
 }
 
-.customer-profile-card .password-change-form input {
+.customer-profile-dialog::backdrop {
+  background: rgb(25 34 28 / 48%);
+  backdrop-filter: blur(3px);
+}
+
+.customer-profile-dialog-card {
+  border: 1px solid var(--p-hair);
+  border-radius: 22px;
+  background: #fff;
+  padding: clamp(20px, 5vw, 28px);
+  box-shadow: var(--p-shadow-lg);
+}
+
+.customer-profile-dialog-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.customer-profile-dialog-header h2 {
+  margin: 8px 0 0;
+  color: var(--p-forest);
+  font-size: 24px;
+}
+
+.customer-profile-dialog-close {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-color: var(--p-hair);
+  border-style: solid;
+  border-width: 1px;
+  border-radius: 50%;
+  background: var(--p-sage-2);
+  color: var(--p-forest);
+  cursor: pointer;
+}
+
+.customer-profile-dialog-close:hover {
+  background: var(--p-sage);
+}
+
+.customer-profile-dialog-identity {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 20px;
+  border-radius: 14px;
+  background: var(--p-sage-2);
+  padding: 14px;
+}
+
+.customer-profile-dialog-identity strong {
+  overflow-wrap: anywhere;
+  color: var(--p-forest);
+  font-size: 15px;
+}
+
+.customer-profile-dialog-password {
+  border-top: 1px solid var(--p-hair);
+  margin-top: 20px;
+  padding-top: 18px;
+}
+
+.customer-profile-dialog-password h3 {
+  margin: 0 0 12px;
+  color: var(--p-forest);
+  font-size: 15px;
+}
+
+.customer-profile-dialog .password-change {
+  display: grid;
+  justify-items: stretch;
+}
+
+.customer-profile-dialog .password-change-toggle {
+  justify-content: flex-start;
+  border-color: var(--p-hair);
+  color: var(--p-forest);
+}
+
+.customer-profile-dialog .password-change-toggle:hover {
+  border-color: var(--p-gold-soft);
+  background: var(--p-sage-2);
+}
+
+.customer-profile-dialog .password-change-form {
+  margin-top: 4px;
+}
+
+.customer-profile-dialog .password-change-form label {
+  color: var(--p-forest);
+}
+
+.customer-profile-dialog .password-change-form input {
   border-color: var(--p-hair);
 }
 
-.customer-profile-card .password-change-form .button-primary {
+.customer-profile-dialog .password-change-form .button-primary {
   min-height: 44px;
   border: 0;
   border-radius: 999px;
@@ -938,9 +1076,21 @@
   font-weight: 600;
 }
 
-.customer-profile-card .password-change-form .button-primary:disabled {
+.customer-profile-dialog .password-change-form .button-primary:disabled {
   cursor: wait;
   opacity: .65;
+}
+
+.customer-orders-section {
+  display: grid;
+  gap: 18px;
+}
+
+.customer-orders-toolbar h1 {
+  margin: 0;
+  color: var(--p-forest);
+  font-size: clamp(24px, 3vw, 30px);
+  font-weight: 500;
 }
 
 .customer-order-list { display: grid; gap: 16px; }
@@ -979,8 +1129,18 @@
 .customer-orders-pagination > span { color: var(--p-muted); font-size: 13px; }
 
 @media (max-width: 600px) {
-  .customer-account-header { align-items: flex-start; flex-direction: column; margin-bottom: 36px; }
-  .customer-profile-card { grid-template-columns: 1fr; }
+  .customer-account-header {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "user user"
+      "back actions";
+    gap: 16px 8px;
+    margin-bottom: 24px;
+  }
+  .customer-account-header > .store-back-link { grid-area: back; justify-self: start; padding: 10px 13px; font-size: 12px; }
+  .customer-account-user { grid-area: user; }
+  .customer-account-actions { grid-area: actions; }
+  .customer-account-actions .button-secondary { min-height: 40px; padding: 0 11px; font-size: 12px; }
   .customer-orders-toolbar { align-items: stretch; flex-direction: column; }
   .customer-orders-filter select { width: 100%; }
   .customer-order-heading { align-items: flex-start; flex-direction: column; }

@@ -1,11 +1,14 @@
 "use client";
 
-import { useRef, useState, type FormEvent } from "react";
+import { useId, useRef, useState, type FormEvent } from "react";
 import { useMutation } from "@tanstack/react-query";
+import { ChevronDown, ChevronUp, KeyRound } from "lucide-react";
 import { apiRequest, getApiErrorMessage } from "@/lib/api/client";
 
 export function ChangePasswordForm() {
+  const formId = useId();
   const formRef = useRef<HTMLFormElement>(null);
+  const [isOpen, setIsOpen] = useState(false);
   const [success, setSuccess] = useState<string | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
   const changePassword = useMutation({
@@ -42,27 +45,43 @@ export function ChangePasswordForm() {
   }
 
   return (
-    <form className="password-change-form" onSubmit={handleSubmit} ref={formRef}>
-      <label>
-        <span>Mot de passe actuel</span>
-        <input autoComplete="current-password" maxLength={128} minLength={6} name="current_password" required type="password" />
-      </label>
-      <label>
-        <span>Nouveau mot de passe</span>
-        <input autoComplete="new-password" maxLength={128} minLength={6} name="new_password" required type="password" />
-      </label>
-      <label>
-        <span>Confirmer le nouveau mot de passe</span>
-        <input autoComplete="new-password" maxLength={128} minLength={6} name="password_confirmation" required type="password" />
-      </label>
-      {validationError ? <p className="password-change-error" role="alert">{validationError}</p> : null}
-      {changePassword.isError ? (
-        <p className="password-change-error" role="alert">{getApiErrorMessage(changePassword.error)}</p>
-      ) : null}
-      {success ? <p className="password-change-success" role="status">{success}</p> : null}
-      <button className="button-primary" disabled={changePassword.isPending} type="submit">
-        {changePassword.isPending ? "Modification en cours…" : "Modifier le mot de passe"}
+    <div className="password-change">
+      <button
+        aria-label={isOpen ? "Fermer le formulaire de changement de mot de passe" : "Modifier le mot de passe"}
+        aria-controls={formId}
+        aria-expanded={isOpen}
+        className="password-change-toggle"
+        onClick={() => setIsOpen((open) => !open)}
+        type="button"
+      >
+        <KeyRound size={16} aria-hidden="true" />
+        <span>{isOpen ? "Fermer le formulaire" : "Modifier le mot de passe"}</span>
+        {isOpen ? <ChevronUp size={16} aria-hidden="true" /> : <ChevronDown size={16} aria-hidden="true" />}
       </button>
-    </form>
+      {isOpen ? (
+        <form className="password-change-form" id={formId} onSubmit={handleSubmit} ref={formRef}>
+          <label>
+            <span>Mot de passe actuel</span>
+            <input autoComplete="current-password" maxLength={128} minLength={6} name="current_password" required type="password" />
+          </label>
+          <label>
+            <span>Nouveau mot de passe</span>
+            <input autoComplete="new-password" maxLength={128} minLength={6} name="new_password" required type="password" />
+          </label>
+          <label>
+            <span>Confirmer le nouveau mot de passe</span>
+            <input autoComplete="new-password" maxLength={128} minLength={6} name="password_confirmation" required type="password" />
+          </label>
+          {validationError ? <p className="password-change-error" role="alert">{validationError}</p> : null}
+          {changePassword.isError ? (
+            <p className="password-change-error" role="alert">{getApiErrorMessage(changePassword.error)}</p>
+          ) : null}
+          {success ? <p className="password-change-success" role="status">{success}</p> : null}
+          <button className="button-primary" disabled={changePassword.isPending} type="submit">
+            {changePassword.isPending ? "Modification en cours…" : "Enregistrer le nouveau mot de passe"}
+          </button>
+        </form>
+      ) : success ? <p className="password-change-success" role="status">{success}</p> : null}
+    </div>
   );
 }
