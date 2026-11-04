@@ -222,6 +222,10 @@ export function DashboardPage() {
     retry: false,
   });
   const membership = profile.data?.memberships[0];
+  const financialAccess = Boolean(
+    membership && ["owner", "admin", "manager"].includes(membership.role),
+  );
+  const visibleChartMetric: ChartMetric = financialAccess ? chartMetric : "production";
   const overview = useQuery({
     queryKey: ["dashboard", "overview", membership?.organization_id, year],
     queryFn: async () => {
@@ -238,18 +242,19 @@ export function DashboardPage() {
       return response;
     },
     enabled: Boolean(membership),
+    refetchInterval: 15_000,
     retry: false,
   });
 
   const value = overview.data;
   const metrics = value
     ? [
-        {
+        ...(financialAccess ? [{
           label: "Chiffre d’affaires",
-          value: formatFcfa(value.revenue_fcfa),
+          value: formatFcfa(value.revenue_fcfa ?? 0),
           detail: "ventes non annulées cette année",
           icon: CircleDollarSign,
-        },
+        }] : []),
         {
           label: "Commandes",
           value: value.order_count.toLocaleString("fr-FR"),
@@ -370,13 +375,13 @@ export function DashboardPage() {
                   ×
                 </button>
               </div>
-              {activeMetric?.label === "Chiffre d’affaires" && value ? (
+              {activeMetric?.label === "Chiffre d’affaires" && value && financialAccess ? (
                 <div className="metric-explanation">
                   <p>
                     Total des commandes confirmées, en préparation ou livrées. Les commandes en attente et annulées ne sont pas incluses.
                   </p>
                   <ul>
-                    {value.monthly_revenue.map((month) => (
+                    {(value.monthly_revenue ?? []).map((month) => (
                       <li key={month.month_number}>
                         <span>{month.month}</span><strong>{formatFcfa(month.amount_fcfa)}</strong>
                       </li>
@@ -393,7 +398,10 @@ export function DashboardPage() {
                     {value.order_count} commande(s) non annulée(s) sur l’année. {value.pending_order_count} commande(s) sont à traiter.
                   </p>
                   <p>
-                    {value.customer_count} client(s) distinct(s) et un panier moyen de {formatFcfa(value.average_order_fcfa)} pour les commandes prises en compte dans le chiffre d’affaires.
+                    {value.customer_count} client(s) distinct(s)
+                    {financialAccess
+                      ? ` et un panier moyen de ${formatFcfa(value.average_order_fcfa ?? 0)} pour les commandes prises en compte dans le chiffre d’affaires.`
+                      : "."}
                   </p>
                   <Link className="module-back-link" href="/ventes">
                     Gérer les commandes <ArrowRight size={14} />
@@ -435,9 +443,9 @@ export function DashboardPage() {
             <article className="panel revenue-panel">
               <div className="panel-header revenue-panel-header">
                 <div>
-                  <h2 className="panel-title">{metricLabels[chartMetric]}</h2>
+                  <h2 className="panel-title">{metricLabels[visibleChartMetric]}</h2>
                   <p className="panel-subtitle">
-                    {chartMetric === "revenue"
+                    {visibleChartMetric === "revenue"
                       ? "Commandes confirmées, en préparation et livrées · FCFA"
                       : "Poids des récoltes enregistrées · kg"}
                   </p>
@@ -460,13 +468,15 @@ export function DashboardPage() {
               <div className="chart-toolbar">
                 <div className="chart-controls">
                   <div className="chart-style-control" role="group" aria-label="Indicateur du graphique">
-                    {(["revenue", "production"] as const).map((metric) => (
+                    {((financialAccess
+                      ? ["revenue", "production"]
+                      : ["production"]) as ChartMetric[]).map((metric) => (
                       <button
                         className="chart-style-button"
                         key={metric}
                         type="button"
-                        aria-pressed={chartMetric === metric}
-                        data-active={chartMetric === metric}
+                        aria-pressed={visibleChartMetric === metric}
+                        data-active={visibleChartMetric === metric}
                         onClick={() => setChartMetric(metric)}
                       >
                         {metric === "revenue" ? <CircleDollarSign size={15} /> : <Sprout size={15} />}
@@ -476,7 +486,7 @@ export function DashboardPage() {
                   </div>
                   <span className="chart-legend">
                     <span className="legend-item">
-                      <span className="legend-dot" /> {chartMetric === "revenue" ? "Ventes" : "Récoltes"}
+                      <span className="legend-dot" /> {visibleChartMetric === "revenue" ? "Ventes" : "Récoltes"}
                     </span>
                   </span>
                 </div>
@@ -499,8 +509,8 @@ export function DashboardPage() {
               </div>
               <ActivityChart
                 data={
-                  chartMetric === "revenue"
-                    ? value.monthly_revenue.map((month) => ({
+                  visibleChartMetric === "revenue"
+                    ? (value.monthly_revenue ?? []).map((month) => ({
                         month: month.month,
                         month_number: month.month_number,
                         value: month.amount_fcfa,
@@ -512,8 +522,8 @@ export function DashboardPage() {
                       }))
                 }
                 style={chartStyle}
-                hasData={chartMetric === "revenue" ? value.revenue_fcfa > 0 : value.production_kg > 0}
-                metric={chartMetric}
+                hasData={visibleChartMetric === "revenue" ? (value.revenue_fcfa ?? 0) > 0 : value.production_kg > 0}
+                metric={visibleChartMetric}
               />
             </article>
 

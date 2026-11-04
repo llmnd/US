@@ -4,7 +4,7 @@ import NextImage from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Activity,
   Bell,
@@ -19,8 +19,10 @@ import {
   Image as ImageIcon,
   LayoutDashboard,
   Leaf,
+  LoaderCircle,
   LogOut,
   Package,
+  Pencil,
   Settings2,
   ShoppingCart,
   UsersRound,
@@ -31,6 +33,7 @@ import {
   ApiError,
   apiRequest,
   getApiErrorMessage,
+  type OrganizationMembership,
   type UserProfile,
 } from "@/lib/api/client";
 
@@ -58,6 +61,24 @@ const roleLabels = {
   reader: "Lecture seule",
 } as const;
 
+function canAccessPath(role: OrganizationMembership["role"], pathname: string): boolean {
+  if (role === "owner" || role === "admin") return true;
+  if (role === "manager") return pathname !== "/administration" && !pathname.startsWith("/administration/");
+  return (
+    pathname === "/dashboard" ||
+    pathname === "/agriculture" ||
+    pathname === "/elevage" ||
+    pathname === "/operations" ||
+    pathname.startsWith("/operations/") ||
+    pathname === "/stocks" ||
+    pathname === "/productions" ||
+    pathname === "/ventes" ||
+    pathname === "/clients" ||
+    pathname === "/aide" ||
+    pathname.startsWith("/aide/")
+  );
+}
+
 export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
   const pathname = usePathname();
   const router = useRouter();
@@ -75,18 +96,45 @@ export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
   const [logoutError, setLogoutError] = useState<string | null>(null);
   const [logoutPending, setLogoutPending] = useState(false);
   const [profileDialogOpen, setProfileDialogOpen] = useState(false);
+  const [profileEditing, setProfileEditing] = useState(false);
   const profile = useQuery({
     queryKey: ["auth", "me"],
     queryFn: () => apiRequest<UserProfile>("/auth/me"),
     enabled: !isPublicRoute,
     retry: false,
   });
+  const updateProfile = useMutation({
+    mutationFn: (data: { full_name: string; phone: string | null }) => {
+      const organizationId = profile.data?.memberships[0]?.organization_id;
+      if (!organizationId) throw new Error("Aucune organisation active n’est associée au compte.");
+      return apiRequest<UserProfile>("/auth/me", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Organization-ID": organizationId,
+        },
+        body: JSON.stringify(data),
+      });
+    },
+    onSuccess: (updatedProfile) => {
+      queryClient.setQueryData(["auth", "me"], updatedProfile);
+      setProfileEditing(false);
+    },
+  });
+  const role = profile.data?.memberships[0]?.role;
+  const canAccessCurrentPath = role ? canAccessPath(role, pathname) : true;
 
   useEffect(() => {
     if (!isPublicRoute && profile.error instanceof ApiError && profile.error.status === 401) {
       router.replace(`/login?next=${encodeURIComponent(pathname)}`);
     }
   }, [isPublicRoute, pathname, profile.error, router]);
+
+  useEffect(() => {
+    if (!isPublicRoute && role && !canAccessCurrentPath) {
+      router.replace("/dashboard");
+    }
+  }, [canAccessCurrentPath, isPublicRoute, role, router]);
 
   useEffect(() => {
     const dialog = profileDialogRef.current;
@@ -149,6 +197,14 @@ export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
     );
   }
 
+  if (!canAccessCurrentPath) {
+    return (
+      <div className="auth-loading" role="status">
+        <span>Redirection vers les pages autorisées…</span>
+      </div>
+    );
+  }
+
   const currentPage =
     navigation.find((item) => item.href === pathname)?.label ?? "Vue d'ensemble";
   const profileInitials = profile.data.full_name
@@ -186,7 +242,7 @@ export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
         <nav aria-label="Modules">
           <div className="nav-label">Espace de travail</div>
           <div className="nav-list">
-            {navigation.map(({ label, href, icon: Icon }) => {
+            {navigation.filter(({ href }) => canAccessPath(membership.role, href)).map(({ label, href, icon: Icon }) => {
               const active =
                 pathname === href ||
                 (href !== "/" && pathname.startsWith(`${href}/`));
@@ -235,7 +291,10 @@ export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
         id="profile-dialog"
         className="profile-dialog"
         aria-labelledby="profile-dialog-title"
-        onClose={() => setProfileDialogOpen(false)}
+        onClose={() => {
+          setProfileDialogOpen(false);
+          setProfileEditing(false);
+        }}
         onClick={(event) => {
           if (event.target === event.currentTarget) setProfileDialogOpen(false);
         }}
@@ -267,6 +326,73 @@ export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
               <span>{membership.organization_name}</span>
             </span>
           </div>
+
+          {profileEditing ? (
+            <form
+              className="profile-edit-form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                const formData = new FormData(event.currentTarget);
+                updateProfile.mutate({
+                  full_name: String(formData.get("full_name") ?? "").trim(),
+                  phone: String(formData.get("phone") ?? "").trim() || null,
+                });
+              }}
+            >
+              <label>
+                <span>Nom complet</span>
+                <input
+                  autoComplete="name"
+                  defaultValue={profile.data.full_name}
+                  maxLength={160}
+                  minLength={2}
+                  name="full_name"
+                  required
+                />
+              </label>
+              <label>
+                <span>Téléphone</span>
+                <input
+                  autoComplete="tel"
+                  defaultValue={profile.data.phone ?? ""}
+                  maxLength={32}
+                  minLength={6}
+                  name="phone"
+                  type="tel"
+                />
+              </label>
+              {updateProfile.isError ? (
+                <p className="profile-edit-error" role="alert">{getApiErrorMessage(updateProfile.error)}</p>
+              ) : null}
+              <div className="profile-edit-actions">
+                <button
+                  className="profile-edit-cancel"
+                  onClick={() => {
+                    updateProfile.reset();
+                    setProfileEditing(false);
+                  }}
+                  type="button"
+                >
+                  Annuler
+                </button>
+                <button className="profile-edit-save" disabled={updateProfile.isPending} type="submit">
+                  {updateProfile.isPending ? <LoaderCircle className="auth-spinner" size={15} /> : null}
+                  {updateProfile.isPending ? "Enregistrement…" : "Enregistrer"}
+                </button>
+              </div>
+            </form>
+          ) : (
+            <button
+              className="profile-edit-trigger"
+              onClick={() => {
+                updateProfile.reset();
+                setProfileEditing(true);
+              }}
+              type="button"
+            >
+              <Pencil size={15} /> Modifier mon profil
+            </button>
+          )}
 
           <div className="profile-dialog-actions">
             <Link

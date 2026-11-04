@@ -29,7 +29,12 @@ import {
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { ApiError, apiRequest, getApiErrorMessage } from "@/lib/api/client";
 import { formatFcfa } from "@/features/sales/sales-types";
-import type { StoreOrder, StoreProduct, StoreProductPage } from "./store-types";
+import type {
+  StoreCustomerProfile,
+  StoreOrder,
+  StoreProduct,
+  StoreProductPage,
+} from "./store-types";
 import { useShopCart } from "./use-shop-cart";
 import { useProductPhoto } from "./use-product-photo";
 import type { UserProfile } from "@/lib/api/client";
@@ -1037,6 +1042,7 @@ export function CartPage() {
   const { cart, setCart } = useShopCart();
   const [step, setStep] = useState(0);
   const [completedOrder, setCompletedOrder] = useState<StoreOrder | null>(null);
+  const [deliveryAddressOverride, setDeliveryAddressOverride] = useState<string | null>(null);
   const products = useQuery({
     queryKey: storeProductsQueryKey,
     queryFn: () => apiRequest<StoreProductPage>("/store/products"),
@@ -1047,6 +1053,13 @@ export function CartPage() {
     queryFn: () => apiRequest<UserProfile>("/auth/me"),
     retry: false,
   });
+  const customerProfile = useQuery({
+    queryKey: ["store", "my-profile"],
+    queryFn: () => apiRequest<StoreCustomerProfile>("/store/my-profile"),
+    enabled: profile.data?.customer_account === true,
+    retry: false,
+  });
+  const deliveryAddress = deliveryAddressOverride ?? customerProfile.data?.address ?? "";
   const checkout = useMutation({
     mutationFn: (data: {
       delivery_address?: string;
@@ -1280,11 +1293,23 @@ export function CartPage() {
               ) : profile.data?.customer_account ? (
                 <form className="checkout-customer-form" onSubmit={submitOrder}>
                   <p className="customer-checkout-greeting">
-                    Connecté en tant que <strong>{profile.data.full_name}</strong>. Votre nom et téléphone sont repris de votre compte.
+                    Connecté en tant que <strong>{customerProfile.data?.full_name ?? profile.data.full_name}</strong>
+                    {customerProfile.data?.phone ? <> · Téléphone : <strong>{customerProfile.data.phone}</strong></> : null}
                   </p>
+                  {customerProfile.isError ? (
+                    <p className="auth-error" role="alert">
+                      Impossible de charger votre adresse enregistrée. {getApiErrorMessage(customerProfile.error)}
+                    </p>
+                  ) : null}
                   <label className="auth-field">
                     <span>Adresse ou indications <small>(facultatif)</small></span>
-                    <textarea maxLength={500} name="delivery_address" rows={3} />
+                    <textarea
+                      maxLength={500}
+                      name="delivery_address"
+                      onChange={(event) => setDeliveryAddressOverride(event.target.value)}
+                      rows={3}
+                      value={deliveryAddress}
+                    />
                   </label>
                   {checkout.isError ? (
                     <p className="auth-error checkout-form-error" role="alert">

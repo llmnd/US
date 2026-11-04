@@ -323,6 +323,7 @@ export function AgriculturePage() {
   const canManage = Boolean(
     membership && ["owner", "admin", "manager"].includes(membership.role),
   );
+  const canOperate = canManage || membership?.role === "operator";
   const today = new Date().toISOString().slice(0, 10);
 
   useEffect(() => {
@@ -423,7 +424,7 @@ export function AgriculturePage() {
         headers: organizationHeaders,
       });
     },
-    enabled: Boolean(membership),
+    enabled: Boolean(membership && canManage),
     retry: false,
   });
   const transactions = useQuery({
@@ -436,7 +437,7 @@ export function AgriculturePage() {
         headers: organizationHeaders,
       });
     },
-    enabled: Boolean(membership),
+    enabled: Boolean(membership && canManage),
     retry: false,
   });
   const activeCampaignOptions = (campaignOptions.data?.items ?? []).filter(
@@ -585,9 +586,9 @@ export function AgriculturePage() {
           expected_harvest_date: data.get("expected_harvest_date"),
           area_hectares: Number(data.get("area_hectares")),
           expected_yield_kg_per_hectare: Number(data.get("yield")),
-          expected_price_fcfa_per_kg: Number(data.get("price")),
-          estimated_input_cost_fcfa: Number(data.get("input_cost")),
-          estimated_other_cost_fcfa: Number(data.get("other_cost")),
+          expected_price_fcfa_per_kg: canManage ? Number(data.get("price")) : 0,
+          estimated_input_cost_fcfa: canManage ? Number(data.get("input_cost")) : 0,
+          estimated_other_cost_fcfa: canManage ? Number(data.get("other_cost")) : 0,
         }),
       });
       form.reset();
@@ -913,7 +914,7 @@ export function AgriculturePage() {
 
       <div className="agriculture-toolbar">
         <div className="agriculture-tabs" role="tablist" aria-label="Espaces agricoles">
-          {tabs.map(({ id, label, icon: Icon }) => (
+          {tabs.filter(({ id }) => canManage || (id !== "finance" && id !== "reports")).map(({ id, label, icon: Icon }) => (
             <button
               key={id}
               id={`agriculture-tab-${id}`}
@@ -965,7 +966,7 @@ export function AgriculturePage() {
             </div>
           </div>
           {!selectedFarmForEdit ? <FeedbackMessage feedback={farmFeedback} /> : null}
-          {farmFilter === "active" && canManage ? (
+          {farmFilter === "active" && canOperate ? (
             <details className="panel agriculture-create-card">
               <summary><span className="agriculture-add-icon"><Plus size={17} /></span><span><strong>Ajouter une ferme</strong><small>Nom, localisation et photo de votre exploitation</small></span><ChevronRight size={16} /></summary>
               <form className="agriculture-form-grid" onSubmit={handleFarmSubmit}>
@@ -1004,14 +1005,16 @@ export function AgriculturePage() {
                         setTab("farms");
                         document.getElementById("parcel-section")?.scrollIntoView({ behavior: "smooth" });
                       }}>Voir les parcelles</button>
+                      {canOperate && farm.is_active ? (
+                        <>
+                          <button className="button-secondary" type="button" onClick={() => {
+                            setFarmFeedback(null);
+                            setSelectedFarmForEdit(farm);
+                          }}><Pencil size={14} />Modifier</button>
+                        </>
+                      ) : null}
                       {canManage ? (
                         <>
-                          {farm.is_active ? (
-                            <button className="button-secondary" type="button" onClick={() => {
-                              setFarmFeedback(null);
-                              setSelectedFarmForEdit(farm);
-                            }}><Pencil size={14} />Modifier</button>
-                          ) : null}
                           <button className="text-action" type="button" disabled={actionPending === `${farm.id}:${farm.is_active ? "archive" : "restore"}`} onClick={() => void farmAction(farm, farm.is_active ? "archive" : "restore")}>
                             {farm.is_active ? <Archive size={14} /> : <RotateCcw size={14} />}
                             {actionPending === `${farm.id}:${farm.is_active ? "archive" : "restore"}` ? "…" : farm.is_active ? "Archiver" : "Restaurer"}
@@ -1071,7 +1074,7 @@ export function AgriculturePage() {
                 <label className="sales-search"><Search size={15} /><span className="visually-hidden">Rechercher une parcelle</span><input type="search" value={parcelSearch} placeholder="Nom ou culture" onChange={(event) => { setParcelSearch(event.target.value); setParcelPage(1); }} /></label>
               </div>
             </div>
-            {canManage && activeFarms.length ? (
+            {canOperate && activeFarms.length ? (
               <details className="panel agriculture-create-card parcel-create-card">
                 <summary><span className="agriculture-add-icon"><Plus size={17} /></span><span><strong>Ajouter une parcelle</strong><small>Rattachez une culture et une superficie à une ferme</small></span><ChevronRight size={16} /></summary>
                 <form className="agriculture-inline-form" onSubmit={handleParcelSubmit}>
@@ -1110,14 +1113,16 @@ export function AgriculturePage() {
                           <span><small>Ferme</small><strong>{parcel.farm_name}</strong></span>
                           <span><small>Superficie</small><strong>{formattedNumber(parcel.area_hectares)} ha</strong></span>
                         </div>
+                        {canOperate && parcel.is_active ? (
+                          <div className="parcel-card-actions">
+                            <button className="button-secondary" type="button" onClick={() => {
+                              setParcelFeedback(null);
+                              setSelectedParcelForEdit(parcel);
+                            }}><Pencil size={14} />Modifier</button>
+                          </div>
+                        ) : null}
                         {canManage ? (
                           <div className="parcel-card-actions">
-                            {parcel.is_active ? (
-                              <button className="button-secondary" type="button" onClick={() => {
-                                setParcelFeedback(null);
-                                setSelectedParcelForEdit(parcel);
-                              }}><Pencil size={14} />Modifier</button>
-                            ) : null}
                             <button className="text-action" type="button" disabled={actionPending === `${parcel.id}:${parcel.is_active ? "archive" : "restore"}`} onClick={() => void parcelAction(parcel, parcel.is_active ? "archive" : "restore")}>
                               {parcel.is_active ? <Archive size={14} /> : <RotateCcw size={14} />}
                               {actionPending === `${parcel.id}:${parcel.is_active ? "archive" : "restore"}` ? "…" : parcel.is_active ? "Archiver" : "Restaurer"}
@@ -1174,7 +1179,7 @@ export function AgriculturePage() {
             </div>
           </div>
           <FeedbackMessage feedback={campaignFeedback} />
-          {campaignFilter === "active" && canManage && activeFarms.length && campaignParcels.data?.items.length ? (
+          {campaignFilter === "active" && canOperate && activeFarms.length && campaignParcels.data?.items.length ? (
             <details className="panel campaign-planner">
               <summary><span className="agriculture-add-icon"><Plus size={17} /></span><span><strong>Planifier une campagne</strong><small>Définissez vos hypothèses avant de la lancer</small></span><ChevronRight size={16} /></summary>
               <form className="campaign-form-grid" onSubmit={handleCampaignSubmit}>
@@ -1185,17 +1190,21 @@ export function AgriculturePage() {
                 <Field label="Récolte prévue"><input name="expected_harvest_date" required type="date" /></Field>
                 <Field label="Surface (ha)"><input min="0.01" name="area_hectares" placeholder="2.5" required step="0.01" type="number" /></Field>
                 <Field label="Rendement estimé (kg/ha)"><input min="0" name="yield" placeholder="1800" required step="0.01" type="number" /></Field>
-                <Field label="Prix estimé (FCFA/kg)"><input min="0" name="price" placeholder="450" required step="0.01" type="number" /></Field>
-                <Field label="Intrants estimés (FCFA)"><input min="0" name="input_cost" placeholder="250000" required type="number" /></Field>
-                <Field label="Autres coûts (FCFA)"><input min="0" name="other_cost" placeholder="100000" required type="number" /></Field>
+                {canManage ? (
+                  <>
+                    <Field label="Prix estimé (FCFA/kg)"><input min="0" name="price" placeholder="450" required step="0.01" type="number" /></Field>
+                    <Field label="Intrants estimés (FCFA)"><input min="0" name="input_cost" placeholder="250000" required type="number" /></Field>
+                    <Field label="Autres coûts (FCFA)"><input min="0" name="other_cost" placeholder="100000" required type="number" /></Field>
+                  </>
+                ) : null}
                 <button className="button-primary campaign-submit" disabled={campaignSubmitting} type="submit">{campaignSubmitting ? "Planification…" : "Enregistrer le plan"}</button>
               </form>
             </details>
           ) : null}
-          {campaignFilter === "active" && canManage && activeFarms.length && campaignParcels.data && !campaignParcels.data.items.length ? (
+          {campaignFilter === "active" && canOperate && activeFarms.length && campaignParcels.data && !campaignParcels.data.items.length ? (
             <div className="panel agriculture-empty compact"><p>Créez une parcelle active pour pouvoir planifier une campagne.</p></div>
           ) : null}
-          {canManage && activeCampaignOptions.some((campaign) => campaign.status === "active") ? (
+          {canOperate && activeCampaignOptions.some((campaign) => campaign.status === "active") ? (
             <details className="panel harvest-entry-card">
               <summary><Wheat size={17} /><span><strong>Enregistrer une récolte</strong><small>Reliez les quantités à une campagne active</small></span><ChevronRight size={16} /></summary>
               <form className="agriculture-inline-form" onSubmit={handleHarvestSubmit}>
@@ -1219,18 +1228,26 @@ export function AgriculturePage() {
                   <div className="campaign-dates"><span>{formatDate(campaign.start_date)} – {formatDate(campaign.expected_harvest_date)}</span><span>{formattedNumber(campaign.area_hectares)} ha</span></div>
                   <div className="campaign-metrics">
                     <div><span>Production prévue</span><strong>{formattedNumber(campaign.expected_production_kg)} kg</strong></div>
-                    <div><span>Revenu estimé</span><strong>{formatFcfa(campaign.expected_revenue_fcfa)}</strong></div>
-                    <div><span>Coûts estimés</span><strong>{formatFcfa(campaign.estimated_total_cost_fcfa)}</strong></div>
-                    <div><span>Marge estimée</span><strong className={campaign.estimated_margin_fcfa >= 0 ? "positive-value" : "negative-value"}>{formatFcfa(campaign.estimated_margin_fcfa)}</strong></div>
+                    {canManage ? (
+                      <>
+                        <div><span>Revenu estimé</span><strong>{formatFcfa(campaign.expected_revenue_fcfa ?? 0)}</strong></div>
+                        <div><span>Coûts estimés</span><strong>{formatFcfa(campaign.estimated_total_cost_fcfa ?? 0)}</strong></div>
+                        <div><span>Marge estimée</span><strong className={(campaign.estimated_margin_fcfa ?? 0) >= 0 ? "positive-value" : "negative-value"}>{formatFcfa(campaign.estimated_margin_fcfa ?? 0)}</strong></div>
+                      </>
+                    ) : null}
                   </div>
                   {campaign.status === "closed" ? (
                     <div className="campaign-actuals">
                       <span>Réel : <strong>{formattedNumber(campaign.actual_production_kg)} kg récoltés · {formattedNumber(campaign.actual_sold_kg)} kg vendus</strong></span>
-                      <span><strong>{formatFcfa(campaign.actual_revenue_fcfa)}</strong> commercialisés</span>
-                      <span><strong>{formatFcfa(campaign.actual_expenses_fcfa)}</strong> dépensés</span>
+                      {canManage ? (
+                        <>
+                          <span><strong>{formatFcfa(campaign.actual_revenue_fcfa ?? 0)}</strong> commercialisés</span>
+                          <span><strong>{formatFcfa(campaign.actual_expenses_fcfa ?? 0)}</strong> dépensés</span>
+                        </>
+                      ) : null}
                     </div>
                   ) : null}
-                  {campaign.status === "closed" && canManage ? (
+                  {campaign.status === "closed" && canOperate ? (
                     <details className="campaign-sale-form">
                       <summary><ArrowUpRight size={14} />Commercialiser une récolte</summary>
                       <form className="agriculture-inline-form" onSubmit={(event) => void handleSaleSubmit(event, campaign)}>
@@ -1249,16 +1266,16 @@ export function AgriculturePage() {
                       </form>
                     </details>
                   ) : null}
-                  {canManage ? (
+                  {canOperate ? (
                     <div className="campaign-actions">
-                      {campaign.status === "planned" || campaign.status === "simulated" ? (
+                      {canManage && (campaign.status === "planned" || campaign.status === "simulated") ? (
                         <>
                           <button className="button-secondary" type="button" disabled={actionPending === `${campaign.id}:simulate`} onClick={() => void campaignAction(campaign, "simulate")}><FlaskConical size={14} />{actionPending === `${campaign.id}:simulate` ? "Simulation…" : "Simuler"}</button>
-                          <button className="button-primary" type="button" disabled={actionPending === `${campaign.id}:start`} onClick={() => void campaignAction(campaign, "start")}><Check size={14} />Lancer la campagne</button>
                         </>
                       ) : null}
+                      {canOperate && (campaign.status === "planned" || campaign.status === "simulated") ? <button className="button-primary" type="button" disabled={actionPending === `${campaign.id}:start`} onClick={() => void campaignAction(campaign, "start")}><Check size={14} />Lancer la campagne</button> : null}
                       {campaign.status === "active" ? <button className="button-secondary" type="button" disabled={actionPending === `${campaign.id}:close`} onClick={() => void campaignAction(campaign, "close")}><Check size={14} />Clôturer</button> : null}
-                      {campaign.status !== "active" && campaign.status !== "archived" && (campaign.status !== "closed" || Number(campaign.actual_sold_kg) >= Number(campaign.actual_production_kg)) ? <button className="text-action" type="button" disabled={actionPending === `${campaign.id}:archive`} onClick={() => void campaignAction(campaign, "archive")}><Archive size={14} />Archiver</button> : null}
+                      {canManage && campaign.status !== "active" && campaign.status !== "archived" && (campaign.status !== "closed" || Number(campaign.actual_sold_kg) >= Number(campaign.actual_production_kg)) ? <button className="text-action" type="button" disabled={actionPending === `${campaign.id}:archive`} onClick={() => void campaignAction(campaign, "archive")}><Archive size={14} />Archiver</button> : null}
                     </div>
                   ) : null}
                 </article>
@@ -1342,7 +1359,7 @@ export function AgriculturePage() {
           ) : financeSummary.isPending ? <div className="dashboard-loading" role="status">Préparation du rapport…</div> : <div className="dashboard-error" role="alert"><p>{getApiErrorMessage(financeSummary.error)}</p></div>}
           <section className="panel agriculture-data-panel">
             <div className="agriculture-section-heading"><div><h2>Campagnes de l’exercice</h2><p>Prévisions, rendement et commercialisation.</p></div></div>
-            {campaigns.data?.items.length ? <div className="table-wrap"><table className="data-table agriculture-table"><thead><tr><th scope="col">CAMPAGNE</th><th scope="col">STATUT</th><th scope="col">PRODUCTION PRÉVUE</th><th scope="col">REVENU ESTIMÉ</th><th scope="col">REVENU RÉEL</th><th scope="col">MARGE</th></tr></thead><tbody>{campaigns.data.items.map((campaign) => <tr key={campaign.id}><td className="table-primary">{campaign.name}<small className="table-subtext">{campaign.farm_name} · {campaign.crop}</small></td><td>{campaignLabels[campaign.status]}</td><td>{formattedNumber(campaign.expected_production_kg)} kg</td><td>{formatFcfa(campaign.expected_revenue_fcfa)}</td><td>{formatFcfa(campaign.actual_revenue_fcfa)}</td><td className={campaign.estimated_margin_fcfa >= 0 ? "finance-amount-income" : "finance-amount-expense"}>{formatFcfa(campaign.estimated_margin_fcfa)}</td></tr>)}</tbody></table></div> : <div className="agriculture-empty compact"><p>Aucune campagne à inclure dans le rapport.</p></div>}
+            {campaigns.data?.items.length ? <div className="table-wrap"><table className="data-table agriculture-table"><thead><tr><th scope="col">CAMPAGNE</th><th scope="col">STATUT</th><th scope="col">PRODUCTION PRÉVUE</th><th scope="col">REVENU ESTIMÉ</th><th scope="col">REVENU RÉEL</th><th scope="col">MARGE</th></tr></thead><tbody>{campaigns.data.items.map((campaign) => <tr key={campaign.id}><td className="table-primary">{campaign.name}<small className="table-subtext">{campaign.farm_name} · {campaign.crop}</small></td><td>{campaignLabels[campaign.status]}</td><td>{formattedNumber(campaign.expected_production_kg)} kg</td><td>{formatFcfa(campaign.expected_revenue_fcfa ?? 0)}</td><td>{formatFcfa(campaign.actual_revenue_fcfa ?? 0)}</td><td className={(campaign.estimated_margin_fcfa ?? 0) >= 0 ? "finance-amount-income" : "finance-amount-expense"}>{formatFcfa(campaign.estimated_margin_fcfa ?? 0)}</td></tr>)}</tbody></table></div> : <div className="agriculture-empty compact"><p>Aucune campagne à inclure dans le rapport.</p></div>}
           </section>
         </div>
       ) : null}

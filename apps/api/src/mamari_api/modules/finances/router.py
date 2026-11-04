@@ -22,7 +22,7 @@ from mamari_api.modules.human_resources.models import PayrollRecord
 from mamari_api.modules.identity.dependencies import (
     CurrentMembership,
     SessionDep,
-    get_current_membership,
+    require_roles,
 )
 from mamari_api.modules.identity.models import User
 from mamari_api.modules.livestock.models import (
@@ -33,7 +33,10 @@ from mamari_api.modules.livestock.models import (
 )
 
 router = APIRouter(prefix="/finance")
-CurrentOrganizationDep = Annotated[CurrentMembership, Depends(get_current_membership)]
+CanViewFinancesDep = Annotated[
+    CurrentMembership,
+    Depends(require_roles("owner", "admin", "manager")),
+]
 MONTHS = (
     "Jan",
     "Fév",
@@ -167,7 +170,7 @@ def _finance_filters(
 @router.get("/transactions", response_model=FinanceTransactionPageResponse)
 async def list_finance_transactions(
     session: SessionDep,
-    context: CurrentOrganizationDep,
+    context: CanViewFinancesDep,
     page: Annotated[int, Query(ge=1)] = 1,
     page_size: Annotated[int, Query(ge=1, le=100)] = 20,
     year: Annotated[int, Query(ge=2000, le=2100)] = date.today().year,
@@ -202,7 +205,7 @@ async def list_finance_transactions(
 @router.get("/summary", response_model=FinanceSummaryResponse)
 async def read_finance_summary(
     session: SessionDep,
-    context: CurrentOrganizationDep,
+    context: CanViewFinancesDep,
     year: Annotated[int, Query(ge=2000, le=2100)] = date.today().year,
 ) -> FinanceSummaryResponse:
     transactions = _transaction_union(

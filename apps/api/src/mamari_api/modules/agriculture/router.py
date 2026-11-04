@@ -63,6 +63,14 @@ CanManageAgricultureDep = Annotated[
     CurrentMembership,
     Depends(require_roles("owner", "admin", "manager")),
 ]
+CanOperateAgricultureDep = Annotated[
+    CurrentMembership,
+    Depends(require_roles("owner", "admin", "manager", "operator")),
+]
+CanViewAgricultureFinanceDep = Annotated[
+    CurrentMembership,
+    Depends(require_roles("owner", "admin", "manager")),
+]
 MONTH_LABELS = (
     "Jan",
     "Fév",
@@ -192,6 +200,8 @@ async def _campaign_responses(
     session: AsyncSession,
     rows: list[tuple[Campaign, Parcel, Farm, Crop]],
     organization_id: uuid.UUID,
+    *,
+    include_financials: bool = True,
 ) -> list[CampaignResponse]:
     campaign_ids = [row[0].id for row in rows]
     if not campaign_ids:
@@ -219,43 +229,46 @@ async def _campaign_responses(
         .group_by(FinanceTransaction.campaign_id)
     )
     sold_totals = {campaign_id: quantity for campaign_id, quantity in sold_rows}
-    finance_rows = await session.execute(
-        select(
-            FinanceTransaction.campaign_id,
-            func.coalesce(
-                func.sum(
-                    case(
-                        (
-                            FinanceTransaction.transaction_type == FinanceType.INCOME.value,
-                            FinanceTransaction.amount_fcfa,
-                        ),
-                        else_=0,
-                    )
+    finance_totals: dict[uuid.UUID, tuple[int, int]] = {}
+    if include_financials:
+        finance_rows = await session.execute(
+            select(
+                FinanceTransaction.campaign_id,
+                func.coalesce(
+                    func.sum(
+                        case(
+                            (
+                                FinanceTransaction.transaction_type == FinanceType.INCOME.value,
+                                FinanceTransaction.amount_fcfa,
+                            ),
+                            else_=0,
+                        )
+                    ),
+                    0,
                 ),
-                0,
-            ),
-            func.coalesce(
-                func.sum(
-                    case(
-                        (
-                            FinanceTransaction.transaction_type == FinanceType.EXPENSE.value,
-                            FinanceTransaction.amount_fcfa,
-                        ),
-                        else_=0,
-                    )
+                func.coalesce(
+                    func.sum(
+                        case(
+                            (
+                                FinanceTransaction.transaction_type == FinanceType.EXPENSE.value,
+                                FinanceTransaction.amount_fcfa,
+                            ),
+                            else_=0,
+                        )
+                    ),
+                    0,
                 ),
-                0,
-            ),
+            )
+            .where(
+                FinanceTransaction.organization_id == organization_id,
+                FinanceTransaction.campaign_id.in_(campaign_ids),
+            )
+            .group_by(FinanceTransaction.campaign_id)
         )
-        .where(
-            FinanceTransaction.organization_id == organization_id,
-            FinanceTransaction.campaign_id.in_(campaign_ids),
-        )
-        .group_by(FinanceTransaction.campaign_id)
-    )
-    finance_totals = {
-        campaign_id: (int(income), int(expense)) for campaign_id, income, expense in finance_rows
-    }
+        finance_totals = {
+            campaign_id: (int(income), int(expense))
+            for campaign_id, income, expense in finance_rows
+        }
 
     responses: list[CampaignResponse] = []
     for campaign, parcel, farm, crop in rows:
@@ -279,21 +292,27 @@ async def _campaign_responses(
                 expected_harvest_date=campaign.expected_harvest_date,
                 area_hectares=campaign.area_hectares,
                 expected_yield_kg_per_hectare=campaign.expected_yield_kg_per_hectare,
-                expected_price_fcfa_per_kg=campaign.expected_price_fcfa_per_kg,
-                estimated_input_cost_fcfa=campaign.estimated_input_cost_fcfa,
-                estimated_other_cost_fcfa=campaign.estimated_other_cost_fcfa,
+                expected_price_fcfa_per_kg=(
+                    campaign.expected_price_fcfa_per_kg if include_financials else None
+                ),
+                estimated_input_cost_fcfa=(
+                    campaign.estimated_input_cost_fcfa if include_financials else None
+                ),
+                estimated_other_cost_fcfa=(
+                    campaign.estimated_other_cost_fcfa if include_financials else None
+                ),
                 simulated_at=campaign.simulated_at,
                 started_at=campaign.started_at,
                 closed_at=campaign.closed_at,
                 archived_at=campaign.archived_at,
                 expected_production_kg=expected_production,
-                expected_revenue_fcfa=expected_revenue,
-                estimated_total_cost_fcfa=estimated_costs,
-                estimated_margin_fcfa=estimated_margin,
+                expected_revenue_fcfa=expected_revenue if include_financials else None,
+                estimated_total_cost_fcfa=estimated_costs if include_financials else None,
+                estimated_margin_fcfa=estimated_margin if include_financials else None,
                 actual_production_kg=harvest_totals.get(campaign.id, Decimal(0)),
                 actual_sold_kg=sold_totals.get(campaign.id, Decimal(0)),
-                actual_revenue_fcfa=actual_income,
-                actual_expenses_fcfa=actual_expenses,
+                actual_revenue_fcfa=actual_income if include_financials else None,
+                actual_expenses_fcfa=actual_expenses if include_financials else None,
                 created_at=campaign.created_at,
             )
         )
@@ -415,7 +434,7 @@ async def list_farms(
 )
 async def create_farm(
     session: SessionDep,
-    context: CanManageAgricultureDep,
+    context: CanOperateAgricultureDep,
     name: Annotated[str, Form(min_length=2, max_length=120)],
     location: Annotated[str | None, Form(max_length=180)] = None,
     photo: Annotated[UploadFile | None, File()] = None,
@@ -483,7 +502,7 @@ async def read_farm_photo(
 async def update_farm(
     farm_id: uuid.UUID,
     session: SessionDep,
-    context: CanManageAgricultureDep,
+    context: CanOperateAgricultureDep,
     name: Annotated[str, Form(min_length=2, max_length=120)],
     location: Annotated[str | None, Form(max_length=180)] = None,
     photo: Annotated[UploadFile | None, File()] = None,
@@ -699,7 +718,7 @@ async def list_parcels(
 async def create_parcel(
     data: CreateParcelRequest,
     session: SessionDep,
-    context: CanManageAgricultureDep,
+    context: CanOperateAgricultureDep,
 ) -> ParcelResponse:
     farm = await session.scalar(
         select(Farm).where(
@@ -760,7 +779,7 @@ async def update_parcel(
     parcel_id: uuid.UUID,
     data: UpdateParcelRequest,
     session: SessionDep,
-    context: CanManageAgricultureDep,
+    context: CanOperateAgricultureDep,
 ) -> ParcelResponse:
     parcel = await session.scalar(
         select(Parcel).where(
@@ -807,7 +826,7 @@ async def update_parcel(
 async def update_parcel_photo(
     parcel_id: uuid.UUID,
     session: SessionDep,
-    context: CanManageAgricultureDep,
+    context: CanOperateAgricultureDep,
     photo: Annotated[UploadFile, File()],
 ) -> ParcelResponse:
     parcel = await session.scalar(
@@ -839,7 +858,7 @@ async def update_parcel_photo(
 async def remove_parcel_photo(
     parcel_id: uuid.UUID,
     session: SessionDep,
-    context: CanManageAgricultureDep,
+    context: CanOperateAgricultureDep,
 ) -> ParcelResponse:
     parcel = await session.scalar(
         select(Parcel).where(
@@ -989,7 +1008,12 @@ async def list_campaigns(
         .offset((page - 1) * page_size)
         .limit(page_size)
     )
-    items = await _campaign_responses(session, list(rows.all()), context.organization.id)
+    items = await _campaign_responses(
+        session,
+        list(rows.all()),
+        context.organization.id,
+        include_financials=context.membership.role in {"owner", "admin", "manager"},
+    )
     return CampaignPageResponse(items=items, total=total or 0, page=page, page_size=page_size)
 
 
@@ -1002,7 +1026,7 @@ async def list_campaigns(
 async def create_campaign(
     data: CreateCampaignRequest,
     session: SessionDep,
-    context: CanManageAgricultureDep,
+    context: CanOperateAgricultureDep,
 ) -> CampaignResponse:
     parcel = await session.scalar(
         select(Parcel)
@@ -1063,7 +1087,14 @@ async def create_campaign(
         raise HTTPException(status_code=409, detail="La campagne n'a pas pu être créée.") from error
     row = await _get_campaign_rows(session, context.organization.id, campaign.id)
     assert row is not None
-    return (await _campaign_responses(session, [row], context.organization.id))[0]
+    return (
+        await _campaign_responses(
+            session,
+            [row],
+            context.organization.id,
+            include_financials=context.membership.role in {"owner", "admin", "manager"},
+        )
+    )[0]
 
 
 @router.post(
@@ -1087,7 +1118,17 @@ async def simulate_campaign(
     campaign.status = CampaignStatus.SIMULATED.value
     campaign.simulated_at = datetime.now(UTC)
     await session.commit()
-    campaign_response = (await _campaign_responses(session, [row], context.organization.id))[0]
+    campaign_response = (
+        await _campaign_responses(
+            session,
+            [row],
+            context.organization.id,
+            include_financials=True,
+        )
+    )[0]
+    assert campaign_response.estimated_margin_fcfa is not None
+    assert campaign_response.expected_revenue_fcfa is not None
+    assert campaign_response.estimated_total_cost_fcfa is not None
     margin_rate = (
         Decimal(campaign_response.estimated_margin_fcfa)
         / Decimal(campaign_response.expected_revenue_fcfa)
@@ -1116,7 +1157,7 @@ async def simulate_campaign(
 async def start_campaign(
     campaign_id: uuid.UUID,
     session: SessionDep,
-    context: CanManageAgricultureDep,
+    context: CanOperateAgricultureDep,
 ) -> CampaignResponse:
     row = await _get_campaign_rows(session, context.organization.id, campaign_id)
     if row is None:
@@ -1127,14 +1168,21 @@ async def start_campaign(
     campaign.status = CampaignStatus.ACTIVE.value
     campaign.started_at = datetime.now(UTC)
     await session.commit()
-    return (await _campaign_responses(session, [row], context.organization.id))[0]
+    return (
+        await _campaign_responses(
+            session,
+            [row],
+            context.organization.id,
+            include_financials=context.membership.role in {"owner", "admin", "manager"},
+        )
+    )[0]
 
 
 @router.patch("/campaigns/{campaign_id}/close", response_model=CampaignResponse)
 async def close_campaign(
     campaign_id: uuid.UUID,
     session: SessionDep,
-    context: CanManageAgricultureDep,
+    context: CanOperateAgricultureDep,
 ) -> CampaignResponse:
     row = await _get_campaign_rows(session, context.organization.id, campaign_id)
     if row is None:
@@ -1145,7 +1193,14 @@ async def close_campaign(
     campaign.status = CampaignStatus.CLOSED.value
     campaign.closed_at = datetime.now(UTC)
     await session.commit()
-    return (await _campaign_responses(session, [row], context.organization.id))[0]
+    return (
+        await _campaign_responses(
+            session,
+            [row],
+            context.organization.id,
+            include_financials=context.membership.role in {"owner", "admin", "manager"},
+        )
+    )[0]
 
 
 @router.patch("/campaigns/{campaign_id}/archive", response_model=CampaignResponse)
@@ -1172,7 +1227,14 @@ async def archive_campaign(
     campaign.status = CampaignStatus.ARCHIVED.value
     campaign.archived_at = datetime.now(UTC)
     await session.commit()
-    return (await _campaign_responses(session, [row], context.organization.id))[0]
+    return (
+        await _campaign_responses(
+            session,
+            [row],
+            context.organization.id,
+            include_financials=context.membership.role in {"owner", "admin", "manager"},
+        )
+    )[0]
 
 
 async def _campaign_harvest_balance(
@@ -1206,7 +1268,7 @@ async def sell_campaign_harvest(
     campaign_id: uuid.UUID,
     data: CampaignSaleRequest,
     session: SessionDep,
-    context: CanManageAgricultureDep,
+    context: CanOperateAgricultureDep,
 ) -> FinanceTransactionResponse:
     customer = None
     if data.customer_id is not None:
@@ -1275,7 +1337,7 @@ async def sell_campaign_harvest(
 async def create_harvest(
     data: CreateHarvestRequest,
     session: SessionDep,
-    context: CanManageAgricultureDep,
+    context: CanOperateAgricultureDep,
 ) -> HarvestResponse:
     parcel = await session.scalar(
         select(Parcel).where(
@@ -1490,7 +1552,7 @@ async def create_finance_transaction(
 )
 async def list_finance_transactions(
     session: SessionDep,
-    context: CurrentOrganizationDep,
+    context: CanViewAgricultureFinanceDep,
     page: Annotated[int, Query(ge=1)] = 1,
     page_size: Annotated[int, Query(ge=1, le=100)] = 20,
     year: Annotated[int, Query(ge=2000, le=2100)] = date.today().year,
@@ -1533,7 +1595,7 @@ async def list_finance_transactions(
 @router.get("/finance/summary", response_model=FinanceSummaryResponse)
 async def read_finance_summary(
     session: SessionDep,
-    context: CurrentOrganizationDep,
+    context: CanViewAgricultureFinanceDep,
     year: Annotated[int, Query(ge=2000, le=2100)] = date.today().year,
     farm_id: uuid.UUID | None = None,
 ) -> FinanceSummaryResponse:

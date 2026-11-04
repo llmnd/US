@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { useMemo, useState, type FormEvent } from "react";
 import { MemberAvatar } from "@/components/member-avatar";
+import { PasswordInput } from "@/features/auth/password-input";
 import {
   ApiError,
   apiRequest,
@@ -297,7 +298,7 @@ export function UserManagement() {
           </label>
           <label className="auth-field">
             <span>Mot de passe temporaire</span>
-            <input autoComplete="new-password" minLength={6} maxLength={128} name="password" required type="password" />
+            <PasswordInput autoComplete="new-password" minLength={6} maxLength={128} name="password" required />
             <small>6 caractères minimum.</small>
           </label>
           <div className="adm-form-foot">

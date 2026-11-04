@@ -1,11 +1,17 @@
 import uuid
+from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
 from mamari_api.core.config import get_settings
-from mamari_api.modules.identity.dependencies import CurrentUserDep, SessionDep
+from mamari_api.modules.identity.dependencies import (
+    CurrentMembership,
+    CurrentUserDep,
+    SessionDep,
+    get_current_membership,
+)
 from mamari_api.modules.identity.models import Membership, Organization, User
 from mamari_api.modules.identity.schemas import (
     ChangePasswordRequest,
@@ -13,6 +19,7 @@ from mamari_api.modules.identity.schemas import (
     LoginRequest,
     MembershipResponse,
     MessageResponse,
+    UpdateCurrentUserRequest,
     UserResponse,
 )
 from mamari_api.modules.identity.security import (
@@ -24,6 +31,7 @@ from mamari_api.modules.identity.service import authenticate_user
 from mamari_api.modules.sales.models import Customer
 
 router = APIRouter(prefix="/auth")
+CurrentMembershipDep = Annotated[CurrentMembership, Depends(get_current_membership)]
 
 
 async def user_response(session: SessionDep, user: User) -> UserResponse:
@@ -37,6 +45,7 @@ async def user_response(session: SessionDep, user: User) -> UserResponse:
         )
         .order_by(Organization.name)
     )
+    rows = result.all()
     memberships = [
         MembershipResponse(
             organization_id=organization.id,
@@ -44,7 +53,7 @@ async def user_response(session: SessionDep, user: User) -> UserResponse:
             organization_slug=organization.slug,
             role=membership.role,
         )
-        for membership, organization in result.all()
+        for membership, organization in rows
     ]
     customer_account = await session.scalar(
         select(Customer.id).where(Customer.user_id == user.id).limit(1)
@@ -53,6 +62,7 @@ async def user_response(session: SessionDep, user: User) -> UserResponse:
         id=user.id,
         username=user.username,
         full_name=user.full_name,
+        phone=rows[0][0].phone if rows else None,
         memberships=memberships,
         customer_account=customer_account is not None,
     )
@@ -164,6 +174,25 @@ async def logout(response: Response) -> MessageResponse:
 @router.get("/me", response_model=UserResponse, summary="Consulter le compte connecté")
 async def read_current_user(session: SessionDep, user: CurrentUserDep) -> UserResponse:
     return await user_response(session, user)
+
+
+@router.patch(
+    "/me",
+    response_model=UserResponse,
+    summary="Modifier le profil du compte connecté",
+)
+async def update_current_user(
+    data: UpdateCurrentUserRequest,
+    session: SessionDep,
+    context: CurrentMembershipDep,
+) -> UserResponse:
+    changes = data.model_dump(exclude_unset=True)
+    if "full_name" in changes:
+        context.user.full_name = changes["full_name"]
+    if "phone" in changes:
+        context.membership.phone = changes["phone"]
+    await session.commit()
+    return await user_response(session, context.user)
 
 
 @router.post(

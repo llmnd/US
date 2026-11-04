@@ -73,6 +73,12 @@ class SalesOrder(Base):
         lazy="selectin",
         order_by="SalesOrderItem.created_at",
     )
+    status_history: Mapped[list[SalesOrderStatusEvent]] = relationship(
+        back_populates="order",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+        order_by="SalesOrderStatusEvent.created_at",
+    )
 
 
 class Customer(Base):
@@ -161,3 +167,27 @@ class SalesOrderItem(Base):
         DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
     )
     order: Mapped[SalesOrder] = relationship(back_populates="items")
+
+
+class SalesOrderStatusEvent(Base):
+    __tablename__ = "sales_order_status_events"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('pending', 'confirmed', 'preparing', 'delivered', 'cancelled')",
+            name="ck_sales_order_status_events_status",
+        ),
+        Index("ix_sales_order_status_events_order_created", "order_id", "created_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    order_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("sales_orders.id", ondelete="CASCADE"), nullable=False
+    )
+    status: Mapped[str] = mapped_column(String(16), nullable=False)
+    actor_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
+    )
+    order: Mapped[SalesOrder] = relationship(back_populates="status_history")

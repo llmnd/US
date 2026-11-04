@@ -45,6 +45,7 @@ export function CustomersPage() {
     retry: false,
   });
   const membership = profile.data?.memberships[0];
+  const isOperator = membership?.role === "operator";
   useEffect(() => {
     const dialog = editDialogRef.current;
     if (!dialog) return;
@@ -97,10 +98,13 @@ export function CustomersPage() {
         { headers: { "X-Organization-ID": membership.organization_id } },
       );
     },
-    enabled: Boolean(membership && selectedCustomer),
+    enabled: Boolean(membership && selectedCustomer && !isOperator),
     retry: false,
   });
   const canManage = Boolean(
+    membership && ["owner", "admin", "manager", "operator"].includes(membership.role),
+  );
+  const canDelete = Boolean(
     membership && ["owner", "admin", "manager"].includes(membership.role),
   );
   const saveCustomer = useMutation({
@@ -468,6 +472,7 @@ export function CustomersPage() {
                 <p className="customer-transactions-empty">Aucun achat enregistré pour ce client.</p>
               )}
             </section>
+            {!isOperator ? (
             <section className="customer-finance-transactions" aria-labelledby="customer-finance-title">
               <div className="customer-transactions-heading">
                 <h3 id="customer-finance-title">Transactions financières</h3>
@@ -504,6 +509,7 @@ export function CustomersPage() {
                 </p>
               )}
             </section>
+            ) : null}
           </div>
         </dialog>
       ) : null}
@@ -585,15 +591,17 @@ export function CustomersPage() {
                           >
                             <Pencil size={15} />
                           </button>
-                          <button
-                            aria-label={`Supprimer ${customer.name}`}
-                            className="customer-icon-action customer-delete-action"
-                            disabled={deleteCustomer.isPending}
-                            onClick={() => confirmDelete(customer)}
-                            type="button"
-                          >
-                            <Trash2 size={15} />
-                          </button>
+                          {canDelete ? (
+                            <button
+                              aria-label={`Supprimer ${customer.name}`}
+                              className="customer-icon-action customer-delete-action"
+                              disabled={deleteCustomer.isPending}
+                              onClick={() => confirmDelete(customer)}
+                              type="button"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          ) : null}
                         </div>
                       </td>
                     ) : null}

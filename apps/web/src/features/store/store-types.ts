@@ -37,3 +37,23 @@ export interface StoreOrder {
     unit_price_fcfa: number;
   }[];
 }
+
+export interface StoreCustomerProfile {
+  full_name: string;
+  email: string;
+  phone: string;
+  address: string | null;
+}
+
+export interface StoreOrderSummary {
+  in_progress_count: number;
+  delivered_count: number;
+  total_spent_fcfa: number;
+}
+
+export interface StoreOrderNotification {
+  order_id: string;
+  order_reference: string;
+  status: StoreOrder["status"];
+  created_at: string;
+}

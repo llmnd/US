@@ -113,6 +113,7 @@ export function StocksPage() {
   const canManageStock = Boolean(
     membership && ["owner", "admin", "manager"].includes(membership.role),
   );
+  const canRecordStockMovement = canManageStock || membership?.role === "operator";
   const headers = organizationId ? { "X-Organization-ID": organizationId } : undefined;
   const stockQuery = useQuery({
     queryKey: ["stocks", "ledger", organizationId],
@@ -362,11 +363,13 @@ export function StocksPage() {
                     <button aria-label={`Historique ${item.name}`} onClick={() => { setSelectedItem(item); setHistoryPage(1); setMode("history"); }} title="Historique" type="button">
                       <History size={16} />
                     </button>
+                    {canRecordStockMovement ? (
+                      <button aria-label={`Ajouter un mouvement pour ${item.name}`} onClick={() => { setSelectedItem(item); setFormError(null); setMode("movement"); }} title="Entrée ou sortie" type="button">
+                        <ClipboardList size={16} />
+                      </button>
+                    ) : null}
                     {canManageStock ? (
                       <>
-                        <button aria-label={`Ajouter un mouvement pour ${item.name}`} onClick={() => { setSelectedItem(item); setFormError(null); setMode("movement"); }} title="Entrée ou sortie" type="button">
-                          <ClipboardList size={16} />
-                        </button>
                         <button aria-label={`Transférer ${item.name}`} onClick={() => { setSelectedItem(item); setFormError(null); setMode("transfer"); }} title="Transfert" type="button">
                           <ArrowLeftRight size={16} />
                         </button>
@@ -501,12 +504,14 @@ export function StocksPage() {
                       <option value="addition">Ajout / approvisionnement</option>
                       <option value="loss">Perte</option>
                       <option value="consumption">Consommation</option>
-                      <option value="adjustment">Ajustement d’inventaire</option>
+                      {canManageStock ? <option value="adjustment">Ajustement d’inventaire</option> : null}
                     </select>
                   </label>
-                  <label className="auth-field"><span>Sens (pour un ajustement)</span>
-                    <select defaultValue="out" name="direction"><option value="in">Entrée</option><option value="out">Sortie</option></select>
-                  </label>
+                  {canManageStock ? (
+                    <label className="auth-field"><span>Sens (pour un ajustement)</span>
+                      <select defaultValue="out" name="direction"><option value="in">Entrée</option><option value="out">Sortie</option></select>
+                    </label>
+                  ) : null}
                   <div className="auth-form-grid">
                     <label className="auth-field"><span>Quantité ({currentItem?.unit})</span><input autoFocus min="0.001" name="quantity" required step="0.001" type="number" /></label>
                     <label className="auth-field"><span>Date</span><input defaultValue={new Date().toISOString().slice(0, 10)} name="movement_date" required type="date" /></label>

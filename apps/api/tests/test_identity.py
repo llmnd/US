@@ -253,6 +253,51 @@ async def test_admin_can_create_a_user_for_mamari(client: AsyncClient) -> None:
 
 
 @pytest.mark.asyncio
+async def test_employee_can_update_own_profile(client: AsyncClient) -> None:
+    admin_login = await client.post(
+        "/api/v1/auth/login",
+        json={"username": "mamari", "password": "passer123m"},
+    )
+    organization_id = admin_login.json()["memberships"][0]["organization_id"]
+    employee = await client.post(
+        "/api/v1/organizations/users",
+        headers={"X-Organization-ID": organization_id},
+        json={
+            "username": "profile-member",
+            "full_name": "Membre",
+            "password": "memberpass",
+            "role": "operator",
+            "phone": "+221 77 123 45 67",
+        },
+    )
+    assert employee.status_code == 201
+
+    client.cookies.clear()
+    employee_login = await client.post(
+        "/api/v1/auth/login",
+        json={"username": "profile-member", "password": "memberpass"},
+    )
+    assert employee_login.status_code == 200
+    update = await client.patch(
+        "/api/v1/auth/me",
+        headers={"X-Organization-ID": organization_id},
+        json={"full_name": "Membre Mis à jour", "phone": "+221 76 987 65 43"},
+    )
+
+    assert update.status_code == 200
+    assert update.json()["full_name"] == "Membre Mis à jour"
+    assert update.json()["phone"] == "+221 76 987 65 43"
+    current = await client.get("/api/v1/auth/me")
+    assert current.json()["full_name"] == "Membre Mis à jour"
+
+    missing_organization = await client.patch(
+        "/api/v1/auth/me",
+        json={"full_name": "Autre nom"},
+    )
+    assert missing_organization.status_code == 422
+
+
+@pytest.mark.asyncio
 async def test_member_profile_photo_is_private_and_organization_scoped(
     client: AsyncClient,
     monkeypatch: pytest.MonkeyPatch,
@@ -324,7 +369,9 @@ async def test_member_profile_photo_is_private_and_organization_scoped(
 
 
 @pytest.mark.asyncio
-async def test_operator_cannot_mutate_business_modules(client: AsyncClient) -> None:
+async def test_operator_can_update_operations_but_not_admin_or_finances(
+    client: AsyncClient,
+) -> None:
     login = await client.post(
         "/api/v1/auth/login",
         json={"username": "mamari", "password": "passer123m"},
@@ -353,21 +400,36 @@ async def test_operator_cannot_mutate_business_modules(client: AsyncClient) -> N
     farm = await client.post(
         "/api/v1/agriculture/farms",
         headers=headers,
-        json={"name": "Ferme interdite"},
+        data={"name": "Ferme opérationnelle"},
     )
     facility = await client.post(
         "/api/v1/livestock/facilities",
         headers=headers,
-        json={"name": "Poulailler interdit"},
+        json={"name": "Poulailler opérationnel"},
     )
-    order = await client.post(
-        "/api/v1/sales/orders",
+    customer = await client.post(
+        "/api/v1/sales/customers",
         headers=headers,
-        json={"customer_name": "Client interdit", "amount_fcfa": 2000},
+        json={"name": "Client opérationnel", "phone": "771234567"},
     )
-    assert farm.status_code == 403
-    assert facility.status_code == 403
-    assert order.status_code == 403
+    finance_summary = await client.get("/api/v1/finance/summary", headers=headers)
+    agriculture_finances = await client.get(
+        "/api/v1/agriculture/finance/summary", headers=headers
+    )
+    livestock_finances = await client.get(
+        "/api/v1/livestock/finance/summary", headers=headers
+    )
+    overview = await client.get("/api/v1/dashboard/overview", headers=headers)
+
+    assert farm.status_code == 201
+    assert facility.status_code == 201
+    assert customer.status_code == 201
+    assert finance_summary.status_code == 403
+    assert agriculture_finances.status_code == 403
+    assert livestock_finances.status_code == 403
+    assert overview.status_code == 200
+    assert overview.json()["revenue_fcfa"] is None
+    assert overview.json()["average_order_fcfa"] is None
     assert member_list.status_code == 403
 
 

@@ -27,6 +27,7 @@ export interface UserProfile {
   id: string;
   username: string;
   full_name: string;
+  phone: string | null;
   memberships: OrganizationMembership[];
   customer_account: boolean;
 }

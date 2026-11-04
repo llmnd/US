@@ -14,6 +14,72 @@ async def admin_organization(client: AsyncClient) -> str:
 
 
 @pytest.mark.asyncio
+async def test_operator_can_log_livestock_without_financial_details(client: AsyncClient) -> None:
+    organization_id = await admin_organization(client)
+    headers = {"X-Organization-ID": organization_id}
+    animal = await client.post(
+        "/api/v1/livestock/animals",
+        headers=headers,
+        json={"name": "Nala", "species": "Bovin"},
+    )
+    assert animal.status_code == 201
+    financial_record = await client.post(
+        "/api/v1/livestock/records",
+        headers=headers,
+        json={
+            "record_type": "feed",
+            "category": "feed",
+            "title": "Ration du matin",
+            "animal_id": animal.json()["id"],
+            "quantity": 3,
+            "unit": "kg",
+            "amount_fcfa": 18000,
+        },
+    )
+    assert financial_record.status_code == 201
+    created_operator = await client.post(
+        "/api/v1/organizations/users",
+        headers=headers,
+        json={
+            "username": "livestock-operator",
+            "full_name": "Employé élevage",
+            "password": "secret6",
+            "role": "operator",
+        },
+    )
+    assert created_operator.status_code == 201
+    client.cookies.clear()
+    login = await client.post(
+        "/api/v1/auth/login",
+        json={"username": "livestock-operator", "password": "secret6"},
+    )
+    assert login.status_code == 200
+
+    records = await client.get("/api/v1/livestock/records?type=feed", headers=headers)
+    overview = await client.get("/api/v1/livestock/overview", headers=headers)
+    assert records.status_code == 200
+    assert records.json()[0]["amount_fcfa"] is None
+    assert records.json()[0]["finance_transaction_created"] is False
+    assert overview.status_code == 200
+    assert overview.json()["feed_month_cost_fcfa"] is None
+
+    forbidden_financial_entry = await client.post(
+        "/api/v1/livestock/records",
+        headers=headers,
+        json={
+            "record_type": "feed",
+            "category": "feed",
+            "title": "Ration du soir",
+            "animal_id": animal.json()["id"],
+            "quantity": 2,
+            "unit": "kg",
+            "amount_fcfa": 1000,
+        },
+    )
+    assert forbidden_financial_entry.status_code == 403
+
+
+@pytest.mark.asyncio
 async def test_livestock_groups_animals_care_production_feed_and_finance(
     client: AsyncClient,
 ) -> None:

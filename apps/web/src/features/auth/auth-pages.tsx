@@ -11,6 +11,7 @@ import {
   getApiErrorMessage,
   type UserProfile,
 } from "@/lib/api/client";
+import { PasswordInput } from "@/features/auth/password-input";
 
 function AuthBrand() {
   return (
@@ -151,13 +152,12 @@ export function LoginPage() {
         </label>
         <label className="auth-field">
           <span>Mot de passe</span>
-          <input
+          <PasswordInput
             autoComplete="current-password"
             minLength={6}
             name="password"
             placeholder="Votre mot de passe"
             required
-            type="password"
           />
         </label>
         {error ? (
@@ -237,7 +237,7 @@ export function CustomerRegisterPage() {
         </label>
         <label className="auth-field">
           <span>Mot de passe</span>
-          <input autoComplete="new-password" minLength={6} name="password" required type="password" />
+          <PasswordInput autoComplete="new-password" minLength={6} name="password" required />
         </label>
         {error ? <p className="auth-error" role="alert">{error}</p> : null}
         <button className="button-primary auth-submit" disabled={isSubmitting} type="submit">

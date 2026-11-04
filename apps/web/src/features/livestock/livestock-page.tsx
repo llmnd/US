@@ -94,7 +94,7 @@ interface LivestockRecord {
   facility_name: string | null;
   quantity: string | number | null;
   unit: string | null;
-  amount_fcfa: number;
+  amount_fcfa: number | null;
   finance_transaction_created: boolean;
   next_due_date: string | null;
   is_resolved: boolean;
@@ -129,7 +129,7 @@ interface LivestockOverview {
   reproduction_month_totals: Array<{ quantity: string | number; unit: string | null }>;
   feed_month_count: number;
   feed_month_totals: Array<{ quantity: string | number; unit: string | null }>;
-  feed_month_cost_fcfa: number;
+  feed_month_cost_fcfa: number | null;
   upcoming_care: CareReminder[];
 }
 
@@ -327,6 +327,7 @@ export function LivestockPage() {
   const canManage = Boolean(
     membership && ["owner", "admin", "manager"].includes(membership.role),
   );
+  const canOperate = canManage || membership?.role === "operator";
 
   const overview = useQuery({
     queryKey: ["livestock", "overview", organizationId],
@@ -359,7 +360,7 @@ export function LivestockPage() {
   const farms = useQuery({
     queryKey: ["agriculture", "farms", organizationId, "all-active-options"],
     queryFn: () => apiRequest<{ items: Farm[] }>("/agriculture/farms?page=1&page_size=100&active=true", { headers: organizationHeaders }),
-    enabled: Boolean(membership && canManage),
+    enabled: Boolean(membership && canOperate),
     retry: false,
   });
   const records = useQuery({
@@ -379,7 +380,7 @@ export function LivestockPage() {
       `/livestock/finance/summary?year=${financeYear}`,
       { headers: organizationHeaders },
     ),
-    enabled: Boolean(membership && (tab === "finance" || tab === "reports")),
+    enabled: Boolean(membership && canManage && (tab === "finance" || tab === "reports")),
     retry: false,
   });
   const financeTransactions = useQuery({
@@ -392,7 +393,7 @@ export function LivestockPage() {
         { headers: organizationHeaders },
       );
     },
-    enabled: Boolean(membership && tab === "finance"),
+    enabled: Boolean(membership && canManage && tab === "finance"),
     retry: false,
   });
   const activeAnimals = animals.data ?? noAnimals;
@@ -707,7 +708,7 @@ export function LivestockPage() {
 
       <div className="livestock-toolbar">
         <div className="livestock-tabs" role="tablist" aria-label="Sections de l'élevage">
-          {tabs.map(({ id, label, icon: Icon }) => (
+          {tabs.filter(({ id }) => canManage || (id !== "finance" && id !== "reports")).map(({ id, label, icon: Icon }) => (
             <button key={id} id={`livestock-tab-${id}`} className="livestock-tab" type="button" role="tab" aria-selected={tab === id} aria-controls={`livestock-panel-${id}`} onClick={() => { setTab(id); setFeedback(null); }}>
               <Icon size={16} /><span>{label}</span>
             </button>
@@ -799,7 +800,7 @@ export function LivestockPage() {
               { label: "Espèces", value: formatCount(overview.data?.species_count, overview.isPending, overview.isError), detail: "Représentées dans le cheptel", icon: <Sprout size={17} /> },
             ]}
           />
-          {canManage ? (
+          {canOperate ? (
             <details className="panel livestock-create-card">
               <summary><span className="agriculture-add-icon"><Plus size={17} /></span><span><strong>Ajouter un animal</strong><small>Identifier une vache, une chèvre, une poule et suivre son parcours</small></span><ChevronRight size={16} /></summary>
               <form className="livestock-form-grid" onSubmit={(event) => void handleAnimalSubmit(event)}>
@@ -846,7 +847,7 @@ export function LivestockPage() {
               { label: "Bâtiments actifs", value: formatCount(overview.data?.facility_count, overview.isPending, overview.isError), detail: "Étables, enclos et pâturages", icon: <Sprout size={17} /> },
             ]}
           />
-          {canManage ? (
+          {canOperate ? (
             <div className="livestock-management-grid">
               <details className="panel livestock-create-card">
                 <summary><span className="agriculture-add-icon"><Plus size={17} /></span><span><strong>Créer un lot</strong><small>Pour les poussins, poulets, chèvres ou animaux similaires</small></span><ChevronRight size={16} /></summary>
@@ -906,14 +907,14 @@ export function LivestockPage() {
                 { label: "Quantités de reproduction", value: overview.isPending ? "…" : overview.isError ? "—" : formatSummaryQuantity(overview.data?.reproduction_month_totals ?? []), detail: "Ex. petits ou œufs enregistrés", icon: <HeartPulse size={17} /> },
                 { label: "Rations distribuées", value: formatCount(overview.data?.feed_month_count, overview.isPending, overview.isError), detail: "Enregistrements d’alimentation", icon: <Wheat size={17} /> },
                 { label: "Quantités distribuées", value: overview.isPending ? "…" : overview.isError ? "—" : formatSummaryQuantity(overview.data?.feed_month_totals ?? []), detail: "Cumul par unité ce mois", icon: <Sprout size={17} /> },
-                { label: "Coût alimentaire", value: overview.isPending ? "…" : overview.isError ? "—" : formatFcfa(overview.data?.feed_month_cost_fcfa ?? 0), detail: "Dépenses saisies ce mois", icon: <CircleDollarSign size={17} /> },
+                ...(canManage ? [{ label: "Coût alimentaire", value: overview.isPending ? "…" : overview.isError ? "—" : formatFcfa(overview.data?.feed_month_cost_fcfa ?? 0), detail: "Dépenses saisies ce mois", icon: <CircleDollarSign size={17} /> }] : []),
               ]}
             />
           )}
           <div className="livestock-record-layout">
             <div>
               <div className="livestock-subsection-heading"><h2>{tab === "care" ? "Journal santé & soins" : "Journal des activités"}</h2><p>{tab === "care" ? "Retrouvez les maladies, traitements, vaccinations et contrôles." : "Suivez les naissances, le lait, les œufs, la croissance et l’alimentation."}</p></div>
-              {canManage && activeAnimalsAndGroups.length ? (
+              {canOperate && activeAnimalsAndGroups.length ? (
                 <details className="panel livestock-create-card">
                   <summary><span className="agriculture-add-icon"><Plus size={17} /></span><span><strong>Enregistrer une opération</strong><small>Ajoutez un soin, une production, une naissance ou un repas</small></span><ChevronRight size={16} /></summary>
                   <form className="livestock-form-grid" onSubmit={(event) => void handleRecordSubmit(event)}>
@@ -925,12 +926,12 @@ export function LivestockPage() {
                     {recordType === "production" || recordType === "feed" || recordType === "reproduction" ? <Field label={recordType === "reproduction" ? "Nombre de petits" : "Quantité"}><input min="0.001" name="quantity" placeholder="Ex. 12" step="0.001" type="number" /></Field> : null}
                     {recordType === "production" || recordType === "feed" || recordType === "reproduction" ? <Field label="Unité"><MeasurementUnitSelect name="unit" defaultValue={recordType === "production" ? "litres" : recordType === "feed" ? "kg" : "têtes"} /></Field> : null}
                     {recordType === "health" ? <Field label="Prochain contrôle"><input name="next_due_date" type="date" /></Field> : null}
-                    {recordType === "feed" || recordType === "health" || recordType === "production" ? <Field label={recordType === "production" ? "Recette (FCFA)" : "Coût (FCFA)"}><input min="0" name="amount_fcfa" placeholder="0" type="number" /></Field> : null}
+                    {canManage && (recordType === "feed" || recordType === "health" || recordType === "production") ? <Field label={recordType === "production" ? "Recette (FCFA)" : "Coût (FCFA)"}><input min="0" name="amount_fcfa" placeholder="0" type="number" /></Field> : null}
                     <Field label="Notes"><input maxLength={2000} name="notes" placeholder="Observations complémentaires" /></Field>
                     <button className="button-primary" disabled={submitting === "record"} type="submit">{submitting === "record" ? "Enregistrement…" : "Enregistrer"}</button>
                   </form>
                 </details>
-              ) : canManage ? <div className="panel livestock-empty compact"><p>Ajoutez d’abord un animal ou un lot pour commencer le suivi.</p></div> : null}
+              ) : canOperate ? <div className="panel livestock-empty compact"><p>Ajoutez d’abord un animal ou un lot pour commencer le suivi.</p></div> : null}
               {tab === "production" ? <p className="livestock-stock-note">Les rations distribuées sont enregistrées ici. Le module Stocks n’est pas encore relié à l’élevage.</p> : null}
               {records.isPending ? <div className="dashboard-loading" role="status">Chargement du journal…</div> : currentRecords.length ? (
                 <div className="livestock-record-list">{currentRecords.map((record) => <article className="panel livestock-record-card" key={record.id}><span className={`livestock-record-icon livestock-record-${record.record_type}`}>{record.record_type === "health" ? <Stethoscope size={18} /> : record.record_type === "reproduction" ? <Baby size={18} /> : record.record_type === "production" ? record.category === "eggs" ? <Egg size={18} /> : <Milk size={18} /> : <Wheat size={18} />}</span><div className="livestock-record-copy"><div><span>{recordLabels[record.record_type]} · {record.category}</span><time dateTime={record.event_date}>{new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium" }).format(new Date(`${record.event_date}T12:00:00`))}</time></div><h3>{record.title}</h3><p>{record.animal_name || record.group_name || "Animal / lot"}{record.facility_name ? ` · ${record.facility_name}` : ""}{record.quantity ? ` · ${record.quantity} ${record.unit || ""}` : ""}{record.amount_fcfa ? ` · ${formatFcfa(record.amount_fcfa)}` : ""}</p>{record.next_due_date ? <small className={record.next_due_date < todayInput() ? "livestock-overdue" : ""}><CalendarDays size={13} />{record.next_due_date < todayInput() ? "Échéance dépassée" : "Prochain contrôle"} : {new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium" }).format(new Date(`${record.next_due_date}T12:00:00`))}</small> : null}{record.notes ? <small>{record.notes}</small> : null}</div></article>)}</div>
@@ -938,7 +939,7 @@ export function LivestockPage() {
             </div>
             <aside className="panel livestock-reminders">
               <div className="livestock-subsection-heading"><h2>Soins à suivre</h2><p>Échéances déjà programmées</p></div>
-              {overview.data?.upcoming_care.length ? overview.data.upcoming_care.map((reminder) => <div className={`livestock-reminder ${reminder.overdue ? "is-overdue" : ""}`} key={reminder.id}><span>{reminder.overdue ? <AlertTriangle size={15} /> : <Clock3 size={15} />}</span><div><strong>{reminder.title}</strong><small>{reminder.animal_name || reminder.group_name || "Animal / lot"} · {new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium" }).format(new Date(`${reminder.due_date}T12:00:00`))}</small>{canManage ? <button className="livestock-reminder-done" type="button" disabled={submitting === reminder.id} onClick={() => void resolveCare(reminder.id)}><Check size={13} />{submitting === reminder.id ? "Enregistrement…" : "Marquer effectué"}</button> : null}</div></div>) : <p className="livestock-reminder-empty">Aucune échéance enregistrée. Ajoutez une date de contrôle lors d’un soin.</p>}
+              {overview.data?.upcoming_care.length ? overview.data.upcoming_care.map((reminder) => <div className={`livestock-reminder ${reminder.overdue ? "is-overdue" : ""}`} key={reminder.id}><span>{reminder.overdue ? <AlertTriangle size={15} /> : <Clock3 size={15} />}</span><div><strong>{reminder.title}</strong><small>{reminder.animal_name || reminder.group_name || "Animal / lot"} · {new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium" }).format(new Date(`${reminder.due_date}T12:00:00`))}</small>{canOperate ? <button className="livestock-reminder-done" type="button" disabled={submitting === reminder.id} onClick={() => void resolveCare(reminder.id)}><Check size={13} />{submitting === reminder.id ? "Enregistrement…" : "Marquer effectué"}</button> : null}</div></div>) : <p className="livestock-reminder-empty">Aucune échéance enregistrée. Ajoutez une date de contrôle lors d’un soin.</p>}
             </aside>
           </div>
         </section>

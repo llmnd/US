@@ -136,6 +136,7 @@ export function ProductionPage() {
   const canManage = Boolean(
     membership && ["owner", "admin", "manager"].includes(membership.role),
   );
+  const canOperateCatalog = canManage || membership?.role === "operator";
   const saveProduct = useMutation({
     mutationFn: ({ id, data }: { id: string | null; data: FormData }) => {
       if (!membership) throw new Error("Aucune organisation active n’est associée au compte.");
@@ -384,7 +385,7 @@ export function ProductionPage() {
                   <strong>{formatFcfa(product.price_fcfa)} <small>/ {product.unit}</small></strong>
                   <span>{product.stock_quantity.toLocaleString("fr-FR")} en stock</span>
                 </div>
-                {canManage ? (
+                {canOperateCatalog ? (
                   <button
                     className="production-edit-button"
                     type="button"
@@ -410,7 +411,7 @@ export function ProductionPage() {
           <span><PackagePlus size={22} /></span>
           <h2>Votre catalogue est encore vide.</h2>
           <p>Ajoutez un produit puis activez « Mettre en vente » pour le publier sur la boutique.</p>
-          {canManage ? (
+          {canOperateCatalog ? (
             <button
               className="button-primary"
               type="button"

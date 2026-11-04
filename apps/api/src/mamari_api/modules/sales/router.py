@@ -26,20 +26,25 @@ from mamari_api.modules.sales.models import (
     Product,
     SalesOrder,
     SalesOrderItem,
+    SalesOrderStatusEvent,
 )
 from mamari_api.modules.sales.schemas import (
     CreateCustomerRequest,
     CreateOrderRequest,
     CreateStoreOrderRequest,
     CustomerFinanceTransactionResponse,
+    CustomerOrderNotificationResponse,
     CustomerPageResponse,
     CustomerResponse,
     ProductResponse,
     SalesOrderPageResponse,
     SalesOrderResponse,
+    StoreCustomerProfileResponse,
+    StoreOrderSummaryResponse,
     StoreProductPageResponse,
     UpdateCustomerRequest,
     UpdateOrderStatusRequest,
+    UpdateStoreCustomerProfileRequest,
 )
 from mamari_api.modules.stocks.models import StockItem
 from mamari_api.modules.stocks.service import record_stock_movement
@@ -47,6 +52,14 @@ from mamari_api.modules.stocks.service import record_stock_movement
 router = APIRouter()
 CurrentOrganizationDep = Annotated[CurrentMembership, Depends(get_current_membership)]
 CanManageSalesDep = Annotated[
+    CurrentMembership,
+    Depends(require_roles("owner", "admin", "manager")),
+]
+CanOperateSalesDep = Annotated[
+    CurrentMembership,
+    Depends(require_roles("owner", "admin", "manager", "operator")),
+]
+CanViewSalesFinanceDep = Annotated[
     CurrentMembership,
     Depends(require_roles("owner", "admin", "manager")),
 ]
@@ -150,7 +163,7 @@ async def list_customer_orders(
 async def list_customer_transactions(
     customer_id: uuid.UUID,
     session: SessionDep,
-    context: CurrentOrganizationDep,
+    context: CanViewSalesFinanceDep,
 ) -> list[CustomerFinanceTransactionResponse]:
     customer_exists = await session.scalar(
         select(Customer.id).where(
@@ -188,7 +201,7 @@ async def list_customer_transactions(
 async def create_customer(
     data: CreateCustomerRequest,
     session: SessionDep,
-    context: CanManageSalesDep,
+    context: CanOperateSalesDep,
 ) -> Customer:
     customer = Customer(
         organization_id=context.organization.id,
@@ -216,7 +229,7 @@ async def update_customer(
     customer_id: uuid.UUID,
     data: UpdateCustomerRequest,
     session: SessionDep,
-    context: CanManageSalesDep,
+    context: CanOperateSalesDep,
 ) -> Customer:
     customer = await session.scalar(
         select(Customer).where(
@@ -395,7 +408,7 @@ async def list_products(
 )
 async def create_product(
     session: SessionDep,
-    context: CanManageSalesDep,
+    context: CanOperateSalesDep,
     name: Annotated[str, Form(min_length=2, max_length=160)],
     price_fcfa: Annotated[int, Form(gt=0, le=9_000_000_000_000_000)],
     stock_quantity: Annotated[int, Form(ge=0, le=2_000_000_000)],
@@ -765,6 +778,9 @@ async def create_store_order(
         amount_fcfa=amount_fcfa,
         status=OrderStatus.PENDING.value,
         items=order_items,
+        status_history=[
+            SalesOrderStatusEvent(status=OrderStatus.PENDING.value, actor_id=user.id)
+        ],
     )
     session.add(order)
     try:
@@ -822,6 +838,7 @@ async def list_my_store_orders(
     page: Annotated[int, Query(ge=1)] = 1,
     page_size: Annotated[int, Query(ge=1, le=100)] = 20,
     status_filter: Annotated[OrderStatus | None, Query(alias="status")] = None,
+    search: Annotated[str | None, Query(min_length=1, max_length=32)] = None,
 ) -> SalesOrderPageResponse:
     organization_id = await session.scalar(
         select(Organization.id).where(
@@ -849,6 +866,8 @@ async def list_my_store_orders(
     ]
     if status_filter is not None:
         filters.append(SalesOrder.status == status_filter.value)
+    if search:
+        filters.append(SalesOrder.reference.ilike(f"%{search.strip()}%"))
     total = await session.scalar(select(func.count()).select_from(SalesOrder).where(*filters))
     orders = await session.scalars(
         select(SalesOrder)
@@ -866,6 +885,274 @@ async def list_my_store_orders(
     )
 
 
+@router.get(
+    "/store/my-orders/summary",
+    response_model=StoreOrderSummaryResponse,
+    summary="Consulter le résumé des commandes du client",
+)
+async def read_my_store_order_summary(
+    session: SessionDep,
+    user: CurrentUserDep,
+) -> StoreOrderSummaryResponse:
+    organization_id = await session.scalar(
+        select(Organization.id).where(
+            Organization.slug == get_settings().public_store_slug,
+            Organization.is_active.is_(True),
+        )
+    )
+    if organization_id is None:
+        raise HTTPException(status_code=404, detail="La boutique Mamari est indisponible.")
+    customer_id = await session.scalar(
+        select(Customer.id).where(
+            Customer.user_id == user.id,
+            Customer.organization_id == organization_id,
+        )
+    )
+    if customer_id is None:
+        raise HTTPException(
+            status_code=403,
+            detail="Aucun compte client de boutique n'est associé.",
+        )
+    orders = SalesOrder.customer_id == customer_id
+    organization = SalesOrder.organization_id == organization_id
+    in_progress_count = await session.scalar(
+        select(func.count(SalesOrder.id)).where(
+            orders,
+            organization,
+            SalesOrder.status.in_(
+                [
+                    OrderStatus.PENDING.value,
+                    OrderStatus.CONFIRMED.value,
+                    OrderStatus.PREPARING.value,
+                ]
+            ),
+        )
+    )
+    delivered_count = await session.scalar(
+        select(func.count(SalesOrder.id)).where(
+            orders,
+            organization,
+            SalesOrder.status == OrderStatus.DELIVERED.value,
+        )
+    )
+    total_spent = await session.scalar(
+        select(func.coalesce(func.sum(SalesOrder.amount_fcfa), 0)).where(
+            orders,
+            organization,
+            SalesOrder.status == OrderStatus.DELIVERED.value,
+        )
+    )
+    return StoreOrderSummaryResponse(
+        in_progress_count=in_progress_count or 0,
+        delivered_count=delivered_count or 0,
+        total_spent_fcfa=total_spent or 0,
+    )
+
+
+@router.get(
+    "/store/my-notifications",
+    response_model=list[CustomerOrderNotificationResponse],
+    summary="Consulter les dernières mises à jour des commandes",
+)
+async def list_my_store_notifications(
+    session: SessionDep,
+    user: CurrentUserDep,
+) -> list[CustomerOrderNotificationResponse]:
+    organization_id = await session.scalar(
+        select(Organization.id).where(
+            Organization.slug == get_settings().public_store_slug,
+            Organization.is_active.is_(True),
+        )
+    )
+    if organization_id is None:
+        raise HTTPException(status_code=404, detail="La boutique Mamari est indisponible.")
+    notifications = await session.execute(
+        select(SalesOrderStatusEvent, SalesOrder)
+        .join(SalesOrder, SalesOrder.id == SalesOrderStatusEvent.order_id)
+        .join(Customer, Customer.id == SalesOrder.customer_id)
+        .where(
+            Customer.user_id == user.id,
+            Customer.organization_id == organization_id,
+            SalesOrder.organization_id == organization_id,
+        )
+        .order_by(SalesOrderStatusEvent.created_at.desc())
+        .limit(20)
+    )
+    return [
+        CustomerOrderNotificationResponse(
+            status=event.status,
+            created_at=event.created_at,
+            order_id=order.id,
+            order_reference=order.reference,
+        )
+        for event, order in notifications.all()
+    ]
+
+
+@router.get(
+    "/store/my-profile",
+    response_model=StoreCustomerProfileResponse,
+    summary="Consulter le profil client de la boutique",
+)
+async def read_my_store_profile(
+    session: SessionDep,
+    user: CurrentUserDep,
+) -> StoreCustomerProfileResponse:
+    organization_id = await session.scalar(
+        select(Organization.id).where(
+            Organization.slug == get_settings().public_store_slug,
+            Organization.is_active.is_(True),
+        )
+    )
+    customer = await session.scalar(
+        select(Customer).where(
+            Customer.user_id == user.id,
+            Customer.organization_id == organization_id,
+        )
+    ) if organization_id else None
+    if customer is None:
+        raise HTTPException(
+            status_code=403,
+            detail="Aucun compte client de boutique n'est associé.",
+        )
+    return StoreCustomerProfileResponse(
+        full_name=user.full_name,
+        email=user.email or customer.email or "",
+        phone=customer.phone,
+        address=customer.address,
+    )
+
+
+@router.put(
+    "/store/my-profile",
+    response_model=StoreCustomerProfileResponse,
+    summary="Modifier le profil client de la boutique",
+)
+async def update_my_store_profile(
+    data: UpdateStoreCustomerProfileRequest,
+    session: SessionDep,
+    user: CurrentUserDep,
+) -> StoreCustomerProfileResponse:
+    organization_id = await session.scalar(
+        select(Organization.id).where(
+            Organization.slug == get_settings().public_store_slug,
+            Organization.is_active.is_(True),
+        )
+    )
+    customer = await session.scalar(
+        select(Customer).where(
+            Customer.user_id == user.id,
+            Customer.organization_id == organization_id,
+        )
+    ) if organization_id else None
+    if customer is None:
+        raise HTTPException(
+            status_code=403,
+            detail="Aucun compte client de boutique n'est associé.",
+        )
+    user.full_name = data.full_name
+    customer.name = data.full_name
+    customer.phone = data.phone
+    customer.address = data.address or None
+    await session.commit()
+    return StoreCustomerProfileResponse(
+        full_name=user.full_name,
+        email=user.email or customer.email or "",
+        phone=customer.phone,
+        address=customer.address,
+    )
+
+
+@router.post(
+    "/store/my-orders/{order_id}/cancel",
+    response_model=SalesOrderResponse,
+    summary="Annuler une commande en attente",
+)
+async def cancel_my_store_order(
+    order_id: uuid.UUID,
+    session: SessionDep,
+    user: CurrentUserDep,
+) -> SalesOrderResponse:
+    organization_id = await session.scalar(
+        select(Organization.id).where(
+            Organization.slug == get_settings().public_store_slug,
+            Organization.is_active.is_(True),
+        )
+    )
+    customer_id = await session.scalar(
+        select(Customer.id).where(
+            Customer.user_id == user.id,
+            Customer.organization_id == organization_id,
+        )
+    ) if organization_id else None
+    if organization_id is None or customer_id is None:
+        raise HTTPException(
+            status_code=403,
+            detail="Aucun compte client de boutique n'est associé.",
+        )
+    order = await session.scalar(
+        select(SalesOrder)
+        .options(selectinload(SalesOrder.items), selectinload(SalesOrder.status_history))
+        .where(
+            SalesOrder.id == order_id,
+            SalesOrder.customer_id == customer_id,
+            SalesOrder.organization_id == organization_id,
+        )
+        .with_for_update()
+    )
+    if order is None:
+        raise HTTPException(status_code=404, detail="Commande introuvable.")
+    if order.status != OrderStatus.PENDING.value:
+        raise HTTPException(
+            status_code=409,
+            detail="Seules les commandes en attente peuvent être annulées depuis votre compte.",
+        )
+
+    product_ids = sorted({item.product_id for item in order.items if item.product_id is not None})
+    if product_ids:
+        await session.scalars(
+            select(Product)
+            .where(
+                Product.id.in_(product_ids),
+                Product.organization_id == organization_id,
+            )
+            .order_by(Product.id)
+            .with_for_update()
+        )
+    for item in order.items:
+        if item.product_id is None:
+            continue
+        stock_item = await session.scalar(
+            select(StockItem)
+            .where(
+                StockItem.organization_id == organization_id,
+                StockItem.product_id == item.product_id,
+            )
+            .with_for_update()
+        )
+        if stock_item is not None:
+            await record_stock_movement(
+                session,
+                organization_id=organization_id,
+                stock_item=stock_item,
+                movement_type="cancellation",
+                direction="in",
+                quantity=item.quantity,
+                movement_date=date.today(),
+                created_by_id=user.id,
+                note=f"Annulation de la commande {order.reference} par le client.",
+                reference_type="order_cancelled_item",
+                reference_id=item.id,
+            )
+    order.status = OrderStatus.CANCELLED.value
+    order.status_history.append(
+        SalesOrderStatusEvent(status=OrderStatus.CANCELLED.value, actor_id=user.id)
+    )
+    await session.commit()
+    await session.refresh(order)
+    return SalesOrderResponse.model_validate(order)
+
+
 @router.post(
     "/sales/orders",
     response_model=SalesOrderResponse,
@@ -875,7 +1162,7 @@ async def list_my_store_orders(
 async def create_order(
     data: CreateOrderRequest,
     session: SessionDep,
-    context: CanManageSalesDep,
+    context: CanOperateSalesDep,
 ) -> SalesOrderResponse:
     customer = None
     if data.customer_id is not None:
@@ -949,6 +1236,12 @@ async def create_order(
         amount_fcfa=amount_fcfa,
         status=OrderStatus.CONFIRMED.value,
         items=order_items,
+        status_history=[
+            SalesOrderStatusEvent(
+                status=OrderStatus.CONFIRMED.value,
+                actor_id=context.user.id,
+            )
+        ],
     )
     session.add(order)
     try:
@@ -1004,8 +1297,16 @@ async def update_order_status(
     order_id: uuid.UUID,
     data: UpdateOrderStatusRequest,
     session: SessionDep,
-    context: CanManageSalesDep,
+    context: CanOperateSalesDep,
 ) -> SalesOrderResponse:
+    if (
+        context.membership.role == "operator"
+        and data.status == OrderStatus.CANCELLED.value
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail="Seul un responsable peut annuler une commande.",
+        )
     order = await session.scalar(
         select(SalesOrder)
         .options(selectinload(SalesOrder.items))
@@ -1060,7 +1361,11 @@ async def update_order_status(
                         reference_type="order_cancelled_item",
                         reference_id=item.id,
                     )
-    order.status = data.status
+    if order.status != data.status:
+        order.status = data.status
+        order.status_history.append(
+            SalesOrderStatusEvent(status=data.status, actor_id=context.user.id)
+        )
     await session.commit()
     await session.refresh(order)
     return SalesOrderResponse.model_validate(order)

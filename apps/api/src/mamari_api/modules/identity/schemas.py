@@ -47,6 +47,19 @@ class ChangePasswordRequest(BaseModel):
     new_password: Password
 
 
+class UpdateCurrentUserRequest(BaseModel):
+    full_name: FullName | None = None
+    phone: Phone | None = None
+
+    @model_validator(mode="after")
+    def require_update_field(self) -> "UpdateCurrentUserRequest":
+        if not self.model_fields_set:
+            raise ValueError("Renseignez au moins une information à modifier.")
+        if "full_name" in self.model_fields_set and self.full_name is None:
+            raise ValueError("Le nom complet ne peut pas être vide.")
+        return self
+
+
 class CreateUserRequest(BaseModel):
     username: Username
     full_name: FullName
@@ -91,6 +104,7 @@ class UserResponse(BaseModel):
     id: uuid.UUID
     username: str
     full_name: str
+    phone: str | None = None
     memberships: list[MembershipResponse]
     customer_account: bool = False
 

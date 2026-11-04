@@ -28,15 +28,16 @@ class RecentHarvestResponse(BaseModel):
 
 class DashboardOverviewResponse(BaseModel):
     year: int
-    revenue_fcfa: int
+    financial_access: bool
+    revenue_fcfa: int | None
     order_count: int
     pending_order_count: int
     customer_count: int
-    average_order_fcfa: int
+    average_order_fcfa: int | None
     production_kg: float
     harvest_count: int
     parcel_count: int
-    monthly_revenue: list[MonthlySalesResponse]
+    monthly_revenue: list[MonthlySalesResponse] | None
     monthly_production_kg: list[MonthlyProductionResponse]
     recent_orders: list[SalesOrderResponse]
     recent_harvests: list[RecentHarvestResponse]

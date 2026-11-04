@@ -353,6 +353,106 @@ button {
   white-space: nowrap;
 }
 
+.profile-edit-trigger {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  border: 1px solid #e6ddd1;
+  border-radius: 10px;
+  background: #fff;
+  padding: 0 12px;
+  color: #684a32;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.profile-edit-trigger:hover {
+  background: #f8f4ed;
+}
+
+.profile-edit-trigger:focus-visible,
+.profile-edit-actions button:focus-visible {
+  outline: 2px solid var(--brand-gold);
+  outline-offset: 2px;
+}
+
+.profile-edit-form {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+  border-top: 1px solid #eee8df;
+  padding-top: 16px;
+}
+
+.profile-edit-form label {
+  display: grid;
+  gap: 5px;
+  color: #5e5145;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.profile-edit-form input {
+  width: 100%;
+  min-height: 40px;
+  border: 1px solid #ded7ce;
+  border-radius: 9px;
+  background: #fff;
+  padding: 0 11px;
+  color: #342219;
+  font: inherit;
+}
+
+.profile-edit-form input:focus-visible {
+  border-color: var(--brand-gold);
+  outline: 2px solid rgb(184 147 90 / 15%);
+}
+
+.profile-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.profile-edit-actions button {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border-radius: 9px;
+  padding: 0 13px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.profile-edit-cancel {
+  border: 1px solid #e6ddd1;
+  background: #fff;
+  color: #684a32;
+}
+
+.profile-edit-save {
+  border: 0;
+  background: #684a32;
+  color: #fff;
+}
+
+.profile-edit-save:disabled {
+  cursor: wait;
+  opacity: .65;
+}
+
+.profile-edit-error {
+  margin: 0;
+  color: #963d31;
+  font-size: 12px;
+}
+
 .profile-dialog-actions {
   display: grid;
   gap: 8px;
@@ -479,6 +579,48 @@ button {
 .password-change-form input:focus-visible {
   border-color: #9e7257;
   outline: 2px solid rgb(158 114 87 / 20%);
+  outline-offset: 1px;
+}
+
+.password-input-wrap {
+  position: relative;
+  display: block;
+  width: 100%;
+}
+
+.password-input-wrap > input {
+  padding-right: 46px;
+}
+
+.auth-field .password-input-wrap > input,
+.password-change-form .password-input-wrap > input {
+  padding-right: 46px;
+}
+
+.password-input-toggle {
+  position: absolute;
+  top: 50%;
+  right: 7px;
+  display: grid;
+  width: 34px;
+  height: 34px;
+  transform: translateY(-50%);
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #78827b;
+  cursor: pointer;
+  transition: background 140ms ease, color 140ms ease;
+}
+
+.password-input-toggle:hover {
+  background: rgb(120 130 123 / 10%);
+  color: #3e5747;
+}
+
+.password-input-toggle:focus-visible {
+  outline: 2px solid #9e7257;
   outline-offset: 1px;
 }
 

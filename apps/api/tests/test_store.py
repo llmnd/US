@@ -41,6 +41,12 @@ async def test_public_store_checkout_creates_order_and_reserves_stock(
     assert catalog.status_code == 200
     assert catalog.json()["organization_name"] == "Mamari"
     assert [item["id"] for item in catalog.json()["items"]] == [product_id]
+    for protected_path in (
+        "/api/v1/store/my-profile",
+        "/api/v1/store/my-orders/summary",
+        "/api/v1/store/my-notifications",
+    ):
+        assert (await client.get(protected_path)).status_code == 401
 
     registration = await client.post(
         "/api/v1/auth/customer/register",
@@ -73,6 +79,7 @@ async def test_public_store_checkout_creates_order_and_reserves_stock(
     assert order["delivery_address"] == "Dakar, Sénégal"
     assert order["amount_fcfa"] == 10_500
     assert order["status"] == "pending"
+    assert [event["status"] for event in order["status_history"]] == ["pending"]
     assert order["items"] == [
         {
             "product_id": product_id,
@@ -130,9 +137,61 @@ async def test_public_store_checkout_creates_order_and_reserves_stock(
     assert first_order_page.status_code == second_order_page.status_code == 200
     assert first_order_page.json()["total"] == 2
     assert first_order_page.json()["items"][0]["id"] != second_order_page.json()["items"][0]["id"]
+    searched_orders = await client.get(
+        f"/api/v1/store/my-orders?search={order['reference']}"
+    )
+    assert searched_orders.status_code == 200
+    assert searched_orders.json()["total"] == 1
+    assert searched_orders.json()["items"][0]["id"] == order["id"]
     confirmed_orders = await client.get("/api/v1/store/my-orders?status=confirmed")
     assert confirmed_orders.status_code == 200
     assert confirmed_orders.json()["items"] == []
+    summary = await client.get("/api/v1/store/my-orders/summary")
+    assert summary.status_code == 200
+    assert summary.json() == {
+        "in_progress_count": 2,
+        "delivered_count": 0,
+        "total_spent_fcfa": 0,
+    }
+    customer_profile = await client.get("/api/v1/store/my-profile")
+    assert customer_profile.status_code == 200
+    assert customer_profile.json() == {
+        "full_name": "Aminata Diallo",
+        "email": "aminata@example.com",
+        "phone": "+221 77 123 45 67",
+        "address": "Dakar, Sénégal",
+    }
+    updated_profile = await client.put(
+        "/api/v1/store/my-profile",
+        json={
+            "full_name": "Aminata Cissé",
+            "phone": "+221 76 555 12 34",
+            "address": "Thiès, Sénégal",
+        },
+    )
+    assert updated_profile.status_code == 200
+    assert updated_profile.json()["full_name"] == "Aminata Cissé"
+    assert updated_profile.json()["phone"] == "+221 76 555 12 34"
+    assert updated_profile.json()["address"] == "Thiès, Sénégal"
+    assert (await client.get("/api/v1/auth/me")).json()["full_name"] == "Aminata Cissé"
+    initial_notifications = await client.get("/api/v1/store/my-notifications")
+    assert initial_notifications.status_code == 200
+    assert {item["status"] for item in initial_notifications.json()} == {"pending"}
+
+    second_order_id = first_order_page.json()["items"][0]["id"]
+    cancelled_by_customer = await client.post(
+        f"/api/v1/store/my-orders/{second_order_id}/cancel"
+    )
+    assert cancelled_by_customer.status_code == 200
+    assert cancelled_by_customer.json()["status"] == "cancelled"
+    assert [event["status"] for event in cancelled_by_customer.json()["status_history"]] == [
+        "pending",
+        "cancelled",
+    ]
+    already_cancelled_order = await client.post(
+        f"/api/v1/store/my-orders/{second_order_id}/cancel"
+    )
+    assert already_cancelled_order.status_code == 409
 
     other_registration = await client.post(
         "/api/v1/auth/customer/register",
@@ -147,7 +206,37 @@ async def test_public_store_checkout_creates_order_and_reserves_stock(
     other_orders = await client.get("/api/v1/store/my-orders")
     assert other_orders.status_code == 200
     assert other_orders.json()["items"] == []
+    assert (await client.get("/api/v1/store/my-profile")).status_code == 200
+    other_customer_cannot_cancel_order = await client.post(
+        f"/api/v1/store/my-orders/{order['id']}/cancel"
+    )
+    assert other_customer_cannot_cancel_order.status_code == 404
 
+    await admin_session(client)
+    for next_status in ("confirmed", "preparing", "delivered"):
+        progressed_order = await client.patch(
+            f"/api/v1/sales/orders/{order['id']}/status",
+            headers=headers,
+            json={"status": next_status},
+        )
+        assert progressed_order.status_code == 200
+    await client.post(
+        "/api/v1/auth/login",
+        json={"username": "aminata@example.com", "password": "secret123"},
+    )
+    delivered_summary = await client.get("/api/v1/store/my-orders/summary")
+    assert delivered_summary.status_code == 200
+    assert delivered_summary.json() == {
+        "in_progress_count": 0,
+        "delivered_count": 1,
+        "total_spent_fcfa": 10_500,
+    }
+    delivered_history = await client.get("/api/v1/store/my-orders?status=delivered")
+    assert delivered_history.status_code == 200
+    assert [
+        event["status"]
+        for event in delivered_history.json()["items"][0]["status_history"]
+    ] == ["pending", "confirmed", "preparing", "delivered"]
     await admin_session(client)
     cancelled = await client.patch(
         f"/api/v1/sales/orders/{order['id']}/status",
@@ -161,12 +250,22 @@ async def test_public_store_checkout_creates_order_and_reserves_stock(
     )
     updated_customer_orders = await client.get("/api/v1/store/my-orders?status=cancelled")
     assert updated_customer_orders.status_code == 200
-    assert updated_customer_orders.json()["items"][0]["status"] == "cancelled"
+    first_order_after_cancellation = next(
+        item for item in updated_customer_orders.json()["items"] if item["id"] == order["id"]
+    )
+    assert first_order_after_cancellation["status"] == "cancelled"
+    assert [
+        event["status"]
+        for event in first_order_after_cancellation["status_history"]
+    ] == ["pending", "confirmed", "preparing", "delivered", "cancelled"]
+    notifications_after_update = await client.get("/api/v1/store/my-notifications")
+    assert notifications_after_update.status_code == 200
+    assert any(item["status"] == "cancelled" for item in notifications_after_update.json())
 
     await admin_session(client)
     products = await client.get("/api/v1/sales/products", headers=headers)
     assert products.status_code == 200
-    assert products.json()[0]["stock_quantity"] == 7
+    assert products.json()[0]["stock_quantity"] == 8
     reactivated = await client.patch(
         f"/api/v1/sales/orders/{order['id']}/status",
         headers=headers,

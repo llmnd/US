@@ -4,6 +4,7 @@ import { useId, useRef, useState, type FormEvent } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { ChevronDown, ChevronUp, KeyRound } from "lucide-react";
 import { apiRequest, getApiErrorMessage } from "@/lib/api/client";
+import { PasswordInput } from "./password-input";
 
 export function ChangePasswordForm() {
   const formId = useId();
@@ -62,15 +63,15 @@ export function ChangePasswordForm() {
         <form className="password-change-form" id={formId} onSubmit={handleSubmit} ref={formRef}>
           <label>
             <span>Mot de passe actuel</span>
-            <input autoComplete="current-password" maxLength={128} minLength={6} name="current_password" required type="password" />
+            <PasswordInput autoComplete="current-password" maxLength={128} minLength={6} name="current_password" required />
           </label>
           <label>
             <span>Nouveau mot de passe</span>
-            <input autoComplete="new-password" maxLength={128} minLength={6} name="new_password" required type="password" />
+            <PasswordInput autoComplete="new-password" maxLength={128} minLength={6} name="new_password" required />
           </label>
           <label>
             <span>Confirmer le nouveau mot de passe</span>
-            <input autoComplete="new-password" maxLength={128} minLength={6} name="password_confirmation" required type="password" />
+            <PasswordInput autoComplete="new-password" maxLength={128} minLength={6} name="password_confirmation" required />
           </label>
           {validationError ? <p className="password-change-error" role="alert">{validationError}</p> : null}
           {changePassword.isError ? (

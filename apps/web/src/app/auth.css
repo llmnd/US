@@ -273,6 +273,20 @@
     box-shadow 160ms ease;
 }
 
+.auth-content .auth-field .password-input-wrap > input {
+  padding-right: 50px;
+}
+
+.auth-content .auth-field .password-input-toggle {
+  right: 10px;
+  color: #7b837a;
+}
+
+.auth-content .auth-field .password-input-toggle:hover {
+  background: rgb(138 105 57 / 9%);
+  color: #765a31;
+}
+
 .auth-content .auth-field input::placeholder {
   color: #a5aca3;
 }

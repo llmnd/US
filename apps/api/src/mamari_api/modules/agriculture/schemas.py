@@ -163,21 +163,21 @@ class CampaignResponse(BaseModel):
     expected_harvest_date: date
     area_hectares: Decimal
     expected_yield_kg_per_hectare: Decimal
-    expected_price_fcfa_per_kg: Decimal
-    estimated_input_cost_fcfa: int
-    estimated_other_cost_fcfa: int
+    expected_price_fcfa_per_kg: Decimal | None
+    estimated_input_cost_fcfa: int | None
+    estimated_other_cost_fcfa: int | None
     simulated_at: datetime | None
     started_at: datetime | None
     closed_at: datetime | None
     archived_at: datetime | None
     expected_production_kg: Decimal
-    expected_revenue_fcfa: int
-    estimated_total_cost_fcfa: int
-    estimated_margin_fcfa: int
+    expected_revenue_fcfa: int | None
+    estimated_total_cost_fcfa: int | None
+    estimated_margin_fcfa: int | None
     actual_production_kg: Decimal
     actual_sold_kg: Decimal
-    actual_revenue_fcfa: int
-    actual_expenses_fcfa: int
+    actual_revenue_fcfa: int | None
+    actual_expenses_fcfa: int | None
     created_at: datetime
 
 

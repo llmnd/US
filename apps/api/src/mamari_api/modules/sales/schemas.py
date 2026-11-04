@@ -91,6 +91,38 @@ class SalesOrderResponse(BaseModel):
     status: OrderState
     created_at: datetime
     items: list["SalesOrderItemResponse"] = Field(default_factory=list)
+    status_history: list["OrderStatusEventResponse"] = Field(default_factory=list)
+
+
+class OrderStatusEventResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    status: OrderState
+    created_at: datetime
+
+
+class StoreOrderSummaryResponse(BaseModel):
+    in_progress_count: int
+    delivered_count: int
+    total_spent_fcfa: int
+
+
+class StoreCustomerProfileResponse(BaseModel):
+    full_name: str
+    email: str
+    phone: str
+    address: str | None
+
+
+class UpdateStoreCustomerProfileRequest(BaseModel):
+    full_name: CustomerName
+    phone: Annotated[str, StringConstraints(strip_whitespace=True, min_length=6, max_length=32)]
+    address: Annotated[str, StringConstraints(strip_whitespace=True, max_length=500)] | None = None
+
+
+class CustomerOrderNotificationResponse(OrderStatusEventResponse):
+    order_id: uuid.UUID
+    order_reference: str
 
 
 class SalesOrderItemResponse(BaseModel):

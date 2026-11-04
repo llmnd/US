@@ -35,6 +35,10 @@ CanManageStockDep = Annotated[
     CurrentMembership,
     Depends(require_roles("owner", "admin", "manager")),
 ]
+CanOperateStockDep = Annotated[
+    CurrentMembership,
+    Depends(require_roles("owner", "admin", "manager", "operator")),
+]
 
 
 async def _stock_item_response(session: AsyncSession, item: StockItem) -> StockItemResponse:
@@ -213,8 +217,13 @@ async def create_stock_movement(
     item_id: uuid.UUID,
     data: CreateStockMovementRequest,
     session: SessionDep,
-    context: CanManageStockDep,
+    context: CanOperateStockDep,
 ) -> StockItemResponse:
+    if context.membership.role == "operator" and data.movement_type == "adjustment":
+        raise HTTPException(
+            status_code=403,
+            detail="Seul un responsable peut effectuer un ajustement de stock.",
+        )
     item = await session.scalar(
         select(StockItem).where(
             StockItem.id == item_id,

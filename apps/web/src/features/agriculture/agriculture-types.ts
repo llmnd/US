@@ -79,21 +79,21 @@ export interface Campaign {
   expected_harvest_date: string;
   area_hectares: string | number;
   expected_yield_kg_per_hectare: string | number;
-  expected_price_fcfa_per_kg: string | number;
-  estimated_input_cost_fcfa: number;
-  estimated_other_cost_fcfa: number;
+  expected_price_fcfa_per_kg: string | number | null;
+  estimated_input_cost_fcfa: number | null;
+  estimated_other_cost_fcfa: number | null;
   simulated_at: string | null;
   started_at: string | null;
   closed_at: string | null;
   archived_at: string | null;
   expected_production_kg: string | number;
-  expected_revenue_fcfa: number;
-  estimated_total_cost_fcfa: number;
-  estimated_margin_fcfa: number;
+  expected_revenue_fcfa: number | null;
+  estimated_total_cost_fcfa: number | null;
+  estimated_margin_fcfa: number | null;
   actual_production_kg: string | number;
   actual_sold_kg: string | number;
-  actual_revenue_fcfa: number;
-  actual_expenses_fcfa: number;
+  actual_revenue_fcfa: number | null;
+  actual_expenses_fcfa: number | null;
   created_at: string;
 }
 

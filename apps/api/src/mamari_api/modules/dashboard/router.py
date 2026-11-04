@@ -2,7 +2,7 @@ from datetime import date
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import case, func, select
+from sqlalchemy import case, func, null, select
 
 from mamari_api.modules.agriculture.models import Harvest, Parcel
 from mamari_api.modules.dashboard.schemas import (
@@ -57,6 +57,7 @@ async def read_dashboard_overview(
     year_start = date(year, 1, 1)
     year_end = date(year + 1, 1, 1)
     organization_id = context.organization.id
+    financial_access = context.membership.role in {"owner", "admin", "manager"}
     order_filters = (
         SalesOrder.organization_id == organization_id,
         SalesOrder.order_date >= year_start,
@@ -69,19 +70,20 @@ async def read_dashboard_overview(
     )
 
     revenue_by_month = [0] * 12
-    sales_months = await session.execute(
-        select(
-            func.extract("month", SalesOrder.order_date),
-            func.sum(SalesOrder.amount_fcfa),
+    if financial_access:
+        sales_months = await session.execute(
+            select(
+                func.extract("month", SalesOrder.order_date),
+                func.sum(SalesOrder.amount_fcfa),
+            )
+            .where(
+                *order_filters,
+                SalesOrder.status.in_(REVENUE_STATUSES),
+            )
+            .group_by(func.extract("month", SalesOrder.order_date))
         )
-        .where(
-            *order_filters,
-            SalesOrder.status.in_(REVENUE_STATUSES),
-        )
-        .group_by(func.extract("month", SalesOrder.order_date))
-    )
-    for month_number, amount in sales_months:
-        revenue_by_month[int(month_number) - 1] = int(amount or 0)
+        for month_number, amount in sales_months:
+            revenue_by_month[int(month_number) - 1] = int(amount or 0)
 
     active_order = SalesOrder.status != OrderStatus.CANCELLED.value
     revenue_order = SalesOrder.status.in_(REVENUE_STATUSES)
@@ -112,7 +114,11 @@ async def read_dashboard_overview(
                         )
                     )
                 ),
-                func.avg(case((revenue_order, SalesOrder.amount_fcfa), else_=None)),
+                (
+                    func.avg(case((revenue_order, SalesOrder.amount_fcfa), else_=None))
+                    if financial_access
+                    else null()
+                ),
             ).where(*order_filters)
         )
     ).one()
@@ -164,24 +170,29 @@ async def read_dashboard_overview(
 
     return DashboardOverviewResponse(
         year=year,
-        revenue_fcfa=sum(revenue_by_month),
+        financial_access=financial_access,
+        revenue_fcfa=sum(revenue_by_month) if financial_access else None,
         order_count=sales_stats[0],
         pending_order_count=sales_stats[1],
         customer_count=sales_stats[2],
-        average_order_fcfa=round(float(sales_stats[3] or 0)),
+        average_order_fcfa=round(float(sales_stats[3] or 0)) if financial_access else None,
         production_kg=float(production_stats[0] or 0),
         harvest_count=production_stats[1],
         parcel_count=parcel_count or 0,
-        monthly_revenue=[
-            MonthlySalesResponse(
-                month=label,
-                month_number=index + 1,
-                amount_fcfa=amount,
-            )
-            for index, (label, amount) in enumerate(
-                zip(MONTH_LABELS, revenue_by_month, strict=True)
-            )
-        ],
+        monthly_revenue=(
+            [
+                MonthlySalesResponse(
+                    month=label,
+                    month_number=index + 1,
+                    amount_fcfa=amount,
+                )
+                for index, (label, amount) in enumerate(
+                    zip(MONTH_LABELS, revenue_by_month, strict=True)
+                )
+            ]
+            if financial_access
+            else None
+        ),
         monthly_production_kg=[
             MonthlyProductionResponse(
                 month=label,

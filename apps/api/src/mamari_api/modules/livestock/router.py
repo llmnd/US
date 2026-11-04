@@ -55,6 +55,14 @@ CanManageLivestockDep = Annotated[
     CurrentMembership,
     Depends(require_roles("owner", "admin", "manager")),
 ]
+CanOperateLivestockDep = Annotated[
+    CurrentMembership,
+    Depends(require_roles("owner", "admin", "manager", "operator")),
+]
+CanViewLivestockFinanceDep = Annotated[
+    CurrentMembership,
+    Depends(require_roles("owner", "admin", "manager")),
+]
 
 MAX_PHOTO_BYTES = 5 * 1024 * 1024
 MONTH_LABELS = (
@@ -171,11 +179,16 @@ async def _animal_response(session: AsyncSession, animal: LivestockAnimal) -> An
     )
 
 
-async def _record_response(session: AsyncSession, record: LivestockRecord) -> RecordResponse:
+async def _record_response(
+    session: AsyncSession,
+    record: LivestockRecord,
+    *,
+    include_financials: bool = True,
+) -> RecordResponse:
     animal_name = None
     group_name = None
     facility_name = None
-    finance_transaction_created = record.amount_fcfa > 0
+    finance_transaction_created = include_financials and record.amount_fcfa > 0
     if record.animal_id is not None:
         animal_result = await session.execute(
             select(LivestockAnimal.name, LivestockAnimal.tag_number).where(
@@ -214,7 +227,7 @@ async def _record_response(session: AsyncSession, record: LivestockRecord) -> Re
         facility_name=facility_name,
         quantity=record.quantity,
         unit=record.unit,
-        amount_fcfa=record.amount_fcfa,
+        amount_fcfa=record.amount_fcfa if include_financials else None,
         finance_transaction_created=finance_transaction_created,
         next_due_date=record.next_due_date,
         is_resolved=record.is_resolved,
@@ -506,7 +519,11 @@ async def read_livestock_overview(
             MonthlyProductionTotal(quantity=quantity or Decimal("0"), unit=unit)
             for quantity, unit in feed_totals.all()
         ],
-        feed_month_cost_fcfa=feed_month_cost or 0,
+        feed_month_cost_fcfa=(
+            (feed_month_cost or 0)
+            if context.membership.role in {"owner", "admin", "manager"}
+            else None
+        ),
         upcoming_care=[
             UpcomingCareResponse(
                 id=record.id,
@@ -546,7 +563,7 @@ async def list_facilities(
 async def create_facility(
     data: CreateFacilityRequest,
     session: SessionDep,
-    context: CanManageLivestockDep,
+    context: CanOperateLivestockDep,
 ) -> FacilityResponse:
     if data.farm_id is not None:
         farm_exists = await session.scalar(
@@ -577,7 +594,7 @@ async def create_facility(
 async def upload_facility_photo(
     facility_id: uuid.UUID,
     session: SessionDep,
-    context: CanManageLivestockDep,
+    context: CanOperateLivestockDep,
     photo: Annotated[UploadFile, File()],
 ) -> FacilityResponse:
     facility = await session.scalar(
@@ -663,7 +680,7 @@ async def list_groups(
 async def create_group(
     data: CreateGroupRequest,
     session: SessionDep,
-    context: CanManageLivestockDep,
+    context: CanOperateLivestockDep,
 ) -> GroupResponse:
     if data.facility_id is not None:
         facility = await session.scalar(
@@ -742,7 +759,7 @@ async def list_animals(
 async def create_animal(
     data: CreateAnimalRequest,
     session: SessionDep,
-    context: CanManageLivestockDep,
+    context: CanOperateLivestockDep,
 ) -> AnimalResponse:
     if data.facility_id is not None:
         facility_exists = await session.scalar(
@@ -792,7 +809,7 @@ async def update_animal_status(
     animal_id: uuid.UUID,
     animal_status: Annotated[str, Query(alias="status", pattern="^(active|sold|deceased)$")],
     session: SessionDep,
-    context: CanManageLivestockDep,
+    context: CanOperateLivestockDep,
 ) -> AnimalResponse:
     animal = await session.scalar(
         select(LivestockAnimal).where(
@@ -826,7 +843,7 @@ async def update_animal_status(
 async def upload_animal_photo(
     animal_id: uuid.UUID,
     session: SessionDep,
-    context: CanManageLivestockDep,
+    context: CanOperateLivestockDep,
     photo: Annotated[UploadFile, File()],
 ) -> AnimalResponse:
     animal = await session.scalar(
@@ -938,7 +955,7 @@ async def create_livestock_finance_transaction(
 )
 async def list_livestock_finance_transactions(
     session: SessionDep,
-    context: CurrentOrganizationDep,
+    context: CanViewLivestockFinanceDep,
     page: Annotated[int, Query(ge=1)] = 1,
     page_size: Annotated[int, Query(ge=1, le=100)] = 100,
     year: Annotated[int, Query(ge=2000, le=2100)] = date.today().year,
@@ -977,7 +994,7 @@ async def list_livestock_finance_transactions(
 @router.get("/finance/summary", response_model=LivestockFinanceSummaryResponse)
 async def read_livestock_finance_summary(
     session: SessionDep,
-    context: CurrentOrganizationDep,
+    context: CanViewLivestockFinanceDep,
     year: Annotated[int, Query(ge=2000, le=2100)] = date.today().year,
 ) -> LivestockFinanceSummaryResponse:
     filters = [
@@ -1087,14 +1104,21 @@ async def list_records(
         .offset(offset)
         .limit(limit)
     )
-    return [await _record_response(session, record) for record in records]
+    return [
+        await _record_response(
+            session,
+            record,
+            include_financials=context.membership.role in {"owner", "admin", "manager"},
+        )
+        for record in records
+    ]
 
 
 @router.patch("/records/{record_id}/resolve", response_model=RecordResponse)
 async def resolve_health_record(
     record_id: uuid.UUID,
     session: SessionDep,
-    context: CanManageLivestockDep,
+    context: CanOperateLivestockDep,
 ) -> RecordResponse:
     record = await session.scalar(
         select(LivestockRecord).where(
@@ -1108,15 +1132,24 @@ async def resolve_health_record(
     record.is_resolved = True
     await session.commit()
     await session.refresh(record)
-    return await _record_response(session, record)
+    return await _record_response(
+        session,
+        record,
+        include_financials=context.membership.role in {"owner", "admin", "manager"},
+    )
 
 
 @router.post("/records", response_model=RecordResponse, status_code=status.HTTP_201_CREATED)
 async def create_record(
     data: CreateRecordRequest,
     session: SessionDep,
-    context: CanManageLivestockDep,
+    context: CanOperateLivestockDep,
 ) -> RecordResponse:
+    if context.membership.role == "operator" and data.amount_fcfa > 0:
+        raise HTTPException(
+            status_code=403,
+            detail="Seul un responsable peut enregistrer un montant financier.",
+        )
     subject_facility_id = None
     if data.animal_id is not None:
         subject = await session.scalar(

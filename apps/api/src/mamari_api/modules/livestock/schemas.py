@@ -140,7 +140,7 @@ class RecordResponse(BaseModel):
     facility_name: str | None
     quantity: Decimal | None
     unit: str | None
-    amount_fcfa: int
+    amount_fcfa: int | None
     finance_transaction_created: bool
     next_due_date: date | None
     is_resolved: bool
@@ -242,5 +242,5 @@ class LivestockOverviewResponse(BaseModel):
     reproduction_month_totals: list[MonthlyProductionTotal]
     feed_month_count: int
     feed_month_totals: list[MonthlyProductionTotal]
-    feed_month_cost_fcfa: int
+    feed_month_cost_fcfa: int | None
     upcoming_care: list[UpcomingCareResponse]

@@ -69,6 +69,7 @@ export function SalesPage() {
     retry: false,
   });
   const membership = profile.data?.memberships[0];
+  const isOperator = membership?.role === "operator";
   const products = useQuery({
     queryKey: ["sales", "products", membership?.organization_id],
     queryFn: () => {
@@ -105,7 +106,7 @@ export function SalesPage() {
     retry: false,
   });
   const canManageSales = Boolean(
-    membership && ["owner", "admin", "manager"].includes(membership.role),
+    membership && ["owner", "admin", "manager", "operator"].includes(membership.role),
   );
   const updateStatus = useMutation({
     mutationFn: ({ id, status }: { id: string; status: OrderStatus }) => {
@@ -391,9 +392,11 @@ export function SalesPage() {
               }}
             >
               <option value="all">Tous les statuts</option>
-              {statuses.map((status) => (
+              {statuses
+                .filter((status) => !isOperator || status !== "cancelled")
+                .map((status) => (
                 <option key={status} value={status}>{orderStatusLabels[status]}</option>
-              ))}
+                ))}
             </select>
           </label>
         </div>
@@ -471,11 +474,13 @@ export function SalesPage() {
                                 }
                               }}
                             >
-                              {statuses.map((status) => (
+                              {statuses
+                                .filter((status) => !isOperator || status !== "cancelled")
+                                .map((status) => (
                                 <option key={status} value={status}>
                                   {orderStatusLabels[status]}
                                 </option>
-                              ))}
+                                ))}
                             </select>
                           </label>
                         ) : (

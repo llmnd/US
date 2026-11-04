@@ -114,6 +114,60 @@ async def test_parcels_and_harvests_feed_real_dashboard_metrics(
 
 
 @pytest.mark.asyncio
+async def test_operator_campaign_responses_hide_financial_details(client: AsyncClient) -> None:
+    organization_id, farm, crop = await setup_farm(client)
+    headers = {"X-Organization-ID": organization_id}
+    parcel = await create_parcel(client, organization_id, farm["id"], crop["id"])
+    created_campaign = await client.post(
+        "/api/v1/agriculture/campaigns",
+        headers=headers,
+        json={
+            "parcel_id": parcel["id"],
+            "crop_id": crop["id"],
+            "name": "Campagne confidentielle",
+            "season": "2026-Hivernage",
+            "start_date": "2026-06-01",
+            "expected_harvest_date": "2026-10-30",
+            "area_hectares": 2,
+            "expected_yield_kg_per_hectare": 1000,
+            "expected_price_fcfa_per_kg": 1000,
+            "estimated_input_cost_fcfa": 500000,
+            "estimated_other_cost_fcfa": 100000,
+        },
+    )
+    assert created_campaign.status_code == 201
+
+    created_operator = await client.post(
+        "/api/v1/organizations/users",
+        headers=headers,
+        json={
+            "username": "agri-operator",
+            "full_name": "Employé agricole",
+            "password": "secret6",
+            "role": "operator",
+        },
+    )
+    assert created_operator.status_code == 201
+    client.cookies.clear()
+    login = await client.post(
+        "/api/v1/auth/login",
+        json={"username": "agri-operator", "password": "secret6"},
+    )
+    assert login.status_code == 200
+
+    campaigns = await client.get("/api/v1/agriculture/campaigns", headers=headers)
+    assert campaigns.status_code == 200
+    campaign = campaigns.json()["items"][0]
+    assert campaign["id"] == created_campaign.json()["id"]
+    assert float(campaign["expected_production_kg"]) == 2000
+    assert campaign["expected_revenue_fcfa"] is None
+    assert campaign["estimated_total_cost_fcfa"] is None
+    assert campaign["estimated_margin_fcfa"] is None
+    assert campaign["actual_revenue_fcfa"] is None
+    assert campaign["actual_expenses_fcfa"] is None
+
+
+@pytest.mark.asyncio
 async def test_campaign_planning_simulation_start_close_and_sale(
     client: AsyncClient,
 ) -> None:
