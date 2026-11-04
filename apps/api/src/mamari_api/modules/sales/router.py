@@ -14,6 +14,7 @@ from mamari_api.core.config import get_settings
 from mamari_api.modules.agriculture.models import FinanceTransaction
 from mamari_api.modules.identity.dependencies import (
     CurrentMembership,
+    CurrentUserDep,
     SessionDep,
     get_current_membership,
     require_roles,
@@ -30,6 +31,7 @@ from mamari_api.modules.sales.schemas import (
     CreateCustomerRequest,
     CreateOrderRequest,
     CreateStoreOrderRequest,
+    CustomerFinanceTransactionResponse,
     CustomerPageResponse,
     CustomerResponse,
     ProductResponse,
@@ -96,6 +98,85 @@ async def list_customers(
         page=page,
         page_size=page_size,
     )
+
+
+@router.get(
+    "/sales/customers/{customer_id}/orders",
+    response_model=SalesOrderPageResponse,
+    summary="Consulter les achats d'un client",
+)
+async def list_customer_orders(
+    customer_id: uuid.UUID,
+    session: SessionDep,
+    context: CurrentOrganizationDep,
+    page: Annotated[int, Query(ge=1)] = 1,
+    page_size: Annotated[int, Query(ge=1, le=100)] = 20,
+) -> SalesOrderPageResponse:
+    customer_exists = await session.scalar(
+        select(Customer.id).where(
+            Customer.id == customer_id,
+            Customer.organization_id == context.organization.id,
+        )
+    )
+    if customer_exists is None:
+        raise HTTPException(status_code=404, detail="Client introuvable.")
+
+    filters = [
+        SalesOrder.customer_id == customer_id,
+        SalesOrder.organization_id == context.organization.id,
+    ]
+    total = await session.scalar(select(func.count()).select_from(SalesOrder).where(*filters))
+    orders = await session.scalars(
+        select(SalesOrder)
+        .options(selectinload(SalesOrder.items))
+        .where(*filters)
+        .order_by(SalesOrder.order_date.desc(), SalesOrder.created_at.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    )
+    return SalesOrderPageResponse(
+        items=list(orders.all()),
+        total=total or 0,
+        page=page,
+        page_size=page_size,
+    )
+
+
+@router.get(
+    "/sales/customers/{customer_id}/transactions",
+    response_model=list[CustomerFinanceTransactionResponse],
+    summary="Consulter les transactions financières d'un client",
+)
+async def list_customer_transactions(
+    customer_id: uuid.UUID,
+    session: SessionDep,
+    context: CurrentOrganizationDep,
+) -> list[CustomerFinanceTransactionResponse]:
+    customer_exists = await session.scalar(
+        select(Customer.id).where(
+            Customer.id == customer_id,
+            Customer.organization_id == context.organization.id,
+        )
+    )
+    if customer_exists is None:
+        raise HTTPException(status_code=404, detail="Client introuvable.")
+
+    transactions = await session.scalars(
+        select(FinanceTransaction)
+        .where(
+            FinanceTransaction.customer_id == customer_id,
+            FinanceTransaction.organization_id == context.organization.id,
+        )
+        .order_by(
+            FinanceTransaction.transaction_date.desc(),
+            FinanceTransaction.created_at.desc(),
+        )
+        .limit(100)
+    )
+    return [
+        CustomerFinanceTransactionResponse.model_validate(transaction)
+        for transaction in transactions.all()
+    ]
 
 
 @router.post(
@@ -593,6 +674,7 @@ async def read_store_product_photo(
 async def create_store_order(
     data: CreateStoreOrderRequest,
     session: SessionDep,
+    user: CurrentUserDep,
 ) -> SalesOrderResponse:
     organization = await session.scalar(
         select(Organization).where(
@@ -606,26 +688,16 @@ async def create_store_order(
     customer = await session.scalar(
         select(Customer).where(
             Customer.organization_id == organization.id,
-            Customer.phone == data.customer_phone,
+            Customer.user_id == user.id,
         )
     )
     if customer is None:
-        customer = Customer(
-            organization_id=organization.id,
-            customer_type="individual",
-            name=data.customer_name,
-            phone=data.customer_phone,
-            email=str(data.customer_email) if data.customer_email else None,
-            address=data.delivery_address,
+        raise HTTPException(
+            status_code=403,
+            detail="Un compte client de la boutique est nécessaire pour commander.",
         )
-        session.add(customer)
-        await session.flush()
-    else:
-        customer.name = data.customer_name
-        if data.customer_email:
-            customer.email = str(data.customer_email)
-        if data.delivery_address:
-            customer.address = data.delivery_address
+    if data.delivery_address:
+        customer.address = data.delivery_address
 
     quantities: dict[uuid.UUID, int] = {}
     for item in data.items:
@@ -682,13 +754,13 @@ async def create_store_order(
     order = SalesOrder(
         id=order_id,
         organization_id=organization.id,
-        created_by_id=None,
+        created_by_id=user.id,
         reference=f"CMD-{date.today().year}-{order_id.hex[:8].upper()}",
         customer_id=customer.id,
-        customer_name=data.customer_name,
-        customer_phone=data.customer_phone,
-        customer_email=str(data.customer_email) if data.customer_email else None,
-        delivery_address=data.delivery_address,
+        customer_name=customer.name,
+        customer_phone=customer.phone,
+        customer_email=customer.email,
+        delivery_address=data.delivery_address or customer.address,
         order_date=date.today(),
         amount_fcfa=amount_fcfa,
         status=OrderStatus.PENDING.value,
@@ -737,6 +809,61 @@ async def create_store_order(
     if saved_order is None:
         raise HTTPException(status_code=500, detail="La commande enregistrée est introuvable.")
     return SalesOrderResponse.model_validate(saved_order)
+
+
+@router.get(
+    "/store/my-orders",
+    response_model=SalesOrderPageResponse,
+    summary="Suivre les commandes du compte client",
+)
+async def list_my_store_orders(
+    session: SessionDep,
+    user: CurrentUserDep,
+    page: Annotated[int, Query(ge=1)] = 1,
+    page_size: Annotated[int, Query(ge=1, le=100)] = 20,
+    status_filter: Annotated[OrderStatus | None, Query(alias="status")] = None,
+) -> SalesOrderPageResponse:
+    organization_id = await session.scalar(
+        select(Organization.id).where(
+            Organization.slug == get_settings().public_store_slug,
+            Organization.is_active.is_(True),
+        )
+    )
+    if organization_id is None:
+        raise HTTPException(status_code=404, detail="La boutique Mamari est indisponible.")
+    customer_id = await session.scalar(
+        select(Customer.id).where(
+            Customer.user_id == user.id,
+            Customer.organization_id == organization_id,
+        )
+    )
+    if customer_id is None:
+        raise HTTPException(
+            status_code=403,
+            detail="Aucun compte client de boutique n'est associé.",
+        )
+
+    filters = [
+        SalesOrder.customer_id == customer_id,
+        SalesOrder.organization_id == organization_id,
+    ]
+    if status_filter is not None:
+        filters.append(SalesOrder.status == status_filter.value)
+    total = await session.scalar(select(func.count()).select_from(SalesOrder).where(*filters))
+    orders = await session.scalars(
+        select(SalesOrder)
+        .options(selectinload(SalesOrder.items))
+        .where(*filters)
+        .order_by(SalesOrder.order_date.desc(), SalesOrder.created_at.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    )
+    return SalesOrderPageResponse(
+        items=list(orders.all()),
+        total=total or 0,
+        page=page,
+        page_size=page_size,
+    )
 
 
 @router.post(

@@ -8,6 +8,7 @@ import { apiRequest, getApiErrorMessage, type UserProfile } from "@/lib/api/clie
 import { formatFcfa } from "@/features/sales/sales-types";
 import type { StoreProduct } from "@/features/store/store-types";
 import { useProductPhoto } from "@/features/store/use-product-photo";
+import { MeasurementUnitSelect } from "@/features/shared/measurement-unit-select";
 
 const productsQueryKey = ["sales", "products"];
 
@@ -303,11 +304,9 @@ export function ProductionPage() {
             </label>
             <label className="auth-field">
               <span>Unité de vente</span>
-              <input
+              <MeasurementUnitSelect
                 defaultValue={editingProduct?.unit ?? "unité"}
-                maxLength={40}
                 name="unit"
-                placeholder="unité, kg, sac…"
                 required
               />
             </label>

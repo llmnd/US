@@ -77,9 +77,16 @@ n’a été enregistrée.
 
 ### Accès privé et comptes
 
-- Mamari est une instance privée pour une seule entreprise : aucune inscription
-  publique n’est proposée. `/register` redirige vers la connexion et l’API ne
-  fournit pas de route d’inscription.
+- L’espace de travail de l’équipe reste privé. Les clients de la boutique
+  peuvent créer leur compte depuis `/register` ou au moment de la commande ;
+  le compte est lié à une fiche client de l’organisation de la boutique.
+- Une commande boutique exige une session client. La route
+  `POST /api/v1/store/orders` utilise la fiche liée au compte connecté et ne
+  fait pas confiance à un identifiant client fourni par le navigateur. Les
+  commandes restent en attente jusqu’à leur validation par l’équipe. Le client
+  ne peut consulter que ses commandes via `GET /api/v1/store/my-orders`.
+  L’équipe retrouve les commandes depuis la fiche client et met leur statut à
+  jour dans Ventes.
 - Au premier accès à une base vide, se connecter avec `mamari` / `passer123m`
   crée l’organisation Mamari et son compte propriétaire. La création ne se
   produit qu’une fois ; les connexions suivantes vérifient le compte existant.
@@ -90,7 +97,12 @@ n’a été enregistrée.
   suspendre/réactiver un accès, enregistrer le téléphone WhatsApp et la photo
   de profil des membres. Les mots de passe sont hachés avec Argon2id.
 - `POST /api/v1/auth/login`, `POST /api/v1/auth/logout` et `GET /api/v1/auth/me`
-  gèrent les sessions avec un cookie `HttpOnly`.
+  gèrent les sessions avec un cookie `HttpOnly`. La connexion accepte
+  l’identifiant d’équipe ou l’adresse e-mail du compte client.
+- Dans Clients, sélectionner le nom d’une fiche affiche ses achats. Les cartes
+  d’indicateurs du tableau de bord ouvrent leur définition et leur détail
+  mensuel. Les formulaires d’unités utilisent un catalogue commun plutôt qu’une
+  saisie libre.
 - Les routes de domaine protégées doivent utiliser la dépendance
   `get_current_membership` et exiger l’en-tête `X-Organization-ID`. Les rôles
   disponibles sont `owner`, `admin`, `manager`, `operator` et `reader`.

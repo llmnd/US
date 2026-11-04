@@ -86,6 +86,9 @@ class Customer(Base):
     organization_id: Mapped[uuid.UUID] = mapped_column(
         Uuid, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False
     )
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="SET NULL"), unique=True, nullable=True
+    )
     customer_type: Mapped[str] = mapped_column(String(16), nullable=False, default="individual")
     name: Mapped[str] = mapped_column(String(160), nullable=False)
     company_name: Mapped[str | None] = mapped_column(String(160), nullable=True)
@@ -97,6 +100,10 @@ class Customer(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
     )
+
+    @property
+    def has_account(self) -> bool:
+        return self.user_id is not None
 
 
 class Product(Base):

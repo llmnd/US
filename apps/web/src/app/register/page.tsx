@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation";
+import { CustomerRegisterPage } from "@/features/auth/auth-pages";
 
-export default function RegisterRoute(): never {
-  redirect("/login");
+export default function RegisterRoute() {
+  return <CustomerRegisterPage />;
 }

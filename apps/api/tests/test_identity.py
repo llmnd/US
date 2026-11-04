@@ -52,6 +52,120 @@ async def test_login_and_logout_manage_the_session(client: AsyncClient) -> None:
 
 
 @pytest.mark.asyncio
+async def test_admin_employee_and_customer_can_change_their_password(
+    client: AsyncClient,
+) -> None:
+    unauthenticated_change = await client.post(
+        "/api/v1/auth/change-password",
+        json={"current_password": "currentpass", "new_password": "newpass123"},
+    )
+    assert unauthenticated_change.status_code == 401
+    admin_login = await client.post(
+        "/api/v1/auth/login",
+        json={"username": "mamari", "password": "passer123m"},
+    )
+    assert admin_login.status_code == 200
+    organization_id = admin_login.json()["memberships"][0]["organization_id"]
+    wrong_current_password = await client.post(
+        "/api/v1/auth/change-password",
+        json={"current_password": "incorrect", "new_password": "newpass123"},
+    )
+    assert wrong_current_password.status_code == 400
+
+    changed_admin_password = await client.post(
+        "/api/v1/auth/change-password",
+        json={"current_password": "passer123m", "new_password": "adminpass123"},
+    )
+    assert changed_admin_password.status_code == 200
+    client.cookies.clear()
+    assert (
+        await client.post(
+            "/api/v1/auth/login",
+            json={"username": "mamari", "password": "passer123m"},
+        )
+    ).status_code == 401
+    client.cookies.clear()
+    assert (
+        await client.post(
+            "/api/v1/auth/login",
+            json={"username": "mamari", "password": "adminpass123"},
+        )
+    ).status_code == 200
+
+    employee = await client.post(
+        "/api/v1/organizations/users",
+        headers={"X-Organization-ID": organization_id},
+        json={
+            "username": "password-member",
+            "full_name": "Membre",
+            "password": "memberpass",
+            "role": "operator",
+        },
+    )
+    assert employee.status_code == 201
+    client.cookies.clear()
+    assert (
+        await client.post(
+            "/api/v1/auth/login",
+            json={"username": "password-member", "password": "memberpass"},
+        )
+    ).status_code == 200
+    changed_employee_password = await client.post(
+        "/api/v1/auth/change-password",
+        json={"current_password": "memberpass", "new_password": "updatedpass"},
+    )
+    assert changed_employee_password.status_code == 200
+    client.cookies.clear()
+    assert (
+        await client.post(
+            "/api/v1/auth/login",
+            json={"username": "password-member", "password": "memberpass"},
+        )
+    ).status_code == 401
+    client.cookies.clear()
+    assert (
+        await client.post(
+            "/api/v1/auth/login",
+            json={"username": "password-member", "password": "updatedpass"},
+        )
+    ).status_code == 200
+
+    client.cookies.clear()
+    registration = await client.post(
+        "/api/v1/auth/customer/register",
+        json={
+            "full_name": "Client Mamari",
+            "phone": "771234567",
+            "email": "password-client@example.com",
+            "password": "clientpass",
+        },
+    )
+    assert registration.status_code == 201
+    changed_customer_password = await client.post(
+        "/api/v1/auth/change-password",
+        json={"current_password": "clientpass", "new_password": "customerpass"},
+    )
+    assert changed_customer_password.status_code == 200
+    client.cookies.clear()
+    assert (
+        await client.post(
+            "/api/v1/auth/login",
+            json={
+                "username": "password-client@example.com",
+                "password": "clientpass",
+            },
+        )
+    ).status_code == 401
+    client.cookies.clear()
+    assert (
+        await client.post(
+            "/api/v1/auth/login",
+            json={"username": "password-client@example.com", "password": "customerpass"},
+        )
+    ).status_code == 200
+
+
+@pytest.mark.asyncio
 async def test_bad_credentials_and_public_registration_are_rejected(
     client: AsyncClient,
 ) -> None:

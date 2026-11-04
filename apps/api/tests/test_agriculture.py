@@ -228,6 +228,13 @@ async def test_campaign_planning_simulation_start_close_and_sale(
     assert sale.status_code == 201, sale.text
     assert sale.json()["amount_fcfa"] == 1_080_000
     assert sale.json()["customer_id"] == customer.json()["id"]
+    customer_transactions = await client.get(
+        f"/api/v1/sales/customers/{customer.json()['id']}/transactions",
+        headers=headers,
+    )
+    assert customer_transactions.status_code == 200, customer_transactions.text
+    assert customer_transactions.json()[0]["id"] == sale.json()["id"]
+    assert customer_transactions.json()[0]["amount_fcfa"] == 1_080_000
 
     summary = await client.get(
         f"/api/v1/agriculture/finance/summary?year={date.today().year}",

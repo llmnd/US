@@ -19,6 +19,7 @@ import {
 } from "@/lib/api/client";
 import { CustomerSelect } from "@/features/customers/customer-select";
 import type { Customer } from "@/features/customers/customer-types";
+import { OrderProductImage } from "@/features/shared/order-product-image";
 import {
   formatDate,
   formatFcfa,
@@ -37,6 +38,7 @@ interface CatalogProduct {
   price_fcfa: number;
   stock_quantity: number;
   is_active: boolean;
+  photo_url: string | null;
 }
 
 interface OrderLineDraft {
@@ -75,7 +77,7 @@ export function SalesPage() {
         headers: { "X-Organization-ID": membership.organization_id },
       });
     },
-    enabled: Boolean(membership && orderDialogOpen),
+    enabled: Boolean(membership),
     retry: false,
   });
   const orders = useQuery({
@@ -170,6 +172,7 @@ export function SalesPage() {
 
   const today = new Date().toISOString().slice(0, 10);
   const ordersData = orders.data;
+  const productById = new Map((products.data ?? []).map((product) => [product.id, product]));
   const totalPages = Math.ceil((ordersData?.total ?? 0) / (ordersData?.page_size ?? 20));
   const availableProducts = (products.data ?? []).filter(
     (product) => product.is_active && product.stock_quantity > 0,
@@ -430,10 +433,20 @@ export function SalesPage() {
                             </summary>
                             <div>
                               {order.items.map((item, index) => (
-                                <p key={`${order.id}-${item.product_id ?? index}`}>
-                                  <strong>{item.quantity} × {item.product_name}</strong>
-                                  <span>{formatFcfa(item.quantity * item.unit_price_fcfa)}</span>
-                                </p>
+                                <div className="sales-order-item" key={`${order.id}-${item.product_id ?? index}`}>
+                                  <OrderProductImage
+                                    name={item.product_name}
+                                    photoPath={item.product_id ? productById.get(item.product_id)?.photo_url ?? null : null}
+                                    organizationId={membership?.organization_id}
+                                  />
+                                  <span className="sales-order-item-copy">
+                                    <strong>{item.quantity} × {item.product_name}</strong>
+                                    <small>{item.unit}</small>
+                                  </span>
+                                  <strong className="sales-order-item-price">
+                                    {formatFcfa(item.quantity * item.unit_price_fcfa)}
+                                  </strong>
+                                </div>
                               ))}
                             </div>
                           </details>

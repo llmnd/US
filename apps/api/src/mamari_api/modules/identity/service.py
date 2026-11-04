@@ -1,7 +1,7 @@
 import uuid
 
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -112,7 +112,14 @@ async def authenticate_user(
     password: str,
 ) -> User:
     normalized_username = username.casefold()
-    user = await session.scalar(select(User).where(User.username == normalized_username))
+    user = await session.scalar(
+        select(User).where(
+            or_(
+                User.username == normalized_username,
+                func.lower(User.email) == normalized_username,
+            )
+        )
+    )
     settings = get_settings()
     if (
         user is None

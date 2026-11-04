@@ -42,12 +42,21 @@ async def test_public_store_checkout_creates_order_and_reserves_stock(
     assert catalog.json()["organization_name"] == "Mamari"
     assert [item["id"] for item in catalog.json()["items"]] == [product_id]
 
+    registration = await client.post(
+        "/api/v1/auth/customer/register",
+        json={
+            "full_name": "Aminata Diallo",
+            "phone": "+221 77 123 45 67",
+            "email": "aminata@example.com",
+            "password": "secret123",
+        },
+    )
+    assert registration.status_code == 201
+    assert registration.json()["customer_account"] is True
+
     checkout = await client.post(
         "/api/v1/store/orders",
         json={
-            "customer_name": "Aminata Diallo",
-            "customer_phone": "+221 77 123 45 67",
-            "customer_email": "aminata@example.com",
             "delivery_address": "Dakar, Sénégal",
             "items": [
                 {"product_id": product_id, "quantity": 2},
@@ -79,6 +88,19 @@ async def test_public_store_checkout_creates_order_and_reserves_stock(
     assert customer_page.status_code == 200
     assert customer_page.json()["total"] == 1
     assert customer_page.json()["items"][0]["id"] == order["customer_id"]
+    customer_purchases = await client.get(
+        f"/api/v1/sales/customers/{order['customer_id']}/orders",
+        headers=headers,
+    )
+    assert customer_purchases.status_code == 200
+    assert [item["id"] for item in customer_purchases.json()["items"]] == [order["id"]]
+    customer_transactions = await client.get(
+        f"/api/v1/sales/customers/{order['customer_id']}/transactions",
+        headers=headers,
+    )
+    assert customer_transactions.status_code == 200
+    assert customer_transactions.json() == []
+    assert customer_page.json()["items"][0]["has_account"] is True
     sales_orders = await client.get("/api/v1/sales/orders", headers=headers)
     assert sales_orders.status_code == 200
     assert sales_orders.json()["items"][0]["id"] == order["id"]
@@ -87,16 +109,64 @@ async def test_public_store_checkout_creates_order_and_reserves_stock(
     assert dashboard.json()["pending_order_count"] == 1
     assert dashboard.json()["revenue_fcfa"] == 0
 
+    customer_login = await client.post(
+        "/api/v1/auth/login",
+        json={"username": "AMINATA@example.com", "password": "secret123"},
+    )
+    assert customer_login.status_code == 200
+    customer_orders = await client.get("/api/v1/store/my-orders")
+    assert customer_orders.status_code == 200
+    assert [item["id"] for item in customer_orders.json()["items"]] == [order["id"]]
+    second_checkout = await client.post(
+        "/api/v1/store/orders",
+        json={
+            "delivery_address": "Dakar, Sénégal",
+            "items": [{"product_id": product_id, "quantity": 1}],
+        },
+    )
+    assert second_checkout.status_code == 201
+    first_order_page = await client.get("/api/v1/store/my-orders?page=1&page_size=1")
+    second_order_page = await client.get("/api/v1/store/my-orders?page=2&page_size=1")
+    assert first_order_page.status_code == second_order_page.status_code == 200
+    assert first_order_page.json()["total"] == 2
+    assert first_order_page.json()["items"][0]["id"] != second_order_page.json()["items"][0]["id"]
+    confirmed_orders = await client.get("/api/v1/store/my-orders?status=confirmed")
+    assert confirmed_orders.status_code == 200
+    assert confirmed_orders.json()["items"] == []
+
+    other_registration = await client.post(
+        "/api/v1/auth/customer/register",
+        json={
+            "full_name": "Autre client",
+            "phone": "771111111",
+            "email": "autre@example.com",
+            "password": "secret123",
+        },
+    )
+    assert other_registration.status_code == 201
+    other_orders = await client.get("/api/v1/store/my-orders")
+    assert other_orders.status_code == 200
+    assert other_orders.json()["items"] == []
+
+    await admin_session(client)
     cancelled = await client.patch(
         f"/api/v1/sales/orders/{order['id']}/status",
         headers=headers,
         json={"status": "cancelled"},
     )
     assert cancelled.status_code == 200
+    await client.post(
+        "/api/v1/auth/login",
+        json={"username": "aminata@example.com", "password": "secret123"},
+    )
+    updated_customer_orders = await client.get("/api/v1/store/my-orders?status=cancelled")
+    assert updated_customer_orders.status_code == 200
+    assert updated_customer_orders.json()["items"][0]["status"] == "cancelled"
 
+    await admin_session(client)
     products = await client.get("/api/v1/sales/products", headers=headers)
     assert products.status_code == 200
-    assert products.json()[0]["stock_quantity"] == 8
+    assert products.json()[0]["stock_quantity"] == 7
     reactivated = await client.patch(
         f"/api/v1/sales/orders/{order['id']}/status",
         headers=headers,
@@ -128,13 +198,26 @@ async def test_public_store_rejects_unavailable_products_and_exposes_only_publis
     catalog = await client.get("/api/v1/store/products")
     assert catalog.status_code == 200
     assert catalog.json()["items"] == []
-    unavailable_order = await client.post(
+    unauthenticated_order = await client.post(
         "/api/v1/store/orders",
         json={
-            "customer_name": "Client Mamari",
-            "customer_phone": "771234567",
             "items": [{"product_id": product_id, "quantity": 1}],
         },
+    )
+    assert unauthenticated_order.status_code == 401
+    registration = await client.post(
+        "/api/v1/auth/customer/register",
+        json={
+            "full_name": "Client Mamari",
+            "phone": "771234567",
+            "email": "client-mamari@example.com",
+            "password": "secret123",
+        },
+    )
+    assert registration.status_code == 201
+    unavailable_order = await client.post(
+        "/api/v1/store/orders",
+        json={"items": [{"product_id": product_id, "quantity": 1}]},
     )
     assert unavailable_order.status_code == 409
 

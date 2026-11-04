@@ -14,7 +14,7 @@ import {
   Sprout,
   ShoppingBasket,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ApiError,
   apiRequest,
@@ -214,6 +214,8 @@ export function DashboardPage() {
   const [year, setYear] = useState(new Date().getFullYear());
   const [chartStyle, setChartStyle] = useState<ChartStyle>("line");
   const [chartMetric, setChartMetric] = useState<ChartMetric>("revenue");
+  const [selectedMetric, setSelectedMetric] = useState<string | null>(null);
+  const metricDialogRef = useRef<HTMLDialogElement>(null);
   const profile = useQuery({
     queryKey: ["auth", "me"],
     queryFn: () => apiRequest<UserProfile>("/auth/me"),
@@ -269,6 +271,14 @@ export function DashboardPage() {
       ]
     : [];
   const currentYear = new Date().getFullYear();
+  const activeMetric = metrics.find((metric) => metric.label === selectedMetric);
+
+  useEffect(() => {
+    const dialog = metricDialogRef.current;
+    if (!dialog) return;
+    if (activeMetric && !dialog.open) dialog.showModal();
+    else if (!activeMetric && dialog.open) dialog.close();
+  }, [activeMetric]);
 
   return (
     <div className="dashboard-content">
@@ -318,17 +328,108 @@ export function DashboardPage() {
             {metrics.map((metric) => {
               const Icon = metric.icon;
               return (
-                <article className="metric-card" key={metric.label}>
+                <button
+                  aria-haspopup="dialog"
+                  className="metric-card"
+                  key={metric.label}
+                  onClick={() => setSelectedMetric(metric.label)}
+                  type="button"
+                >
                   <div className="metric-heading">
                     <span>{metric.label}</span>
                     <span className="metric-icon"><Icon size={18} /></span>
                   </div>
                   <MetricValue text={metric.value} />
                   <div className="metric-foot">{metric.detail}</div>
-                </article>
+                  <span className="metric-details-hint">Voir le détail</span>
+                </button>
               );
             })}
           </section>
+          <dialog
+            aria-labelledby="metric-details-title"
+            className="parcel-edit-dialog dashboard-metric-dialog"
+            onClose={() => setSelectedMetric(null)}
+            onClick={(event) => {
+              if (event.target === event.currentTarget) metricDialogRef.current?.close();
+            }}
+            ref={metricDialogRef}
+          >
+            <div className="parcel-edit-dialog-content">
+              <div className="parcel-edit-dialog-heading">
+                <div>
+                  <h2 id="metric-details-title">{activeMetric?.label}</h2>
+                  <p>Indicateur calculé sur l’année {year}</p>
+                </div>
+                <button
+                  aria-label="Fermer"
+                  className="parcel-edit-dialog-close"
+                  onClick={() => metricDialogRef.current?.close()}
+                  type="button"
+                >
+                  ×
+                </button>
+              </div>
+              {activeMetric?.label === "Chiffre d’affaires" && value ? (
+                <div className="metric-explanation">
+                  <p>
+                    Total des commandes confirmées, en préparation ou livrées. Les commandes en attente et annulées ne sont pas incluses.
+                  </p>
+                  <ul>
+                    {value.monthly_revenue.map((month) => (
+                      <li key={month.month_number}>
+                        <span>{month.month}</span><strong>{formatFcfa(month.amount_fcfa)}</strong>
+                      </li>
+                    ))}
+                  </ul>
+                  <Link className="module-back-link" href="/ventes">
+                    Voir les commandes <ArrowRight size={14} />
+                  </Link>
+                </div>
+              ) : null}
+              {activeMetric?.label === "Commandes" && value ? (
+                <div className="metric-explanation">
+                  <p>
+                    {value.order_count} commande(s) non annulée(s) sur l’année. {value.pending_order_count} commande(s) sont à traiter.
+                  </p>
+                  <p>
+                    {value.customer_count} client(s) distinct(s) et un panier moyen de {formatFcfa(value.average_order_fcfa)} pour les commandes prises en compte dans le chiffre d’affaires.
+                  </p>
+                  <Link className="module-back-link" href="/ventes">
+                    Gérer les commandes <ArrowRight size={14} />
+                  </Link>
+                </div>
+              ) : null}
+              {activeMetric?.label === "Production" && value ? (
+                <div className="metric-explanation">
+                  <p>
+                    Cumul des récoltes saisies pour l’année : {value.harvest_count} récolte(s).
+                  </p>
+                  <ul>
+                    {value.monthly_production_kg.map((month) => (
+                      <li key={month.month_number}>
+                        <span>{month.month}</span>
+                        <strong>{new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 2 }).format(month.quantity_kg)} kg</strong>
+                      </li>
+                    ))}
+                  </ul>
+                  <Link className="module-back-link" href="/agriculture">
+                    Voir l’agriculture <ArrowRight size={14} />
+                  </Link>
+                </div>
+              ) : null}
+              {activeMetric?.label === "Parcelles actives" && value ? (
+                <div className="metric-explanation">
+                  <p>
+                    {value.parcel_count} parcelle(s) actuellement active(s), tous sites confondus.
+                  </p>
+                  <Link className="module-back-link" href="/agriculture">
+                    Voir les parcelles <ArrowRight size={14} />
+                  </Link>
+                </div>
+              ) : null}
+            </div>
+          </dialog>
 
           <section className="dashboard-grid" aria-label="Suivi des activités">
             <article className="panel revenue-panel">

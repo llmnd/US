@@ -26,6 +26,7 @@ import {
   UsersRound,
   X,
 } from "lucide-react";
+import { ChangePasswordForm } from "@/features/auth/change-password-form";
 import {
   ApiError,
   apiRequest,
@@ -68,7 +69,9 @@ export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
     pathname === "/produits" ||
     pathname === "/panier" ||
     pathname === "/qui-sommes-nous" ||
-    pathname === "/login";
+    pathname === "/login" ||
+    pathname === "/register";
+  const isCustomerRoute = pathname === "/mon-compte";
   const [logoutError, setLogoutError] = useState<string | null>(null);
   const [logoutPending, setLogoutPending] = useState(false);
   const [profileDialogOpen, setProfileDialogOpen] = useState(false);
@@ -113,6 +116,18 @@ export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
         <p className="auth-error">{getApiErrorMessage(profile.error)}</p>
         <button className="button-primary" type="button" onClick={() => void profile.refetch()}>
           Réessayer
+        </button>
+      </div>
+    );
+  }
+
+  if (isCustomerRoute) {
+    if (profile.data.customer_account) return <>{children}</>;
+    return (
+      <div className="auth-loading">
+        <p className="auth-error">Cet espace est réservé aux comptes clients de la boutique.</p>
+        <button className="button-secondary" type="button" onClick={() => router.replace("/produits")}>
+          Retour à la boutique
         </button>
       </div>
     );
@@ -274,6 +289,10 @@ export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
               <span>{logoutPending ? "Déconnexion en cours…" : "Se déconnecter"}</span>
             </button>
           </div>
+          <section className="profile-password-section" aria-labelledby="profile-password-title">
+            <h3 id="profile-password-title">Sécurité du compte</h3>
+            <ChangePasswordForm />
+          </section>
           {logoutError ? <p className="logout-error" role="alert">{logoutError}</p> : null}
         </section>
       </dialog>

@@ -28,6 +28,7 @@ export interface UserProfile {
   username: string;
   full_name: string;
   memberships: OrganizationMembership[];
+  customer_account: boolean;
 }
 
 export function getApiErrorMessage(error: unknown): string {

@@ -25,6 +25,7 @@ import {
   Sprout,
   Wheat,
 } from "lucide-react";
+import { MeasurementUnitSelect } from "@/features/shared/measurement-unit-select";
 import {
   useDeferredValue,
   useEffect,
@@ -1296,7 +1297,7 @@ export function AgriculturePage() {
                 <Field label="Montant (FCFA)"><input min="1" name="amount_fcfa" placeholder="125000" required type="number" /></Field>
                 <Field label="Date"><input defaultValue={today} name="transaction_date" required type="date" /></Field>
                 <Field label="Quantité (facultatif)"><input min="0.01" name="quantity" placeholder="50" step="0.01" type="number" /></Field>
-                <Field label="Unité"><input maxLength={24} name="unit" placeholder="kg, sacs…" /></Field>
+                <Field label="Unité"><MeasurementUnitSelect includeEmpty name="unit" /></Field>
                 <button className="button-primary campaign-submit" disabled={financeSubmitting} type="submit">{financeSubmitting ? "Enregistrement…" : "Enregistrer le mouvement"}</button>
               </form>
               <FeedbackMessage feedback={financeFeedback} />

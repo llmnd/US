@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowRight, Home, Leaf, LoaderCircle } from "lucide-react";
+import { ArrowRight, Home, Leaf, LoaderCircle, UserRound } from "lucide-react";
 import {
   apiRequest,
   getApiErrorMessage,
@@ -116,10 +116,13 @@ export function LoginPage() {
       });
       queryClient.setQueryData(["auth", "me"], profile);
       const requestedPath = new URLSearchParams(window.location.search).get("next");
-      const destination =
+      const requestedDestination =
         requestedPath?.startsWith("/") && !requestedPath.startsWith("//")
           ? requestedPath
-          : "/dashboard";
+          : null;
+      const destination = profile.customer_account
+        ? requestedDestination === "/panier" ? "/panier" : "/mon-compte"
+        : requestedDestination ?? "/dashboard";
       router.replace(destination);
     } catch (submitError) {
       setError(getApiErrorMessage(submitError));
@@ -131,18 +134,17 @@ export function LoginPage() {
   return (
     <AuthLayout
       eyebrow="Votre espace de travail"
-      title="Ravi de vous retrouver"
-      description="Connectez-vous pour accéder au pilotage de votre entreprise."
+      title="Connectez-vous à Mamari"
+      description="Accédez à votre espace client ou à l’espace de travail de votre équipe."
     >
       <form className="auth-form" onSubmit={handleSubmit}>
         <label className="auth-field">
-          <span>Identifiant</span>
+          <span>Identifiant ou e-mail</span>
           <input
             autoComplete="username"
             autoFocus
-            defaultValue="mamari"
             name="username"
-            placeholder="mamari"
+            placeholder="Votre identifiant ou e-mail"
             required
             type="text"
           />
@@ -176,7 +178,76 @@ export function LoginPage() {
         </button>
       </form>
       <p className="auth-switch">
-        Accès réservé aux utilisateurs de Mamari.
+        Nouveau client ? <Link href="/register">Créer un compte pour commander</Link>
+      </p>
+    </AuthLayout>
+  );
+}
+
+export function CustomerRegisterPage() {
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError(null);
+    setIsSubmitting(true);
+    const formData = new FormData(event.currentTarget);
+    try {
+      const profile = await apiRequest<UserProfile>("/auth/customer/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          full_name: formData.get("full_name")?.toString(),
+          email: formData.get("email")?.toString(),
+          phone: formData.get("phone")?.toString(),
+          password: formData.get("password")?.toString(),
+        }),
+      });
+      queryClient.setQueryData(["auth", "me"], profile);
+      const requestedPath = new URLSearchParams(window.location.search).get("next");
+      router.replace(requestedPath === "/panier" ? "/panier" : "/mon-compte");
+    } catch (submitError) {
+      setError(getApiErrorMessage(submitError));
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <AuthLayout
+      eyebrow="Votre espace client"
+      title="Créez votre compte"
+      description="Retrouvez vos achats et suivez l’avancement de vos commandes."
+    >
+      <form className="auth-form" onSubmit={handleSubmit}>
+        <label className="auth-field">
+          <span>Nom complet</span>
+          <input autoComplete="name" autoFocus maxLength={160} minLength={2} name="full_name" required />
+        </label>
+        <label className="auth-field">
+          <span>Adresse e-mail</span>
+          <input autoComplete="email" maxLength={320} name="email" required type="email" />
+        </label>
+        <label className="auth-field">
+          <span>Téléphone</span>
+          <input autoComplete="tel" maxLength={32} minLength={6} name="phone" required type="tel" />
+        </label>
+        <label className="auth-field">
+          <span>Mot de passe</span>
+          <input autoComplete="new-password" minLength={6} name="password" required type="password" />
+        </label>
+        {error ? <p className="auth-error" role="alert">{error}</p> : null}
+        <button className="button-primary auth-submit" disabled={isSubmitting} type="submit">
+          {isSubmitting ? <LoaderCircle className="auth-spinner" size={16} /> : <UserRound size={16} />}
+          Créer mon compte
+          {!isSubmitting ? <ArrowRight size={16} /> : null}
+        </button>
+      </form>
+      <p className="auth-switch">
+        Vous avez déjà un compte ? <Link href="/login?next=%2Fpanier">Se connecter</Link>
       </p>
     </AuthLayout>
   );

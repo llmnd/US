@@ -23,12 +23,28 @@ Username = Annotated[
         pattern=r"(?i)^[a-z0-9][a-z0-9._-]*$",
     ),
 ]
+LoginIdentifier = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, to_lower=True, min_length=3, max_length=320),
+]
 FullName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=2, max_length=160)]
 
 
 class LoginRequest(BaseModel):
-    username: Username
+    username: LoginIdentifier
     password: Password
+
+
+class CustomerRegistrationRequest(BaseModel):
+    full_name: FullName
+    email: EmailStr
+    phone: Phone
+    password: Password
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: Password
+    new_password: Password
 
 
 class CreateUserRequest(BaseModel):
@@ -76,6 +92,7 @@ class UserResponse(BaseModel):
     username: str
     full_name: str
     memberships: list[MembershipResponse]
+    customer_account: bool = False
 
 
 class OrganizationUserResponse(BaseModel):

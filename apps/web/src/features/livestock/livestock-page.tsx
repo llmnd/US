@@ -32,6 +32,7 @@ import {
   type UserProfile,
 } from "@/lib/api/client";
 import { formatDate, formatFcfa } from "@/features/sales/sales-types";
+import { MeasurementUnitSelect } from "@/features/shared/measurement-unit-select";
 
 type LivestockTab = "animals" | "groups" | "care" | "production" | "finance" | "reports";
 type FinanceFilter = "all" | "income" | "expense";
@@ -743,7 +744,7 @@ export function LivestockPage() {
                 <Field label="Montant (FCFA)"><input min="1" name="amount_fcfa" placeholder="25000" required type="number" /></Field>
                 <Field label="Date"><input defaultValue={todayInput()} name="transaction_date" required type="date" /></Field>
                 <Field label="Quantité (facultatif)"><input min="0.001" name="quantity" placeholder="25" step="0.001" type="number" /></Field>
-                <Field label="Unité"><input maxLength={24} name="unit" placeholder="kg, litres…" /></Field>
+                <Field label="Unité"><MeasurementUnitSelect includeEmpty name="unit" /></Field>
                 <Field label="Notes"><input maxLength={2000} name="notes" placeholder="Précisions complémentaires" /></Field>
                 <button className="button-primary" disabled={submitting === "finance"} type="submit">{submitting === "finance" ? "Enregistrement…" : "Enregistrer le mouvement"}</button>
               </form>
@@ -922,7 +923,7 @@ export function LivestockPage() {
                     <Field label={recordType === "health" ? "Maladie, soin ou produit" : recordType === "reproduction" ? "Description" : recordType === "production" ? "Description" : "Aliment distribué"}><input maxLength={120} minLength={1} name="title" placeholder={recordType === "health" ? "Ex. Vaccin Newcastle" : recordType === "reproduction" ? "Ex. Mise bas réussie" : recordType === "production" ? "Ex. Collecte du matin" : "Ex. Aliment pondeuse"} required /></Field>
                     <Field label="Date"><input defaultValue={todayInput()} name="event_date" required type="date" /></Field>
                     {recordType === "production" || recordType === "feed" || recordType === "reproduction" ? <Field label={recordType === "reproduction" ? "Nombre de petits" : "Quantité"}><input min="0.001" name="quantity" placeholder="Ex. 12" step="0.001" type="number" /></Field> : null}
-                    {recordType === "production" || recordType === "feed" || recordType === "reproduction" ? <Field label="Unité"><select name="unit" defaultValue={recordType === "production" ? "litres" : recordType === "feed" ? "kg" : "têtes"}><option value="litres">Litres</option><option value="kg">Kg</option><option value="œufs">Œufs</option><option value="têtes">Têtes</option><option value="unités">Unités</option></select></Field> : null}
+                    {recordType === "production" || recordType === "feed" || recordType === "reproduction" ? <Field label="Unité"><MeasurementUnitSelect name="unit" defaultValue={recordType === "production" ? "litres" : recordType === "feed" ? "kg" : "têtes"} /></Field> : null}
                     {recordType === "health" ? <Field label="Prochain contrôle"><input name="next_due_date" type="date" /></Field> : null}
                     {recordType === "feed" || recordType === "health" || recordType === "production" ? <Field label={recordType === "production" ? "Recette (FCFA)" : "Coût (FCFA)"}><input min="0" name="amount_fcfa" placeholder="0" type="number" /></Field> : null}
                     <Field label="Notes"><input maxLength={2000} name="notes" placeholder="Observations complémentaires" /></Field>

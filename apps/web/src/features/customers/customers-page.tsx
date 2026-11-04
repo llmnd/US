@@ -4,7 +4,25 @@ import { useDeferredValue, useEffect, useRef, useState, type FormEvent } from "r
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Pencil, Plus, Search, Trash2, UsersRound } from "lucide-react";
 import { apiRequest, getApiErrorMessage, type UserProfile } from "@/lib/api/client";
+import {
+  formatDate,
+  formatFcfa,
+  orderStatusLabels,
+  type SalesOrderPage,
+} from "@/features/sales/sales-types";
 import { customerTypeLabel, type Customer, type CustomerPage } from "./customer-types";
+
+interface CustomerFinanceTransaction {
+  id: string;
+  transaction_type: "income" | "expense";
+  category: string;
+  label: string;
+  amount_fcfa: number;
+  transaction_date: string;
+  quantity: number | string | null;
+  unit: string | null;
+  notes: string | null;
+}
 
 export function CustomersPage() {
   const queryClient = useQueryClient();
@@ -14,10 +32,12 @@ export function CustomersPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [deletingCustomer, setDeletingCustomer] = useState<Customer | null>(null);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const editDialogRef = useRef<HTMLDialogElement>(null);
   const deleteDialogRef = useRef<HTMLDialogElement>(null);
+  const customerOrdersDialogRef = useRef<HTMLDialogElement>(null);
   const deferredSearch = useDeferredValue(search.trim());
   const profile = useQuery({
     queryKey: ["auth", "me"],
@@ -37,6 +57,12 @@ export function CustomersPage() {
     if (deletingCustomer && !dialog.open) dialog.showModal();
     else if (!deletingCustomer && dialog.open) dialog.close();
   }, [deletingCustomer]);
+  useEffect(() => {
+    const dialog = customerOrdersDialogRef.current;
+    if (!dialog) return;
+    if (selectedCustomer && !dialog.open) dialog.showModal();
+    else if (!selectedCustomer && dialog.open) dialog.close();
+  }, [selectedCustomer]);
   const customers = useQuery({
     queryKey: ["sales", "customers", membership?.organization_id, deferredSearch],
     queryFn: () => {
@@ -48,6 +74,30 @@ export function CustomersPage() {
       });
     },
     enabled: Boolean(membership),
+    retry: false,
+  });
+  const customerOrders = useQuery({
+    queryKey: ["sales", "customer-orders", membership?.organization_id, selectedCustomer?.id],
+    queryFn: () => {
+      if (!membership || !selectedCustomer) throw new Error("Sélectionnez un client.");
+      return apiRequest<SalesOrderPage>(
+        `/sales/customers/${selectedCustomer.id}/orders?page=1&page_size=100`,
+        { headers: { "X-Organization-ID": membership.organization_id } },
+      );
+    },
+    enabled: Boolean(membership && selectedCustomer),
+    retry: false,
+  });
+  const customerTransactions = useQuery({
+    queryKey: ["sales", "customer-transactions", membership?.organization_id, selectedCustomer?.id],
+    queryFn: () => {
+      if (!membership || !selectedCustomer) throw new Error("Sélectionnez un client.");
+      return apiRequest<CustomerFinanceTransaction[]>(
+        `/sales/customers/${selectedCustomer.id}/transactions`,
+        { headers: { "X-Organization-ID": membership.organization_id } },
+      );
+    },
+    enabled: Boolean(membership && selectedCustomer),
     retry: false,
   });
   const canManage = Boolean(
@@ -359,6 +409,105 @@ export function CustomersPage() {
         </dialog>
       ) : null}
 
+      {selectedCustomer ? (
+        <dialog
+          aria-labelledby="customer-orders-title"
+          className="parcel-edit-dialog customer-orders-dialog"
+          onClose={() => setSelectedCustomer(null)}
+          onClick={(event) => {
+            if (event.target === event.currentTarget) customerOrdersDialogRef.current?.close();
+          }}
+          ref={customerOrdersDialogRef}
+        >
+          <div className="parcel-edit-dialog-content">
+            <div className="parcel-edit-dialog-heading">
+              <div>
+                <h2 id="customer-orders-title">Transactions de {selectedCustomer.name}</h2>
+                <p>{customerOrders.data?.total ?? 0} commande(s)</p>
+              </div>
+              <button
+                aria-label="Fermer"
+                className="parcel-edit-dialog-close"
+                onClick={() => customerOrdersDialogRef.current?.close()}
+                type="button"
+              >
+                ×
+              </button>
+            </div>
+            <section className="customer-activity-section" aria-labelledby="customer-orders-section-title">
+              <h3 id="customer-orders-section-title">Commandes et achats</h3>
+              {customerOrders.isError ? (
+                <p className="auth-error" role="alert">{getApiErrorMessage(customerOrders.error)}</p>
+              ) : customerOrders.isPending ? (
+                <p className="dashboard-loading" role="status">Chargement des achats…</p>
+              ) : customerOrders.data?.items.length ? (
+                <div className="customer-purchase-list">
+                  {customerOrders.data.items.map((order) => (
+                    <article className="customer-purchase-card" key={order.id}>
+                      <div className="customer-purchase-heading">
+                        <strong>{order.reference}</strong>
+                        <span className="status-pill">{orderStatusLabels[order.status]}</span>
+                      </div>
+                      <time dateTime={order.order_date}>{formatDate(order.order_date)}</time>
+                      <ul>
+                        {order.items.map((item) => (
+                          <li key={`${order.id}-${item.product_id ?? item.product_name}`}>
+                            <span>{item.quantity} × {item.product_name} · {item.unit}</span>
+                            <strong>{formatFcfa(item.quantity * item.unit_price_fcfa)}</strong>
+                          </li>
+                        ))}
+                      </ul>
+                      <p className="customer-purchase-total">Total : <strong>{formatFcfa(order.amount_fcfa)}</strong></p>
+                    </article>
+                  ))}
+                  {customerOrders.data.total > customerOrders.data.items.length ? (
+                    <p className="customer-select-hint">Les 100 commandes les plus récentes sont affichées.</p>
+                  ) : null}
+                </div>
+              ) : (
+                <p className="customer-transactions-empty">Aucun achat enregistré pour ce client.</p>
+              )}
+            </section>
+            <section className="customer-finance-transactions" aria-labelledby="customer-finance-title">
+              <div className="customer-transactions-heading">
+                <h3 id="customer-finance-title">Transactions financières</h3>
+                <span>{customerTransactions.data?.length ?? 0}</span>
+              </div>
+              {customerTransactions.isError ? (
+                <p className="auth-error" role="alert">
+                  {getApiErrorMessage(customerTransactions.error)}
+                </p>
+              ) : customerTransactions.isPending ? (
+                <p className="dashboard-loading" role="status">Chargement des transactions…</p>
+              ) : customerTransactions.data?.length ? (
+                <ul>
+                  {customerTransactions.data.map((transaction) => (
+                    <li key={transaction.id}>
+                      <div>
+                        <strong>{transaction.label}</strong>
+                        <small>
+                          {formatDate(transaction.transaction_date)} · {transaction.category}
+                          {transaction.quantity && transaction.unit
+                            ? ` · ${transaction.quantity} ${transaction.unit}`
+                            : ""}
+                        </small>
+                      </div>
+                      <strong className={transaction.transaction_type === "income" ? "finance-amount-income" : "finance-amount-expense"}>
+                        {transaction.transaction_type === "income" ? "+" : "−"} {formatFcfa(transaction.amount_fcfa)}
+                      </strong>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="customer-transactions-empty">
+                  Aucune transaction financière n’est encore rattachée à ce client.
+                </p>
+              )}
+            </section>
+          </div>
+        </dialog>
+      ) : null}
+
       {customers.isError ? (
         <div className="dashboard-error" role="alert">
           <p>{getApiErrorMessage(customers.error)}</p>
@@ -405,8 +554,15 @@ export function CustomersPage() {
                   <tr key={customer.id}>
                     <td>
                       <span className="sales-customer-details">
-                        <strong>{customer.name}</strong>
+                        <button
+                          className="customer-name-action"
+                          onClick={() => setSelectedCustomer(customer)}
+                          type="button"
+                        >
+                          {customer.name}
+                        </button>
                         {customer.company_name ? <small>{customer.company_name}</small> : null}
+                        {customer.has_account ? <small>Compte client actif</small> : null}
                       </span>
                     </td>
                     <td>

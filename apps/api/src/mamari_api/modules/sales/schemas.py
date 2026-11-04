@@ -1,5 +1,6 @@
 import uuid
 from datetime import date, datetime
+from decimal import Decimal
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, StringConstraints, model_validator
@@ -60,6 +61,7 @@ class CustomerResponse(BaseModel):
     address: str | None
     city: str | None
     notes: str | None
+    has_account: bool
     created_at: datetime
 
 
@@ -124,12 +126,6 @@ class StoreProductPageResponse(BaseModel):
 
 
 class CreateStoreOrderRequest(BaseModel):
-    customer_name: CustomerName
-    customer_phone: Annotated[
-        str,
-        StringConstraints(strip_whitespace=True, min_length=6, max_length=32),
-    ]
-    customer_email: EmailStr | None = None
     delivery_address: (
         Annotated[
             str,
@@ -145,3 +141,17 @@ class SalesOrderPageResponse(BaseModel):
     total: int
     page: int
     page_size: int
+
+
+class CustomerFinanceTransactionResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    transaction_type: Literal["income", "expense"]
+    category: str
+    label: str
+    amount_fcfa: int
+    transaction_date: date
+    quantity: Decimal | None
+    unit: str | None
+    notes: str | None

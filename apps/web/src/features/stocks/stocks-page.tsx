@@ -21,6 +21,7 @@ import {
   type UserProfile,
 } from "@/lib/api/client";
 import { formatDate } from "@/features/sales/sales-types";
+import { MeasurementUnitSelect } from "@/features/shared/measurement-unit-select";
 
 const stockSources = [
   { id: "agriculture", label: "Agriculture", icon: Wheat },
@@ -462,7 +463,7 @@ export function StocksPage() {
                 <>
                   <label className="auth-field"><span>Nom / nature</span><input autoFocus maxLength={160} minLength={2} name="name" required /></label>
                   <div className="auth-form-grid">
-                    <label className="auth-field"><span>Unité</span><input maxLength={40} name="unit" placeholder="kg, litre, sac…" required /></label>
+                    <label className="auth-field"><span>Unité</span><MeasurementUnitSelect name="unit" required /></label>
                     <label className="auth-field"><span>Lieu de stockage</span><input defaultValue="Magasin" maxLength={120} name="location" required /></label>
                   </div>
                   <label className="auth-field"><span>Stock d’ouverture (facultatif)</span><input min="0" name="quantity" step="0.001" type="number" defaultValue="0" /></label>

@@ -27,11 +27,12 @@ import {
   Users,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { apiRequest, getApiErrorMessage } from "@/lib/api/client";
+import { ApiError, apiRequest, getApiErrorMessage } from "@/lib/api/client";
 import { formatFcfa } from "@/features/sales/sales-types";
 import type { StoreOrder, StoreProduct, StoreProductPage } from "./store-types";
 import { useShopCart } from "./use-shop-cart";
 import { useProductPhoto } from "./use-product-photo";
+import type { UserProfile } from "@/lib/api/client";
 
 const storeProductsQueryKey = ["store", "products"];
 
@@ -40,6 +41,11 @@ const storeProductsQueryKey = ["store", "products"];
 /* ------------------------------------------------------------------ */
 function PublicHeader() {
   const { cart } = useShopCart();
+  const profile = useQuery({
+    queryKey: ["auth", "me"],
+    queryFn: () => apiRequest<UserProfile>("/auth/me"),
+    retry: false,
+  });
   const cartCount = Object.values(cart).reduce((total, quantity) => total + quantity, 0);
   const [scrolled, setScrolled] = useState(false);
   const [showTop, setShowTop] = useState(false);
@@ -100,8 +106,11 @@ function PublicHeader() {
               <span>Panier</span>
               {cartCount ? <span className="public-cart-count">{cartCount}</span> : null}
             </Link>
-            <Link className="public-login-link" href="/dashboard">
-              Espace équipe <ArrowRight size={14} />
+            <Link
+              className="public-login-link"
+              href={profile.data?.customer_account ? "/mon-compte" : "/login"}
+            >
+              {profile.data?.customer_account ? "Mon compte" : "Connexion"} <ArrowRight size={14} />
             </Link>
           </span>
         </nav>
@@ -148,6 +157,7 @@ function PublicFooter() {
         <div className="public-footer-team">
           <h2>Une question ?</h2>
           <p>Notre équipe est à votre écoute pour vous accompagner.</p>
+          <Link href="/login?next=%2Fmon-compte">Espace client <ArrowRight size={14} /></Link>
           <Link href="/dashboard">Espace équipe <ArrowRight size={14} /></Link>
         </div>
       </div>
@@ -1032,11 +1042,13 @@ export function CartPage() {
     queryFn: () => apiRequest<StoreProductPage>("/store/products"),
     retry: false,
   });
+  const profile = useQuery({
+    queryKey: ["auth", "me"],
+    queryFn: () => apiRequest<UserProfile>("/auth/me"),
+    retry: false,
+  });
   const checkout = useMutation({
     mutationFn: (data: {
-      customer_name: string;
-      customer_phone: string;
-      customer_email?: string;
       delivery_address?: string;
       items: { product_id: string; quantity: number }[];
     }) => apiRequest<StoreOrder>("/store/orders", {
@@ -1092,9 +1104,6 @@ export function CartPage() {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
     checkout.mutate({
-      customer_name: String(formData.get("customer_name") ?? ""),
-      customer_phone: String(formData.get("customer_phone") ?? ""),
-      customer_email: String(formData.get("customer_email") ?? "") || undefined,
       delivery_address: String(formData.get("delivery_address") ?? "") || undefined,
       items: cartItems.map(({ product, quantity }) => ({
         product_id: product.id,
@@ -1163,6 +1172,9 @@ export function CartPage() {
             </div>
             <Link className="button-primary checkout-home-link" href="/produits">
               Retour à la boutique <ArrowRight size={16} />
+            </Link>
+            <Link className="checkout-account-link" href="/mon-compte">
+              Suivre ma commande <ArrowRight size={15} />
             </Link>
           </section>
         ) : !cartItems.length ? (
@@ -1255,42 +1267,60 @@ export function CartPage() {
               <span className="checkout-details-count">{itemCount} article(s) · {formatFcfa(total)}</span>
             </div>
             <div className="checkout-details-layout">
-              <form className="checkout-customer-form" onSubmit={submitOrder}>
-                <label className="auth-field">
-                  <span>Votre nom</span>
-                  <input autoComplete="name" maxLength={160} minLength={2} name="customer_name" required />
-                </label>
-                <label className="auth-field">
-                  <span>Téléphone pour vous joindre</span>
-                  <input autoComplete="tel" maxLength={32} minLength={6} name="customer_phone" required type="tel" />
-                </label>
-                <label className="auth-field">
-                  <span>E-mail <small>(facultatif)</small></span>
-                  <input autoComplete="email" maxLength={320} name="customer_email" type="email" />
-                </label>
-                <label className="auth-field">
-                  <span>Adresse ou indications <small>(facultatif)</small></span>
-                  <textarea maxLength={500} name="delivery_address" rows={3} />
-                </label>
-                {checkout.isError ? (
-                  <p className="auth-error checkout-form-error" role="alert">
-                    {getApiErrorMessage(checkout.error)}
-                  </p>
-                ) : null}
-                <div className="checkout-form-actions">
-                  <button className="button-secondary" type="button" onClick={() => setStep(0)}>
-                    <ArrowLeft size={15} /> Retour au panier
-                  </button>
-                  <button className="button-primary" disabled={checkout.isPending} type="submit">
-                    {checkout.isPending ? <LoaderCircle className="auth-spinner" size={16} /> : null}
-                    {checkout.isPending ? "Envoi en cours…" : "Confirmer la commande"}
-                    {!checkout.isPending ? <ArrowRight size={16} /> : null}
+              {profile.isPending ? (
+                <p className="store-loading" role="status">Vérification de votre compte…</p>
+              ) : profile.isError &&
+                !(profile.error instanceof ApiError && profile.error.status === 401) ? (
+                <div className="store-feedback store-feedback-error" role="alert">
+                  <p>{getApiErrorMessage(profile.error)}</p>
+                  <button className="button-secondary" type="button" onClick={() => void profile.refetch()}>
+                    Réessayer
                   </button>
                 </div>
-                <p className="store-payment-note">
-                  Aucun paiement en ligne. Le règlement sera organisé avec notre équipe.
-                </p>
-              </form>
+              ) : profile.data?.customer_account ? (
+                <form className="checkout-customer-form" onSubmit={submitOrder}>
+                  <p className="customer-checkout-greeting">
+                    Connecté en tant que <strong>{profile.data.full_name}</strong>. Votre nom et téléphone sont repris de votre compte.
+                  </p>
+                  <label className="auth-field">
+                    <span>Adresse ou indications <small>(facultatif)</small></span>
+                    <textarea maxLength={500} name="delivery_address" rows={3} />
+                  </label>
+                  {checkout.isError ? (
+                    <p className="auth-error checkout-form-error" role="alert">
+                      {getApiErrorMessage(checkout.error)}
+                    </p>
+                  ) : null}
+                  <div className="checkout-form-actions">
+                    <button className="button-secondary" type="button" onClick={() => setStep(0)}>
+                      <ArrowLeft size={15} /> Retour au panier
+                    </button>
+                    <button className="button-primary" disabled={checkout.isPending} type="submit">
+                      {checkout.isPending ? <LoaderCircle className="auth-spinner" size={16} /> : null}
+                      {checkout.isPending ? "Envoi en cours…" : "Confirmer la commande"}
+                      {!checkout.isPending ? <ArrowRight size={16} /> : null}
+                    </button>
+                  </div>
+                  <p className="store-payment-note">
+                    Aucun paiement en ligne. Le règlement sera organisé avec notre équipe.
+                  </p>
+                </form>
+              ) : (
+                <div className="customer-checkout-auth">
+                  <ShoppingBag size={24} />
+                  <h3>Connectez-vous pour commander</h3>
+                  <p>Votre compte vous permettra aussi de retrouver vos achats et de suivre chaque commande.</p>
+                  <div className="checkout-form-actions">
+                    <Link className="button-secondary" href="/produits">Retour au panier</Link>
+                    <Link className="button-primary" href="/register?next=%2Fpanier">
+                      Créer un compte <ArrowRight size={15} />
+                    </Link>
+                  </div>
+                  <p className="auth-switch">
+                    Vous avez déjà un compte ? <Link href="/login?next=%2Fpanier">Se connecter</Link>
+                  </p>
+                </div>
+              )}
               <aside className="checkout-summary checkout-details-summary">
                 <h3>Votre sélection</h3>
                 {cartItems.map(({ product, quantity }) => (

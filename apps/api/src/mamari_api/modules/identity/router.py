@@ -1,19 +1,27 @@
 import uuid
 
 from fastapi import APIRouter, HTTPException, Response, status
-from sqlalchemy import select
+from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 
 from mamari_api.core.config import get_settings
 from mamari_api.modules.identity.dependencies import CurrentUserDep, SessionDep
 from mamari_api.modules.identity.models import Membership, Organization, User
 from mamari_api.modules.identity.schemas import (
+    ChangePasswordRequest,
+    CustomerRegistrationRequest,
     LoginRequest,
     MembershipResponse,
     MessageResponse,
     UserResponse,
 )
-from mamari_api.modules.identity.security import create_access_token
+from mamari_api.modules.identity.security import (
+    create_access_token,
+    hash_password,
+    verify_password,
+)
 from mamari_api.modules.identity.service import authenticate_user
+from mamari_api.modules.sales.models import Customer
 
 router = APIRouter(prefix="/auth")
 
@@ -38,11 +46,15 @@ async def user_response(session: SessionDep, user: User) -> UserResponse:
         )
         for membership, organization in result.all()
     ]
+    customer_account = await session.scalar(
+        select(Customer.id).where(Customer.user_id == user.id).limit(1)
+    )
     return UserResponse(
         id=user.id,
         username=user.username,
         full_name=user.full_name,
         memberships=memberships,
+        customer_account=customer_account is not None,
     )
 
 
@@ -63,13 +75,78 @@ def set_session_cookie(response: Response, user_id: uuid.UUID) -> None:
 async def login(data: LoginRequest, response: Response, session: SessionDep) -> UserResponse:
     user = await authenticate_user(session, data.username, data.password)
     authenticated_user = await user_response(session, user)
-    if not authenticated_user.memberships:
+    if not authenticated_user.memberships and not authenticated_user.customer_account:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Aucune organisation active n'est associée à ce compte.",
         )
     set_session_cookie(response, user.id)
     return authenticated_user
+
+
+@router.post(
+    "/customer/register",
+    response_model=UserResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Créer un compte client",
+)
+async def register_customer(
+    data: CustomerRegistrationRequest,
+    response: Response,
+    session: SessionDep,
+) -> UserResponse:
+    organization = await session.scalar(
+        select(Organization).where(
+            Organization.slug == get_settings().public_store_slug,
+            Organization.is_active.is_(True),
+        )
+    )
+    if organization is None:
+        raise HTTPException(status_code=404, detail="La boutique Mamari est indisponible.")
+
+    email = str(data.email).casefold()
+    existing_user = await session.scalar(
+        select(User.id).where(func.lower(User.email) == email)
+    )
+    if existing_user is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Un compte utilise déjà cette adresse e-mail. Connectez-vous plutôt.",
+        )
+
+    user_id = uuid.uuid4()
+    user = User(
+        id=user_id,
+        username=f"client-{user_id.hex[:20]}",
+        email=email,
+        full_name=data.full_name,
+        password_hash=hash_password(data.password),
+    )
+    customer = Customer(
+        organization_id=organization.id,
+        user_id=user.id,
+        customer_type="individual",
+        name=data.full_name,
+        phone=data.phone,
+        email=email,
+    )
+    session.add_all([user, customer])
+    try:
+        await session.commit()
+    except IntegrityError as error:
+        await session.rollback()
+        constraint = getattr(getattr(error.orig, "diag", None), "constraint_name", None)
+        if constraint not in {"users_email_key", "uq_users_email", "uq_users_username"} and not (
+            "UNIQUE constraint failed: users.email" in str(error.orig)
+            or "UNIQUE constraint failed: users.username" in str(error.orig)
+        ):
+            raise
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Un compte utilise déjà cette adresse e-mail. Connectez-vous plutôt.",
+        ) from None
+    set_session_cookie(response, user.id)
+    return await user_response(session, user)
 
 
 @router.post("/logout", response_model=MessageResponse, summary="Fermer la session")
@@ -87,3 +164,28 @@ async def logout(response: Response) -> MessageResponse:
 @router.get("/me", response_model=UserResponse, summary="Consulter le compte connecté")
 async def read_current_user(session: SessionDep, user: CurrentUserDep) -> UserResponse:
     return await user_response(session, user)
+
+
+@router.post(
+    "/change-password",
+    response_model=MessageResponse,
+    summary="Modifier le mot de passe du compte connecté",
+)
+async def change_password(
+    data: ChangePasswordRequest,
+    session: SessionDep,
+    user: CurrentUserDep,
+) -> MessageResponse:
+    if not verify_password(data.current_password, user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Le mot de passe actuel est incorrect.",
+        )
+    if verify_password(data.new_password, user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Choisissez un mot de passe différent de l’actuel.",
+        )
+    user.password_hash = hash_password(data.new_password)
+    await session.commit()
+    return MessageResponse(message="Votre mot de passe a été modifié.")

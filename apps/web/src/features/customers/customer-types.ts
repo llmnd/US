@@ -10,6 +10,7 @@ export interface Customer {
   address: string | null;
   city: string | null;
   notes: string | null;
+  has_account: boolean;
   created_at: string;
 }
 
