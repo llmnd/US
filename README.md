@@ -1,6 +1,11 @@
-# Mamari
+# Oulimata
 
-Plateforme métier modulaire pour piloter une entreprise agricole et ses activités.
+Boutique en ligne Oulimata, dédiée à la vente de produits Aloe vera, avec un
+espace de gestion modulable.
+
+La configuration de développement utilise une base locale `oulumata`.
+L’instance Neon `US` est une base distincte et ne réutilise pas la base locale
+ou les données de l’ancienne application.
 
 ## Architecture
 
@@ -10,11 +15,9 @@ apps/
   web/       Interface Next.js App Router (TypeScript)
 ```
 
-Le produit démarre comme un monolithe modulaire : les domaines partagent une
-API et une base PostgreSQL, mais gardent leurs propres routes, schémas et règles
-métier. Toute donnée appartenant à un client devra être rattachée à une
-organisation. Les frontières multi-tenant et les permissions doivent être
-appliquées côté API, jamais uniquement dans l’interface.
+Les domaines partagent une API et une base PostgreSQL, mais gardent leurs
+propres routes, schémas et règles métier. Les modules Agriculture et Élevage
+peuvent être masqués depuis la fiche Entreprise sans supprimer leurs données.
 
 ### Frontend
 
@@ -62,6 +65,12 @@ appliquées côté API, jamais uniquement dans l’interface.
    `alembic` peut lancer Conda ou un autre environnement sans les dépendances
    du projet.
 
+   Sur Neon, configurez `DATABASE_URL` avec la chaîne directe de la base `US`
+   sur la branche `production`. L’application utilise SQLAlchemy asynchrone
+   avec `asyncpg`; l’API normalise automatiquement le format PostgreSQL fourni
+   par Neon. Appliquez toutes les migrations avec la même commande
+   `alembic upgrade head` avant de démarrer l’API.
+
 7. Démarrer l’API avec ce même environnement :
 
    ```powershell
@@ -87,8 +96,8 @@ n’a été enregistrée.
   ne peut consulter que ses commandes via `GET /api/v1/store/my-orders`.
   L’équipe retrouve les commandes depuis la fiche client et met leur statut à
   jour dans Ventes.
-- Au premier accès à une base vide, se connecter avec `mamari` / `passer123m`
-  crée l’organisation Mamari et son compte propriétaire. La création ne se
+- Au premier accès à une base vide, se connecter avec `oulumata` / `passer123m`
+  crée l’organisation Oulimata et son compte propriétaire. La création ne se
   produit qu’une fois ; les connexions suivantes vérifient le compte existant.
 - L’administrateur peut créer des utilisateurs dans Administration. L’API
   `POST /api/v1/organizations/users` exige un compte propriétaire ou
@@ -103,6 +112,9 @@ n’a été enregistrée.
   d’indicateurs du tableau de bord ouvrent leur définition et leur détail
   mensuel. Les formulaires d’unités utilisent un catalogue commun plutôt qu’une
   saisie libre.
+- Dans Entreprise, les propriétaires et administrateurs peuvent masquer ou
+  réafficher Agriculture et Élevage pour toute l’organisation. Leurs données
+  restent conservées.
 - Les routes de domaine protégées doivent utiliser la dépendance
   `get_current_membership` et exiger l’en-tête `X-Organization-ID`. Les rôles
   disponibles sont `owner`, `admin`, `manager`, `operator` et `reader`.
@@ -146,42 +158,26 @@ n’a été enregistrée.
   `JWT_SECRET_KEY` unique d’au moins 32 caractères ainsi que les origines de
   confiance dans `CORS_ORIGINS`. Ne pas partager les identifiants par défaut.
 
-### Mise à jour du VPS
+## Base Neon
 
-Après publication d’une nouvelle version, installer les dépendances, configurer
-la clé JWT de production et appliquer les migrations avant de redémarrer l’API :
+La branche `production` du projet Neon dédié contient la base `US`. Pour cette
+instance, `DATABASE_URL` doit viser directement cette base. Après avoir
+configuré l’URL, appliquez les migrations depuis `apps/api` :
 
-```bash
-cd /opt/mamari
-sudo -u mamari git pull --ff-only origin main
-sudo -u mamari -H bash -lc 'cd /opt/mamari && npm ci && npm run build'
-sudo -u mamari -H bash -lc \
-  'cd /opt/mamari && apps/api/.venv/bin/pip install -e apps/api'
+```powershell
+.\.venv\Scripts\python.exe -m alembic upgrade head
 ```
 
-Si `JWT_SECRET_KEY` n’existe pas encore dans `/opt/mamari/.env`, générer une
-clé aléatoire sur le serveur et l’ajouter sans l’afficher :
+Le fichier [`apps/api/schema.sql`](apps/api/schema.sql) est un script autonome
+contenant les 27 tables, contraintes, index et la révision Alembic
+`0022_hidden_organization_modules`, sans données applicatives. Il peut être
+collé dans l’éditeur SQL d’une base PostgreSQL **vide**. Ne l’exécutez pas sur
+une base contenant déjà des tables. Pour la base `US` existante ou toute base
+qui doit évoluer avec le code, préférez Alembic, qui reste la source de vérité.
 
-```bash
-if ! sudo grep -qE '^JWT_SECRET_KEY=[^[:space:]]{32,}$' /opt/mamari/.env ||
-   sudo grep -qE '^JWT_SECRET_KEY=(development-only-change-before-production|replace-with-a-random-secret-at-least-32-characters)$' /opt/mamari/.env; then
-  JWT_SECRET="$(openssl rand -hex 32)"
-  printf '\nJWT_SECRET_KEY=%s\n' "$JWT_SECRET" |
-    sudo tee -a /opt/mamari/.env >/dev/null
-  unset JWT_SECRET
-  sudo chmod 640 /opt/mamari/.env
-fi
-```
-
-Appliquer ensuite les migrations avec la configuration du service, puis
-redémarrer :
-
-```bash
-sudo -u mamari -H bash -lc \
-  'set -a; . /opt/mamari/.env; set +a; cd /opt/mamari/apps/api && .venv/bin/alembic upgrade head'
-sudo systemctl restart mamari-api mamari-web
-curl -fsS https://mamari.fisafigroupe.com/api/v1/health
-```
+Le script SQL et Alembic sont deux méthodes alternatives d’initialisation :
+après avoir exécuté le script dans une base vide, la révision enregistrée
+permet à Alembic de poursuivre avec les migrations ultérieures.
 
 ## Qualité
 
@@ -211,3 +207,5 @@ curl -fsS https://mamari.fisafigroupe.com/api/v1/health
 5. Les permissions, l’audit et l’isolation des organisations sont vérifiés sur
    chaque opération sensible côté serveur.
 6. Les fichiers sont stockés hors base ; PostgreSQL conserve leurs métadonnées.
+#   U S  
+ 
