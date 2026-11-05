@@ -2,18 +2,39 @@
 
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowRight, Leaf, ShieldCheck, ShoppingBag, Sparkles } from "lucide-react";
+import { ArrowRight, Leaf, ShieldCheck, ShoppingBag } from "lucide-react";
 import { apiRequest, getApiErrorMessage } from "@/lib/api/client";
-import type { StoreProductPage } from "./store-types";
-import { ProductImage, PublicFooter, PublicHeader } from "./store-pages";
+import type { StoreProduct, StoreProductPage } from "./store-types";
+import { PublicFooter, PublicHeader, StoreProductCard } from "./store-pages";
+import { useShopCart } from "./use-shop-cart";
 
 export function PublicHomePage() {
+  const { cart, setCart } = useShopCart();
   const products = useQuery({
     queryKey: ["store", "products"],
     queryFn: () => apiRequest<StoreProductPage>("/store/products"),
     retry: false,
   });
   const featuredProducts = products.data?.items.slice(0, 3) ?? [];
+
+  function addProduct(product: StoreProduct) {
+    setCart((current) => ({
+      ...current,
+      [product.id]: Math.min((current[product.id] ?? 0) + 1, product.stock_quantity),
+    }));
+  }
+
+  function removeProduct(product: StoreProduct) {
+    setCart((current) => {
+      const next = (current[product.id] ?? 0) - 1;
+      if (next < 1) {
+        const remaining = { ...current };
+        delete remaining[product.id];
+        return remaining;
+      }
+      return { ...current, [product.id]: next };
+    });
+  }
 
   return (
     <div className="public-site oulimata-site">
@@ -27,20 +48,12 @@ export function PublicHomePage() {
             <Link className="public-primary-link" href="/produits">
               Voir tous les produits <ArrowRight size={17} />
             </Link>
-            <div className="oulimata-trust-note"><ShieldCheck size={16} /> Des produits sélectionnés avec attention</div>
           </div>
           <div className="oulimata-hero-art" aria-hidden="true">
             <span className="oulimata-art-orbit oulimata-art-orbit-one" />
             <span className="oulimata-art-orbit oulimata-art-orbit-two" />
             <div className="oulimata-art-leaf"><Leaf size={110} strokeWidth={0.9} /></div>
-            <span className="oulimata-art-label"><Sparkles size={15} /> Aloe vera</span>
           </div>
-        </section>
-
-        <section className="oulimata-promise" aria-label="Notre approche">
-          <article><span><Leaf size={19} /></span><div><strong>Au cœur de la nature</strong><small>Une sélection inspirée par l&apos;Aloe vera</small></div></article>
-          <article><span><ShieldCheck size={19} /></span><div><strong>Choisis avec attention</strong><small>Des produits présentés en toute clarté</small></div></article>
-          <article><span><ShoppingBag size={19} /></span><div><strong>Commande simplement</strong><small>Parcourez, choisissez et ajoutez au panier</small></div></article>
         </section>
 
         <section className="public-section oulimata-featured" aria-labelledby="oulimata-products-title">
@@ -58,15 +71,15 @@ export function PublicHomePage() {
           ) : featuredProducts.length ? (
             <div className="store-product-grid">
               {featuredProducts.map((product) => (
-                <article className="store-product-card oulimata-product-card" key={product.id}>
-                  <ProductImage product={product} />
-                  <div className="store-product-copy">
-                    {product.category ? <span className="store-product-category">{product.category}</span> : null}
-                    <h3>{product.name}</h3>
-                    <p>{product.description || "Découvrez ce produit de notre sélection Aloe vera."}</p>
-                    <strong>{new Intl.NumberFormat("fr-FR").format(product.price_fcfa)} FCFA</strong>
-                  </div>
-                </article>
+                <StoreProductCard
+                  key={product.id}
+                  product={product}
+                  className="oulimata-product-card"
+                  quantity={cart[product.id] ?? 0}
+                  onAdd={addProduct}
+                  onRemove={removeProduct}
+                  descriptionFallback="Découvrez ce produit de notre sélection Aloe vera."
+                />
               ))}
             </div>
           ) : (

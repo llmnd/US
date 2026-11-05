@@ -216,21 +216,27 @@ export function ProductImage({
 /*  Avec onAdd : bouton « Ajouter », puis stepper − / + dès que le     */
 /*  produit est dans le panier.                                        */
 /* ------------------------------------------------------------------ */
-function StoreProductCard({
+export function StoreProductCard({
   product,
   quantity = 0,
   onAdd,
   onRemove,
+  descriptionFallback,
+  className = "",
 }: {
   product: StoreProduct;
   quantity?: number;
   onAdd?: (product: StoreProduct) => void;
   onRemove?: (product: StoreProduct) => void;
+  descriptionFallback?: string;
+  className?: string;
 }) {
   const unavailable = product.stock_quantity < 1;
   const lowStock = !unavailable && product.stock_quantity <= 5;
   return (
-    <article className={`store-product-card${unavailable ? " is-soldout" : ""}`}>
+    <article
+      className={`store-product-card${className ? ` ${className}` : ""}${unavailable ? " is-soldout" : ""}`}
+    >
       {lowStock ? <span className="store-stock-low">Plus que {product.stock_quantity}</span> : null}
       <ProductImage product={product} />
       <div className="store-product-copy">
@@ -241,7 +247,9 @@ function StoreProductCard({
           </div>
           {unavailable ? <span className="store-stock-empty">Épuisé</span> : null}
         </div>
-        {product.description ? <p>{product.description}</p> : null}
+        {product.description || descriptionFallback ? (
+          <p>{product.description || descriptionFallback}</p>
+        ) : null}
         <div className="store-product-bottom">
           <span className="store-product-price">
             {formatFcfa(product.price_fcfa)}
@@ -250,7 +258,11 @@ function StoreProductCard({
           {onAdd ? (
             quantity > 0 ? (
               <div className="store-quantity" role="group" aria-label={`Quantité de ${product.name}`}>
-                <button type="button" aria-label={`Retirer une unité de ${product.name}`} onClick={() => onRemove?.(product)}>
+                <button
+                  type="button"
+                  aria-label={`Retirer une unité de ${product.name}`}
+                  onClick={() => onRemove?.(product)}
+                >
                   <Minus size={14} />
                 </button>
                 <span>{quantity}</span>
