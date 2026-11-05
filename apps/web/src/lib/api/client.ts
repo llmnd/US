@@ -1,5 +1,22 @@
 const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
+  process.env.NEXT_PUBLIC_API_URL ??
+  (process.env.NODE_ENV === "production"
+    ? "/api/v1"
+    : "http://localhost:8000/api/v1");
+const VERCEL_UPLOAD_LIMIT_BYTES = Number(
+  process.env.NEXT_PUBLIC_VERCEL_UPLOAD_LIMIT_BYTES,
+);
+
+export function getUploadLimitBytes(configuredLimit: number): number {
+  return VERCEL_UPLOAD_LIMIT_BYTES > 0
+    ? Math.min(configuredLimit, VERCEL_UPLOAD_LIMIT_BYTES)
+    : configuredLimit;
+}
+
+export function formatUploadLimit(bytes: number): string {
+  const megabytes = bytes / (1024 * 1024);
+  return `${Number.isInteger(megabytes) ? megabytes : megabytes.toFixed(1)} Mo`;
+}
 
 export function apiUrl(path: string): string {
   return `${API_BASE_URL}${path}`;
@@ -35,7 +52,7 @@ export interface UserProfile {
 export function getApiErrorMessage(error: unknown): string {
   if (!(error instanceof ApiError)) {
     if (error instanceof TypeError) {
-      return "Impossible de joindre l’API Mamari. Vérifiez que le serveur API est démarré et que son adresse est correcte.";
+      return "Impossible de joindre le serveur. Vérifiez que l’API est démarrée et que son adresse est correcte.";
     }
     return "Une erreur inattendue est survenue. Réessayez.";
   }

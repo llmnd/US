@@ -16,6 +16,8 @@ import {
   Phone,
   ShieldCheck,
   Store,
+  Eye,
+  EyeOff,
   UsersRound,
 } from "lucide-react";
 import { useState, type FormEvent } from "react";
@@ -33,6 +35,7 @@ interface OrganizationProfile {
   website: string | null;
   facebook_url: string | null;
   tiktok_url: string | null;
+  hidden_modules: Array<"agriculture" | "elevage">;
   role: "owner" | "admin" | "manager" | "operator" | "reader";
   created_at: string;
 }
@@ -65,12 +68,14 @@ const companyAreas = [
     description: "Parcelles, campagnes, activités et récoltes.",
     href: "/agriculture",
     className: "agriculture",
+    module: "agriculture",
   },
   {
     name: "Élevage",
     description: "Animaux, lots, soins et productions animales.",
     href: "/elevage",
     className: "livestock",
+    module: "elevage",
   },
   {
     name: "Productions",
@@ -168,6 +173,23 @@ export function CompanyPage() {
       setSubmitError(getApiErrorMessage(error));
     },
   });
+  const updateHiddenModules = useMutation({
+    mutationFn: (hiddenModules: Array<"agriculture" | "elevage">) =>
+      apiRequest<OrganizationProfile>("/organizations/current", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...headers },
+        body: JSON.stringify({ hidden_modules: hiddenModules }),
+      }),
+    onSuccess: async () => {
+      setSubmitError(null);
+      setMessage("Les modules affichés ont été mis à jour.");
+      await queryClient.invalidateQueries({ queryKey: ["company", "profile"] });
+    },
+    onError: (error) => {
+      setMessage(null);
+      setSubmitError(getApiErrorMessage(error));
+    },
+  });
 
   function submitProfile(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -215,6 +237,9 @@ export function CompanyPage() {
   }
 
   const company = organization.data;
+  const visibleCompanyAreas = companyAreas.filter(
+    (area) => !("module" in area) || !company.hidden_modules.includes(area.module),
+  );
   const formKey = [
     company.name,
     company.description,
@@ -265,7 +290,7 @@ export function CompanyPage() {
         </article>
         <article className="company-overview-card">
           <span className="company-overview-icon activities"><Building2 size={17} /></span>
-          <div><small>Pôles présentés</small><strong>{companyAreas.length}</strong><span>Agriculture, élevage et vente</span></div>
+          <div><small>Pôles présentés</small><strong>{visibleCompanyAreas.length}</strong><span>Activités de l’organisation</span></div>
         </article>
         <article className="company-overview-card">
           <span className="company-overview-icon departments"><Check size={17} /></span>
@@ -362,10 +387,10 @@ export function CompanyPage() {
 
       <section className="company-areas-section" aria-labelledby="company-areas-title">
         <div className="company-section-heading">
-          <div><p className="eyebrow">Activités Mamari</p><h2 id="company-areas-title">Les pôles de l’entreprise</h2></div>
+          <div><p className="eyebrow">Activités de l’entreprise</p><h2 id="company-areas-title">Les pôles de l’entreprise</h2></div>
         </div>
         <div className="company-areas-grid">
-          {companyAreas.map((area) => (
+          {visibleCompanyAreas.map((area) => (
             <Link className={`company-area-card ${area.className}`} href={area.href} key={area.name}>
               <span className="company-area-icon"><Building2 size={17} /></span>
               <span className="company-area-copy"><strong>{area.name}</strong><small>{area.description}</small></span>
@@ -373,6 +398,46 @@ export function CompanyPage() {
             </Link>
           ))}
         </div>
+      </section>
+
+      <section className="panel company-modules-panel" aria-labelledby="company-modules-title">
+        <div className="company-section-heading">
+          <div>
+            <p className="eyebrow">Personnalisation</p>
+            <h2 id="company-modules-title">Modules visibles</h2>
+            <p className="page-description">Masquez les espaces inutilisés sans supprimer leurs données. Ce choix s’applique à toute l’organisation.</p>
+          </div>
+          <Eye size={19} aria-hidden="true" />
+        </div>
+        <div className="company-module-options">
+          {([
+            ["agriculture", "Agriculture"],
+            ["elevage", "Élevage"],
+          ] as const).map(([module, label]) => {
+            const hidden = company.hidden_modules.includes(module);
+            return (
+              <label className="company-module-option" key={module}>
+                <span>
+                  {hidden ? <EyeOff size={17} aria-hidden="true" /> : <Eye size={17} aria-hidden="true" />}
+                  <span><strong>{label}</strong><small>{hidden ? "Masqué dans l’espace de travail" : "Visible dans l’espace de travail"}</small></span>
+                </span>
+                <input
+                  type="checkbox"
+                  checked={!hidden}
+                  disabled={!canEdit || updateHiddenModules.isPending}
+                  onChange={() => {
+                    const hiddenModules = hidden
+                      ? company.hidden_modules.filter((item) => item !== module)
+                      : [...company.hidden_modules, module];
+                    updateHiddenModules.mutate(hiddenModules);
+                  }}
+                  aria-label={`${hidden ? "Afficher" : "Masquer"} le module ${label}`}
+                />
+              </label>
+            );
+          })}
+        </div>
+        {!canEdit ? <p className="company-readonly-note">Seuls le propriétaire et les administrateurs peuvent modifier ces réglages.</p> : null}
       </section>
     </div>
   );

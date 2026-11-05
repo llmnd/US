@@ -18,11 +18,12 @@ async def ensure_bootstrap_admin(
     username: str,
     password: str,
 ) -> None:
+    organization_slug = get_settings().public_store_slug
     organization = await session.scalar(
-        select(Organization).where(Organization.slug == "mamari")
+        select(Organization).where(Organization.slug == organization_slug)
     )
     if organization is None:
-        organization = Organization(name="Mamari", slug="mamari")
+        organization = Organization(name="Oulimata", slug=organization_slug)
         session.add(organization)
         await session.flush()
 
@@ -38,7 +39,7 @@ async def ensure_bootstrap_admin(
     if user is None:
         user = User(
             username=username,
-            full_name="Administrateur Mamari",
+            full_name="Administrateur Oulimata",
             password_hash=hash_password(password),
         )
         session.add(user)

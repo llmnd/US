@@ -446,7 +446,7 @@ export function HumanResourcesPage() {
           <p className="eyebrow">Équipe & organisation</p>
           <h1 className="page-title" id="hr-title">Ressources humaines</h1>
           <p className="page-description">
-            Retrouvez les membres de Mamari et gardez leurs informations professionnelles à jour.
+            Retrouvez les membres de votre organisation et gardez leurs informations professionnelles à jour.
           </p>
         </div>
         {membership?.role === "owner" || membership?.role === "admin" ? (
@@ -514,7 +514,7 @@ export function HumanResourcesPage() {
           </article>
           <article className="hr-summary-card">
             <span className="hr-summary-icon active"><UserRoundCheck size={17} /></span>
-            <div><small>En activité</small><strong>{summary.active}</strong><span>au sein de Mamari</span></div>
+            <div><small>En activité</small><strong>{summary.active}</strong><span>dans l’organisation</span></div>
           </article>
           <article className="hr-summary-card">
             <span className="hr-summary-icon leave"><Clock3 size={17} /></span>
@@ -540,7 +540,7 @@ export function HumanResourcesPage() {
         <div className="hr-directory-heading">
           <div>
             <p className="eyebrow">Répertoire interne</p>
-            <h2 id="hr-directory-title">L’équipe Mamari</h2>
+            <h2 id="hr-directory-title">L’équipe</h2>
             <p>{employees.data?.total ?? 0} membre(s) affiché(s)</p>
           </div>
           <label className="hr-status-filter">

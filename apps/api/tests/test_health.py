@@ -7,4 +7,4 @@ async def test_health_endpoint_returns_service_status(client: AsyncClient) -> No
     response = await client.get("/api/v1/health")
 
     assert response.status_code == 200
-    assert response.json() == {"status": "ok", "service": "mamari-api"}
+    assert response.json() == {"status": "ok", "service": "oulumata-api"}

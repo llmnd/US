@@ -5,7 +5,7 @@ import { useSyncExternalStore, type SetStateAction } from "react";
 export type ShopCart = Record<string, number>;
 type CartListener = () => void;
 
-const SHOP_CART_KEY = "mamari:store-cart";
+const SHOP_CART_KEY = "oulimata:store-cart";
 const EMPTY_CART: ShopCart = {};
 let cartSnapshot: ShopCart = EMPTY_CART;
 let hasLoadedStorage = false;
@@ -31,6 +31,9 @@ function loadCart() {
   try {
     const stored = localStorage.getItem(SHOP_CART_KEY);
     cartSnapshot = stored ? parseCart(JSON.parse(stored)) : EMPTY_CART;
+    if (stored && !localStorage.getItem(SHOP_CART_KEY)) {
+      localStorage.setItem(SHOP_CART_KEY, JSON.stringify(cartSnapshot));
+    }
   } catch {
     cartSnapshot = EMPTY_CART;
   }

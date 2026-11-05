@@ -8,7 +8,7 @@ from httpx import AsyncClient
 async def admin_session(client: AsyncClient) -> str:
     response = await client.post(
         "/api/v1/auth/login",
-        json={"username": "mamari", "password": "passer123m"},
+        json={"username": "oulumata", "password": "passer123m"},
     )
     assert response.status_code == 200
     return response.json()["memberships"][0]["organization_id"]

@@ -9,15 +9,15 @@ from httpx import AsyncClient
 async def test_default_admin_is_created_on_first_login(client: AsyncClient) -> None:
     response = await client.post(
         "/api/v1/auth/login",
-        json={"username": "MAMARI", "password": "passer123m"},
+        json={"username": "OULUMATA", "password": "passer123m"},
     )
 
     assert response.status_code == 200
     body = response.json()
-    assert body["username"] == "mamari"
-    assert body["full_name"] == "Administrateur Mamari"
+    assert body["username"] == "oulumata"
+    assert body["full_name"] == "Administrateur Oulimata"
     assert body["memberships"][0]["role"] == "owner"
-    assert body["memberships"][0]["organization_name"] == "Mamari"
+    assert body["memberships"][0]["organization_name"] == "Oulimata"
     assert "passer123m" not in response.text
     assert "HttpOnly" in response.headers["set-cookie"]
 
@@ -27,7 +27,7 @@ async def test_default_admin_is_created_on_first_login(client: AsyncClient) -> N
         headers={"X-Organization-ID": organization_id},
     )
     assert current.status_code == 200
-    assert current.json()["slug"] == "mamari"
+    assert current.json()["slug"] == "oulumata"
     crops = await client.get(
         "/api/v1/agriculture/crops",
         headers={"X-Organization-ID": organization_id},
@@ -40,7 +40,7 @@ async def test_default_admin_is_created_on_first_login(client: AsyncClient) -> N
 async def test_login_and_logout_manage_the_session(client: AsyncClient) -> None:
     login = await client.post(
         "/api/v1/auth/login",
-        json={"username": "mamari", "password": "passer123m"},
+        json={"username": "oulumata", "password": "passer123m"},
     )
     assert login.status_code == 200
     assert (await client.get("/api/v1/auth/me")).status_code == 200
@@ -62,7 +62,7 @@ async def test_admin_employee_and_customer_can_change_their_password(
     assert unauthenticated_change.status_code == 401
     admin_login = await client.post(
         "/api/v1/auth/login",
-        json={"username": "mamari", "password": "passer123m"},
+        json={"username": "oulumata", "password": "passer123m"},
     )
     assert admin_login.status_code == 200
     organization_id = admin_login.json()["memberships"][0]["organization_id"]
@@ -81,14 +81,14 @@ async def test_admin_employee_and_customer_can_change_their_password(
     assert (
         await client.post(
             "/api/v1/auth/login",
-            json={"username": "mamari", "password": "passer123m"},
+            json={"username": "oulumata", "password": "passer123m"},
         )
     ).status_code == 401
     client.cookies.clear()
     assert (
         await client.post(
             "/api/v1/auth/login",
-            json={"username": "mamari", "password": "adminpass123"},
+            json={"username": "oulumata", "password": "adminpass123"},
         )
     ).status_code == 200
 
@@ -172,7 +172,7 @@ async def test_bad_credentials_and_public_registration_are_rejected(
     invalid_password = "wrongpass"
     login = await client.post(
         "/api/v1/auth/login",
-        json={"username": "mamari", "password": invalid_password},
+        json={"username": "oulumata", "password": invalid_password},
     )
     assert login.status_code == 401
     assert invalid_password not in login.text
@@ -183,7 +183,7 @@ async def test_bad_credentials_and_public_registration_are_rejected(
 async def test_organization_membership_is_required(client: AsyncClient) -> None:
     login = await client.post(
         "/api/v1/auth/login",
-        json={"username": "mamari", "password": "passer123m"},
+        json={"username": "oulumata", "password": "passer123m"},
     )
     assert login.status_code == 200
     response = await client.get(
@@ -197,7 +197,7 @@ async def test_organization_membership_is_required(client: AsyncClient) -> None:
 async def test_admin_can_create_a_user_for_mamari(client: AsyncClient) -> None:
     login = await client.post(
         "/api/v1/auth/login",
-        json={"username": "mamari", "password": "passer123m"},
+        json={"username": "oulumata", "password": "passer123m"},
     )
     organization_id = login.json()["memberships"][0]["organization_id"]
 
@@ -256,7 +256,7 @@ async def test_admin_can_create_a_user_for_mamari(client: AsyncClient) -> None:
 async def test_employee_can_update_own_profile(client: AsyncClient) -> None:
     admin_login = await client.post(
         "/api/v1/auth/login",
-        json={"username": "mamari", "password": "passer123m"},
+        json={"username": "oulumata", "password": "passer123m"},
     )
     organization_id = admin_login.json()["memberships"][0]["organization_id"]
     employee = await client.post(
@@ -305,7 +305,7 @@ async def test_member_profile_photo_is_private_and_organization_scoped(
 ) -> None:
     login = await client.post(
         "/api/v1/auth/login",
-        json={"username": "mamari", "password": "passer123m"},
+        json={"username": "oulumata", "password": "passer123m"},
     )
     organization_id = login.json()["memberships"][0]["organization_id"]
     monkeypatch.setattr(
@@ -374,7 +374,7 @@ async def test_operator_can_update_operations_but_not_admin_or_finances(
 ) -> None:
     login = await client.post(
         "/api/v1/auth/login",
-        json={"username": "mamari", "password": "passer123m"},
+        json={"username": "oulumata", "password": "passer123m"},
     )
     organization_id = login.json()["memberships"][0]["organization_id"]
     headers = {"X-Organization-ID": organization_id}
@@ -439,7 +439,7 @@ async def test_user_creation_requires_admin_and_rejects_duplicate_usernames(
 ) -> None:
     login = await client.post(
         "/api/v1/auth/login",
-        json={"username": "mamari", "password": "passer123m"},
+        json={"username": "oulumata", "password": "passer123m"},
     )
     organization_id = login.json()["memberships"][0]["organization_id"]
     payload = {
@@ -467,7 +467,7 @@ async def test_user_creation_requires_admin_and_rejects_duplicate_usernames(
 async def test_untrusted_origin_is_rejected(client: AsyncClient) -> None:
     response = await client.post(
         "/api/v1/auth/login",
-        json={"username": "mamari", "password": "passer123m"},
+        json={"username": "oulumata", "password": "passer123m"},
         headers={"Origin": "https://attacker.example"},
     )
     assert response.status_code == 403
@@ -487,7 +487,7 @@ async def test_cors_headers_are_preserved_on_server_errors(
     )
     response = await client.post(
         "/api/v1/auth/login",
-        json={"username": "mamari", "password": "passer123m"},
+        json={"username": "oulumata", "password": "passer123m"},
         headers={"Origin": "http://localhost:3000"},
     )
 
@@ -529,7 +529,7 @@ async def test_password_validation_uses_six_character_minimum(
 ) -> None:
     response = await client.post(
         "/api/v1/auth/login",
-        json={"username": "mamari", "password": "short"},
+        json={"username": "oulumata", "password": "short"},
     )
 
     assert response.status_code == 422

@@ -21,9 +21,13 @@ import { PasswordInput } from "@/features/auth/password-input";
 import {
   ApiError,
   apiRequest,
+  formatUploadLimit,
   getApiErrorMessage,
+  getUploadLimitBytes,
   type UserProfile,
 } from "@/lib/api/client";
+
+const MAX_PROFILE_PHOTO_BYTES = getUploadLimitBytes(5 * 1024 * 1024);
 
 type MemberRole = "owner" | "admin" | "manager" | "operator" | "reader";
 type RoleFilter = "all" | "admins" | "team" | "readers";
@@ -467,6 +471,14 @@ export function UserManagement() {
                               onChange={(event) => {
                                 const file = event.currentTarget.files?.[0];
                                 if (!file) return;
+                                if (file.size > MAX_PROFILE_PHOTO_BYTES) {
+                                  setError(
+                                    `La photo ne doit pas dépasser ${formatUploadLimit(MAX_PROFILE_PHOTO_BYTES)}.`,
+                                  );
+                                  event.currentTarget.value = "";
+                                  return;
+                                }
+                                setError(null);
                                 const form = new FormData();
                                 form.append("photo", file);
                                 uploadPhoto.mutate({ id: member.id, form });

@@ -1,15 +1,15 @@
-import asyncio
 import uuid
 from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
-from fastapi.responses import FileResponse
+from fastapi.responses import Response
 from sqlalchemy import case, func, or_, select
 from sqlalchemy.exc import IntegrityError
 
 from mamari_api.core.config import get_settings
+from mamari_api.core.storage import delete_file, store_file, stored_file_response, upload_limit
 from mamari_api.modules.communication.models import CommunicationPost
 from mamari_api.modules.communication.schemas import (
     CommunicationPostPageResponse,
@@ -298,7 +298,7 @@ async def delete_post(
     await session.delete(post)
     await session.commit()
     if media_path is not None:
-        await asyncio.to_thread(media_path.unlink, missing_ok=True)
+        await delete_file(media_path)
 
 
 @router.post("/posts/{post_id}/media", response_model=CommunicationPostResponse)
@@ -317,11 +317,18 @@ async def upload_post_media(
                 "ou une publication planifiée."
             ),
         )
-    content = await media.read(MAX_MEDIA_BYTES + 1)
+    max_media_bytes = upload_limit(MAX_MEDIA_BYTES)
+    content = await media.read(max_media_bytes + 1)
     if not content:
         raise HTTPException(status_code=422, detail="Le fichier média est vide.")
-    if len(content) > MAX_MEDIA_BYTES:
-        raise HTTPException(status_code=413, detail="Le fichier média ne doit pas dépasser 25 Mo.")
+    if len(content) > max_media_bytes:
+        raise HTTPException(
+            status_code=413,
+            detail=(
+                "Le fichier média ne doit pas dépasser "
+                f"{max_media_bytes // (1024 * 1024)} Mo."
+            ),
+        )
     media_type = MEDIA_TYPES.get(media.content_type or "")
     if media_type is None or not media_type[1](content):
         raise HTTPException(
@@ -335,8 +342,7 @@ async def upload_post_media(
         )
     filename = f"communication-{post.id.hex}-{uuid.uuid4().hex}{media_type[0]}"
     path = _media_path(context.organization.id, filename)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    await asyncio.to_thread(path.write_bytes, content)
+    await store_file(path, content, media.content_type)
     previous_filename = post.media_filename
     post.media_filename = filename
     post.media_mime_type = media.content_type
@@ -344,17 +350,14 @@ async def upload_post_media(
         await session.commit()
     except IntegrityError:
         await session.rollback()
-        await asyncio.to_thread(path.unlink, missing_ok=True)
+        await delete_file(path)
         raise HTTPException(
             status_code=409,
             detail="Le média n’a pas pu être enregistré. Réessayez.",
         ) from None
     await session.refresh(post)
     if previous_filename:
-        await asyncio.to_thread(
-            _media_path(context.organization.id, previous_filename).unlink,
-            missing_ok=True,
-        )
+        await delete_file(_media_path(context.organization.id, previous_filename))
     return _post_response(post)
 
 
@@ -380,7 +383,7 @@ async def delete_post_media(
     post.media_mime_type = None
     await session.commit()
     await session.refresh(post)
-    await asyncio.to_thread(path.unlink, missing_ok=True)
+    await delete_file(path)
     return _post_response(post)
 
 
@@ -389,15 +392,14 @@ async def read_post_media(
     post_id: uuid.UUID,
     session: SessionDep,
     context: CanManageCommunicationDep,
-) -> FileResponse:
+) -> Response:
     post = await _find_post(session, context.organization.id, post_id)
     if post.media_filename is None:
         raise HTTPException(status_code=404, detail="Média introuvable.")
     path = _media_path(context.organization.id, post.media_filename)
-    if not path.is_file():
-        raise HTTPException(status_code=404, detail="Fichier média introuvable.")
-    return FileResponse(
+    return await stored_file_response(
         path,
         media_type=post.media_mime_type or "application/octet-stream",
         headers={"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"},
+        not_found_detail="Fichier média introuvable.",
     )

@@ -135,8 +135,8 @@ n’a été enregistrée.
   agrègent les mouvements réels. Les routes principales sont
   `/api/v1/agriculture/farms`, `/crops`, `/parcels`, `/campaigns`,
   `/harvests` et `/finance/transactions`. Les photos JPEG, PNG et WebP sont
-  limitées à 5 Mo et stockées hors de la base ; en production, configurer
-  `UPLOAD_DIRECTORY` vers un stockage persistant partagé avec l’API.
+  limitées à 5 Mo en local et à 4 Mo sur Vercel ; en local elles sont stockées
+  dans `UPLOAD_DIRECTORY`, et en production dans un Blob Vercel privé.
 - Le module Opérations suit les tâches de l’équipe, avec échéance, priorité,
   responsable, recherche, filtres et états à faire/en cours/terminé/archivé.
   Les employés ne voient que les tâches qui leur sont attribuées et peuvent
@@ -150,13 +150,49 @@ n’a été enregistrée.
   photos, soins et échéances, événements de reproduction, productions et
   alimentation. Les bâtiments rattachés à une ferme ajoutent automatiquement
   les coûts aux Finances et les recettes de production aux revenus. Les médias
-  privés sont stockés sous `UPLOAD_DIRECTORY` et limités à 5 Mo.
+  privés sont stockés sous `UPLOAD_DIRECTORY` en local et dans un Blob Vercel
+  privé en production. La limite est de 5 Mo en local et 4 Mo sur Vercel.
 - La migration `0010_operations_collaborators` ajoute les profils des membres,
   les comptes rendus des tâches et leur historique.
 - Avant d’exposer le serveur sur Internet, remplacer `BOOTSTRAP_ADMIN_PASSWORD`
   par un secret propre à l’instance dans `.env`, et définir une clé
   `JWT_SECRET_KEY` unique d’au moins 32 caractères ainsi que les origines de
   confiance dans `CORS_ORIGINS`. Ne pas partager les identifiants par défaut.
+
+## Déploiement Vercel et fichiers
+
+Déployer le frontend et l’API comme deux projets Vercel du même dépôt :
+
+- projet web, répertoire racine `apps/web` ;
+- projet API, répertoire racine `apps/api` (FastAPI est exposé par
+  `apps/api/src/index.py`).
+
+Dans le projet API, définir `APP_ENV=production`, `DATABASE_URL` (base Neon
+`US`), `JWT_SECRET_KEY` (au moins 32 caractères), `BOOTSTRAP_ADMIN_PASSWORD`,
+`CORS_ORIGINS` (l’origine exacte du site web) et les identifiants du Blob
+Vercel. Dans le projet web, définir `API_PROXY_URL` comme l’URL du projet API
+et `NEXT_PUBLIC_API_URL=/api/v1`. Le proxy Next.js garde les appels API sur
+l’origine du site, ce qui permet aux cookies de session de fonctionner.
+Ajouter chaque origine Vercel de prévisualisation autorisée à `CORS_ORIGINS`.
+
+Créer le Blob en mode **privé** : les photos et médias transitent par les
+routes FastAPI qui vérifient les autorisations avant de les renvoyer. Le
+mode et la région du Blob ne pouvant pas être changés ensuite, utiliser `iad1`
+(US East), région choisie pour rester proche de Neon `us-east-2`. Les fichiers
+restent stockés localement en développement. La limite d’envoi sur Vercel est
+de 4 Mo, car les requêtes des fonctions Vercel sont limitées en taille.
+
+Pour transférer les fichiers locaux existants, fournir les identifiants du
+Blob dans `apps/api/.env.local`, puis, depuis `apps/api`, lancer :
+
+```powershell
+.\.venv\Scripts\python.exe scripts\migrate_uploads_to_blob.py
+```
+
+Le script conserve les chemins des objets attendus par l’API et vérifie chaque
+téléversement en le relisant. Il ne supprime pas les fichiers locaux ; ne
+retirer la copie locale qu’après vérification du site déployé. Appliquer les
+migrations Alembic à Neon avant le premier déploiement de l’API.
 
 ## Base Neon
 

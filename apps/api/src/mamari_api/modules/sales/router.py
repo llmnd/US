@@ -1,16 +1,16 @@
-import asyncio
 import uuid
 from datetime import date
 from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
-from fastapi.responses import FileResponse
+from fastapi.responses import Response
 from sqlalchemy import func, or_, select, update
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import selectinload
 
 from mamari_api.core.config import get_settings
+from mamari_api.core.storage import delete_file, store_file, stored_file_response, upload_limit
 from mamari_api.modules.agriculture.models import FinanceTransaction
 from mamari_api.modules.identity.dependencies import (
     CurrentMembership,
@@ -300,11 +300,15 @@ async def _store_product_photo(
     organization_id: uuid.UUID,
     photo: UploadFile,
 ) -> tuple[str, Path]:
-    content = await photo.read(MAX_PRODUCT_PHOTO_BYTES + 1)
+    max_photo_bytes = upload_limit(MAX_PRODUCT_PHOTO_BYTES)
+    content = await photo.read(max_photo_bytes + 1)
     if not content:
         raise HTTPException(status_code=422, detail="Le fichier photo est vide.")
-    if len(content) > MAX_PRODUCT_PHOTO_BYTES:
-        raise HTTPException(status_code=413, detail="La photo ne doit pas dépasser 5 Mo.")
+    if len(content) > max_photo_bytes:
+        raise HTTPException(
+            status_code=413,
+            detail=f"La photo ne doit pas dépasser {max_photo_bytes // (1024 * 1024)} Mo.",
+        )
     photo_type = PRODUCT_PHOTO_TYPES.get(photo.content_type or "")
     if photo_type is None or not photo_type[1](content):
         raise HTTPException(
@@ -313,8 +317,7 @@ async def _store_product_photo(
         )
     filename = f"product-{uuid.uuid4().hex}{photo_type[0]}"
     path = _product_photo_path(organization_id, filename)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    await asyncio.to_thread(path.write_bytes, content)
+    await store_file(path, content, photo.content_type)
     return filename, path
 
 
@@ -466,7 +469,7 @@ async def create_product(
     except SQLAlchemyError:
         await session.rollback()
         if photo_path is not None:
-            photo_path.unlink(missing_ok=True)
+            await delete_file(photo_path)
         raise
     return _product_response(product)
 
@@ -585,28 +588,28 @@ async def update_product(
     except HTTPException:
         await session.rollback()
         if new_photo_path is not None:
-            new_photo_path.unlink(missing_ok=True)
+            await delete_file(new_photo_path)
         raise
     except SQLAlchemyError:
         await session.rollback()
         if new_photo_path is not None:
-            new_photo_path.unlink(missing_ok=True)
+            await delete_file(new_photo_path)
         raise
     if previous_filename and product.photo_filename != previous_filename:
-        _product_photo_path(context.organization.id, previous_filename).unlink(missing_ok=True)
+        await delete_file(_product_photo_path(context.organization.id, previous_filename))
     return _product_response(product)
 
 
 @router.get(
     "/sales/products/{product_id}/photo",
-    response_class=FileResponse,
+    response_class=Response,
     include_in_schema=False,
 )
 async def read_product_photo(
     product_id: uuid.UUID,
     session: SessionDep,
     context: CurrentOrganizationDep,
-) -> FileResponse:
+) -> Response:
     product = await session.scalar(
         select(Product).where(
             Product.id == product_id,
@@ -616,9 +619,11 @@ async def read_product_photo(
     if product is None or product.photo_filename is None:
         raise HTTPException(status_code=404, detail="Photo du produit introuvable.")
     path = _product_photo_path(context.organization.id, product.photo_filename)
-    if not path.is_file():
-        raise HTTPException(status_code=404, detail="Fichier photo introuvable sur le serveur.")
-    return FileResponse(path, headers={"Cache-Control": "private, max-age=3600"})
+    return await stored_file_response(
+        path,
+        headers={"Cache-Control": "private, max-age=3600"},
+        not_found_detail="Fichier photo introuvable sur le serveur.",
+    )
 
 
 @router.get(
@@ -634,7 +639,7 @@ async def list_store_products(session: SessionDep) -> StoreProductPageResponse:
         )
     )
     if organization is None:
-        raise HTTPException(status_code=404, detail="La boutique Mamari est indisponible.")
+        raise HTTPException(status_code=404, detail="La boutique est indisponible.")
     products = await session.scalars(
         select(Product)
         .where(
@@ -652,13 +657,13 @@ async def list_store_products(session: SessionDep) -> StoreProductPageResponse:
 
 @router.get(
     "/store/products/{product_id}/photo",
-    response_class=FileResponse,
+    response_class=Response,
     include_in_schema=False,
 )
 async def read_store_product_photo(
     product_id: uuid.UUID,
     session: SessionDep,
-) -> FileResponse:
+) -> Response:
     product = await session.scalar(
         select(Product)
         .join(Organization, Product.organization_id == Organization.id)
@@ -673,9 +678,11 @@ async def read_store_product_photo(
     if product is None or product.photo_filename is None:
         raise HTTPException(status_code=404, detail="Photo du produit introuvable.")
     path = _product_photo_path(product.organization_id, product.photo_filename)
-    if not path.is_file():
-        raise HTTPException(status_code=404, detail="Fichier photo introuvable sur le serveur.")
-    return FileResponse(path, headers={"Cache-Control": "public, max-age=3600"})
+    return await stored_file_response(
+        path,
+        headers={"Cache-Control": "public, max-age=3600"},
+        not_found_detail="Fichier photo introuvable sur le serveur.",
+    )
 
 
 @router.post(
@@ -696,7 +703,7 @@ async def create_store_order(
         )
     )
     if organization is None:
-        raise HTTPException(status_code=404, detail="La boutique Mamari est indisponible.")
+        raise HTTPException(status_code=404, detail="La boutique est indisponible.")
 
     customer = await session.scalar(
         select(Customer).where(
@@ -847,7 +854,7 @@ async def list_my_store_orders(
         )
     )
     if organization_id is None:
-        raise HTTPException(status_code=404, detail="La boutique Mamari est indisponible.")
+        raise HTTPException(status_code=404, detail="La boutique est indisponible.")
     customer_id = await session.scalar(
         select(Customer.id).where(
             Customer.user_id == user.id,
@@ -901,7 +908,7 @@ async def read_my_store_order_summary(
         )
     )
     if organization_id is None:
-        raise HTTPException(status_code=404, detail="La boutique Mamari est indisponible.")
+        raise HTTPException(status_code=404, detail="La boutique est indisponible.")
     customer_id = await session.scalar(
         select(Customer.id).where(
             Customer.user_id == user.id,
@@ -965,7 +972,7 @@ async def list_my_store_notifications(
         )
     )
     if organization_id is None:
-        raise HTTPException(status_code=404, detail="La boutique Mamari est indisponible.")
+        raise HTTPException(status_code=404, detail="La boutique est indisponible.")
     notifications = await session.execute(
         select(SalesOrderStatusEvent, SalesOrder)
         .join(SalesOrder, SalesOrder.id == SalesOrderStatusEvent.order_id)

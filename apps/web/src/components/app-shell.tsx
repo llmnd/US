@@ -1,6 +1,5 @@
 "use client";
 
-import NextImage from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
@@ -10,6 +9,7 @@ import {
   Bell,
   Building2,
   CalendarDays,
+  ChevronDown,
   ChevronRight,
   CircleHelp,
   ClipboardList,
@@ -61,6 +61,16 @@ const roleLabels = {
   reader: "Lecture seule",
 } as const;
 
+interface OrganizationModuleSettings {
+  hidden_modules: Array<"agriculture" | "elevage">;
+}
+
+function moduleForPath(pathname: string): "agriculture" | "elevage" | null {
+  if (pathname === "/agriculture" || pathname.startsWith("/agriculture/")) return "agriculture";
+  if (pathname === "/elevage" || pathname.startsWith("/elevage/")) return "elevage";
+  return null;
+}
+
 function canAccessPath(role: OrganizationMembership["role"], pathname: string): boolean {
   if (role === "owner" || role === "admin") return true;
   if (role === "manager") return pathname !== "/administration" && !pathname.startsWith("/administration/");
@@ -103,6 +113,16 @@ export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
     enabled: !isPublicRoute,
     retry: false,
   });
+  const organizationId = profile.data?.memberships[0]?.organization_id;
+  const organization = useQuery({
+    queryKey: ["company", "profile", organizationId],
+    queryFn: () =>
+      apiRequest<OrganizationModuleSettings>("/organizations/current", {
+        headers: { "X-Organization-ID": organizationId! },
+      }),
+    enabled: Boolean(organizationId && !isPublicRoute),
+    retry: false,
+  });
   const updateProfile = useMutation({
     mutationFn: (data: { full_name: string; phone: string | null }) => {
       const organizationId = profile.data?.memberships[0]?.organization_id;
@@ -122,7 +142,10 @@ export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
     },
   });
   const role = profile.data?.memberships[0]?.role;
-  const canAccessCurrentPath = role ? canAccessPath(role, pathname) : true;
+  const hiddenModule = moduleForPath(pathname);
+  const canAccessCurrentPath =
+    (role ? canAccessPath(role, pathname) : true) &&
+    (!hiddenModule || !organization.data?.hidden_modules.includes(hiddenModule));
 
   useEffect(() => {
     if (!isPublicRoute && profile.error instanceof ApiError && profile.error.status === 401) {
@@ -152,8 +175,29 @@ export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
   if (profile.isPending) {
     return (
       <div className="auth-loading" role="status">
-        <NextImage alt="" className="private-brand-logo" height={42} src="/icon.png" width={44} />
+        <span className="private-brand-mark"><Leaf size={22} aria-hidden="true" /></span>
         <span>Chargement de votre espace…</span>
+      </div>
+    );
+  }
+
+  if (hiddenModule && organizationId && organization.isPending) {
+    return (
+      <div className="auth-loading" role="status">
+        <span>Chargement de la configuration de l’organisation…</span>
+      </div>
+    );
+  }
+
+  if (hiddenModule && organizationId && organization.isError) {
+    return (
+      <div className="auth-loading">
+        <p className="auth-error" role="alert">
+          Impossible de vérifier la visibilité de ce module. Réessayez.
+        </p>
+        <button className="button-primary" type="button" onClick={() => void organization.refetch()}>
+          Réessayer
+        </button>
       </div>
     );
   }
@@ -221,7 +265,10 @@ export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
     try {
       await apiRequest<{ message: string }>("/auth/logout", { method: "POST" });
       queryClient.clear();
+      setProfileDialogOpen(false);
+      setProfileEditing(false);
       router.replace("/");
+      router.refresh();
     } catch (error) {
       setLogoutError(getApiErrorMessage(error));
     } finally {
@@ -232,9 +279,10 @@ export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
   return (
     <div className="app-shell">
       <aside className="sidebar" aria-label="Navigation principale">
-        <Link className="brand" href="/" aria-label="Mamari, accueil">
-          <NextImage alt="" className="private-brand-logo" height={62} src="/icon.png" width={64} />
-          <span>
+        <Link className="brand" href="/" aria-label="Oulimata, accueil">
+          <span className="private-brand-mark"><Leaf size={26} aria-hidden="true" /></span>
+          <span className="brand-copy">
+            <strong className="brand-name">Oulimata</strong>
             <span className="brand-caption">Gestion d&apos;entreprise</span>
           </span>
         </Link>
@@ -242,7 +290,16 @@ export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
         <nav aria-label="Modules">
           <div className="nav-label">Espace de travail</div>
           <div className="nav-list">
-            {navigation.filter(({ href }) => canAccessPath(membership.role, href)).map(({ label, href, icon: Icon }) => {
+            {navigation.filter(({ href }) => {
+              const hiddenModuleForHref = moduleForPath(href);
+              return (
+                canAccessPath(membership.role, href) &&
+                (!hiddenModuleForHref ||
+                  (!organization.isPending &&
+                    !organization.isError &&
+                    !organization.data?.hidden_modules.includes(hiddenModuleForHref)))
+              );
+            }).map(({ label, href, icon: Icon }) => {
               const active =
                 pathname === href ||
                 (href !== "/" && pathname.startsWith(`${href}/`));
@@ -263,26 +320,35 @@ export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
         </nav>
 
         <div className="sidebar-footer">
-          <button
-            ref={profileButtonRef}
-            className="profile profile-trigger"
-            type="button"
-            aria-haspopup="dialog"
-            aria-expanded={profileDialogOpen}
-            aria-controls="profile-dialog"
-            onClick={() => setProfileDialogOpen(true)}
-          >
-            <span className="profile-avatar">
-              {profileInitials}
-            </span>
-            <span className="profile-copy">
-              <strong title={profile.data.full_name}>{profile.data.full_name}</strong>
-              <span title={profile.data.username}>
-                {roleLabels[membership.role]} · {profile.data.username}
+          <div className="profile-footer-actions">
+            <Link
+              className="profile profile-home-link"
+              href="/"
+              aria-label="Retourner à l’accueil public sans fermer la session"
+            >
+              <span className="profile-avatar">
+                {profileInitials}
               </span>
-            </span>
-            <ChevronRight className="profile-trigger-chevron" size={16} aria-hidden="true" />
-          </button>
+              <span className="profile-copy">
+                <strong title={profile.data.full_name}>{profile.data.full_name}</strong>
+                <span title={profile.data.username}>
+                  {roleLabels[membership.role]} · {profile.data.username}
+                </span>
+              </span>
+            </Link>
+            <button
+              ref={profileButtonRef}
+              className="profile-menu-trigger"
+              type="button"
+              aria-label="Ouvrir les actions du compte"
+              aria-haspopup="dialog"
+              aria-expanded={profileDialogOpen}
+              aria-controls="profile-dialog"
+              onClick={() => setProfileDialogOpen(true)}
+            >
+              <ChevronDown className="profile-trigger-chevron" size={16} aria-hidden="true" />
+            </button>
+          </div>
         </div>
       </aside>
 

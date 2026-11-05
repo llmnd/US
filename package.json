@@ -9,5 +9,9 @@
     "build": "npm run build --workspace @mamari/web",
     "lint": "npm run lint --workspace @mamari/web",
     "typecheck": "npm run typecheck --workspace @mamari/web"
+  },
+  "dependencies": {
+    "@neon/config": "^1.11.3",
+    "@neon/env": "^1.6.15"
   }
 }

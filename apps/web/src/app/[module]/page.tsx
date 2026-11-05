@@ -41,7 +41,7 @@ const modules: Record<string, { title: string; description: string }> = {
   },
   clients: {
     title: "Clients",
-    description: "Centralisez les coordonnées des particuliers et professionnels de Mamari.",
+    description: "Centralisez les coordonnées des particuliers et professionnels de votre organisation.",
   },
   finances: {
     title: "Finances",

@@ -26,7 +26,7 @@ def create_access_token(user_id: UUID) -> tuple[str, int]:
     token = jwt.encode(
         {
             "sub": str(user_id),
-            "iss": "mamari-api",
+            "iss": "oulumata-api",
             "iat": now,
             "exp": now + timedelta(seconds=lifetime_seconds),
         },
@@ -41,7 +41,7 @@ def decode_access_token(token: str) -> UUID:
         token,
         get_settings().jwt_secret_key.get_secret_value(),
         algorithms=["HS256"],
-        issuer="mamari-api",
+        issuer="oulumata-api",
         options={"require": ["sub", "exp", "iat", "iss"]},
     )
     return UUID(claims["sub"])

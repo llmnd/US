@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowUpRight,
@@ -20,12 +21,23 @@ import {
   Trash2,
   Video,
 } from "lucide-react";
-import { apiBlobRequest, apiRequest, getApiErrorMessage, type UserProfile } from "@/lib/api/client";
+import {
+  apiBlobRequest,
+  apiRequest,
+  formatUploadLimit,
+  getApiErrorMessage,
+  getUploadLimitBytes,
+  type UserProfile,
+} from "@/lib/api/client";
 
 type SocialPlatform = "tiktok" | "facebook" | "both";
 type ContentFormat = "video" | "photo" | "story";
 type PostStatus = "draft" | "scheduled" | "published" | "archived";
 type PostFilter = PostStatus | "all";
+
+const MAX_MEDIA_UPLOAD_BYTES = getUploadLimitBytes(25 * 1024 * 1024);
+const MEDIA_SIZE_ERROR =
+  `Le média ne doit pas dépasser ${formatUploadLimit(MAX_MEDIA_UPLOAD_BYTES)}.`;
 
 interface CommunicationPost {
   id: string;
@@ -64,8 +76,6 @@ type PostDialogState =
   | { mode: "publish"; post: CommunicationPost }
   | { mode: "delete"; post: CommunicationPost }
   | null;
-
-const TIKTOK_PROFILE_URL = "https://www.tiktok.com/@hamid.mamari1";
 
 const statusLabels: Record<PostStatus, string> = {
   draft: "Brouillon",
@@ -115,50 +125,6 @@ function PlatformMark({ platform }: { platform: SocialPlatform }) {
   if (platform === "facebook") return <Facebook size={14} aria-hidden="true" />;
   if (platform === "both") return <span className="communication-both-mark">TK · f</span>;
   return <Music2 size={14} aria-hidden="true" />;
-}
-
-function TikTokProfilePreview() {
-  const [embedError, setEmbedError] = useState(false);
-
-  useEffect(() => {
-    const script = document.createElement("script");
-    script.src = "https://www.tiktok.com/embed.js";
-    script.async = true;
-    script.onerror = () => setEmbedError(true);
-    document.body.appendChild(script);
-
-    return () => {
-      script.remove();
-    };
-  }, []);
-
-  if (embedError) {
-    return (
-      <p className="communication-tiktok-embed-error" role="status">
-        L’aperçu intégré n’est pas disponible pour le moment.{" "}
-        <a href={TIKTOK_PROFILE_URL} rel="noopener noreferrer" target="_blank">
-          Ouvrir le profil TikTok
-        </a>
-      </p>
-    );
-  }
-
-  return (
-    <div className="communication-tiktok-embed">
-      <blockquote
-        className="tiktok-embed"
-        cite={TIKTOK_PROFILE_URL}
-        data-embed-type="creator"
-        data-unique-id="hamid.mamari1"
-      >
-        <section>
-          <a href={TIKTOK_PROFILE_URL} rel="noopener noreferrer" target="_blank">
-            @hamid.mamari1
-          </a>
-        </section>
-      </blockquote>
-    </div>
-  );
 }
 
 function PostMedia({
@@ -406,6 +372,12 @@ export function CommunicationPage() {
     const data = new FormData(event.currentTarget);
     setFormError(null);
     setMessage(null);
+    const media = data.get("media");
+    const mediaFile = media instanceof File && media.size > 0 ? media : null;
+    if (mediaFile && mediaFile.size > MAX_MEDIA_UPLOAD_BYTES) {
+      setFormError(MEDIA_SIZE_ERROR);
+      return;
+    }
     const scheduledDate = String(data.get("scheduled_date") ?? "") || null;
     const status = String(data.get("status")) as "draft" | "scheduled";
     createPost.mutate({
@@ -418,9 +390,7 @@ export function CommunicationPage() {
         status,
         scheduled_date: status === "scheduled" ? scheduledDate : null,
       },
-      mediaFile: data.get("media") instanceof File && (data.get("media") as File).size > 0
-        ? data.get("media") as File
-        : null,
+      mediaFile,
     });
   }
 
@@ -463,37 +433,33 @@ export function CommunicationPage() {
     <div className="dashboard-content communication-workspace">
       <section className="page-heading" aria-labelledby="communication-title">
         <div>
-          <p className="eyebrow">Rayonnement de Mamari</p>
+          <p className="eyebrow">Votre présence en ligne</p>
           <h1 className="page-title" id="communication-title">Communication</h1>
           <p className="page-description">
             Préparez vos contenus, planifiez vos prises de parole et suivez leur publication.
           </p>
         </div>
-        <a
-          className="communication-tiktok-link"
-          href={TIKTOK_PROFILE_URL}
-          rel="noopener noreferrer"
-          target="_blank"
-        >
-          Ouvrir TikTok <ArrowUpRight size={15} />
-        </a>
+        <Link className="communication-tiktok-link" href="/entreprise">
+          Configurer les réseaux <ArrowUpRight size={15} />
+        </Link>
       </section>
 
-      <section className="communication-social-grid" aria-label="Réseaux sociaux de Mamari">
+      <section className="communication-social-grid" aria-label="Réseaux sociaux">
         <article className="communication-social-card tiktok">
           <div className="communication-social-card-top">
             <span className="communication-social-icon"><Music2 size={19} /></span>
-            <span className="communication-social-status">Aperçu officiel TikTok</span>
+            <span className="communication-social-status pending">À configurer</span>
           </div>
           <div className="communication-social-identity">
             <p className="eyebrow">TikTok</p>
-            <h2>@hamid.mamari1</h2>
+            <h2>Votre profil TikTok</h2>
           </div>
-          <TikTokProfilePreview />
-          <a href={TIKTOK_PROFILE_URL} rel="noopener noreferrer" target="_blank">
-            Visiter le profil <ArrowUpRight size={14} />
-          </a>
-          <small>Statistiques et vidéos affichées directement par TikTok, si le profil est public et intégré.</small>
+          <div className="communication-facebook-note">
+            <Heart size={16} />
+            <span>Ajoutez le lien de votre profil dans la fiche de l’entreprise.</span>
+          </div>
+          <Link href="/entreprise">Ouvrir la fiche entreprise <ArrowUpRight size={14} /></Link>
+          <small>Aucun compte externe n’est associé automatiquement.</small>
         </article>
         <article className="communication-social-card facebook">
           <div className="communication-social-card-top">
@@ -502,7 +468,7 @@ export function CommunicationPage() {
           </div>
           <div className="communication-social-identity">
             <p className="eyebrow">Facebook</p>
-            <h2>Page Mamari</h2>
+            <h2>Votre page Facebook</h2>
           </div>
           <div className="communication-facebook-note">
             <Heart size={16} />
@@ -592,15 +558,15 @@ export function CommunicationPage() {
               </label>
               <label className="auth-field communication-form-wide">
                 <span>Hashtags (facultatif)</span>
-                <input maxLength={1000} name="hashtags" placeholder="#Mamari #Agriculture #Elevage" />
+                <input maxLength={1000} name="hashtags" placeholder="#Oulimata #AloeVera" />
               </label>
               <label className="auth-field communication-media-input communication-form-wide">
                 <span>Média (facultatif)</span>
                 <input accept="image/jpeg,image/png,image/webp,video/mp4" name="media" type="file" />
-                <small>JPG, PNG, WebP ou MP4 · 25 Mo maximum · aucun envoi automatique vers les réseaux.</small>
+                <small>JPG, PNG, WebP ou MP4 · {formatUploadLimit(MAX_MEDIA_UPLOAD_BYTES)} maximum · aucun envoi automatique vers les réseaux.</small>
               </label>
               <div className="communication-create-actions communication-form-wide">
-                <span>Le contenu reste privé dans l’espace de travail Mamari.</span>
+                <span>Le contenu reste privé dans l’espace de travail de l’organisation.</span>
                 <button className="button-primary" disabled={createPost.isPending} type="submit">
                   <Plus size={15} /> {createPost.isPending ? "Enregistrement…" : "Enregistrer le contenu"}
                 </button>
@@ -713,7 +679,11 @@ export function CommunicationPage() {
                                 disabled={uploadMedia.isPending || post.status === "archived"}
                                 onChange={(event) => {
                                   const file = event.currentTarget.files?.[0];
-                                  if (file) uploadMedia.mutate({ postId: post.id, mediaFile: file });
+                                  if (file && file.size > MAX_MEDIA_UPLOAD_BYTES) {
+                                    setFormError(MEDIA_SIZE_ERROR);
+                                  } else if (file) {
+                                    uploadMedia.mutate({ postId: post.id, mediaFile: file });
+                                  }
                                   event.currentTarget.value = "";
                                 }}
                                 type="file"

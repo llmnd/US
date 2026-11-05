@@ -7,10 +7,10 @@
   --ink: #1d2922;
   --muted: #78827b;
   --line: #e9ede9;
-  --brand-gold: #b8935a;
-  --brand-gold-strong: #8a6939;
-  --brand-gold-deep: #63471f;
-  --brand-gold-pale: #f6f0e5;
+  --brand-gold: #83a879;
+  --brand-gold-strong: #426b45;
+  --brand-gold-deep: #284b32;
+  --brand-gold-pale: #eaf3e7;
   --green: var(--brand-gold-strong);
   --green-dark: var(--brand-gold-deep);
   --green-pale: var(--brand-gold-pale);
@@ -58,10 +58,10 @@ button {
 }
 
 .sidebar {
-  --sidebar-ink: #342219;
-  --sidebar-muted: #9e7257;
-  --sidebar-line: rgb(70 43 27 / 22%);
-  --sidebar-active: #f7e9df;
+  --sidebar-ink: #173a28;
+  --sidebar-muted: #64826b;
+  --sidebar-line: rgb(23 58 40 / 18%);
+  --sidebar-active: #e7f1e7;
   position: fixed;
   inset: 0 auto 0 0;
   z-index: 20;
@@ -69,10 +69,10 @@ button {
   width: 252px;
   height: 100dvh;
   flex-direction: column;
-  border-right: 1px solid rgb(91 54 31 / 18%);
+  border-right: 1px solid rgb(23 58 40 / 18%);
   background:
-    radial-gradient(ellipse at 0% 100%, rgb(148 77 40 / 15%), transparent 48%),
-    linear-gradient(160deg, #d49164 0%, #d39066 100%);
+    radial-gradient(ellipse at 0% 100%, rgb(44 96 58 / 12%), transparent 48%),
+    linear-gradient(160deg, #f1f6ed 0%, #e8f1e5 100%);
   padding: 24px 16px 16px;
 }
 
@@ -113,7 +113,7 @@ button {
 }
 
 .sidebar .brand-caption {
-  color: #553522;
+  color: #426b45;
 }
 
 .brand-name {
@@ -174,7 +174,8 @@ button {
 }
 
 .nav-link:focus-visible,
-.profile-trigger:focus-visible,
+.profile-home-link:focus-visible,
+.profile-menu-trigger:focus-visible,
 .profile-dialog-close:focus-visible,
 .profile-dialog-action:focus-visible {
   outline: 2px solid #fff8f1;
@@ -207,6 +208,12 @@ button {
   padding-top: 14px;
 }
 
+.profile-footer-actions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
 .profile {
   display: flex;
   min-width: 0;
@@ -214,22 +221,35 @@ button {
   gap: 10px;
 }
 
-.profile-trigger {
-  width: 100%;
+.profile-home-link {
+  flex: 1;
   min-height: 58px;
-  border: 0;
   border-radius: 12px;
   background: rgb(255 248 241 / 18%);
   padding: 9px 10px;
   color: inherit;
-  cursor: pointer;
-  text-align: left;
+  text-decoration: none;
   transition: background 140ms ease;
 }
 
-.profile-trigger:hover,
-.profile-trigger[aria-expanded="true"] {
+.profile-home-link:hover,
+.profile-menu-trigger:hover,
+.profile-menu-trigger[aria-expanded="true"] {
   background: rgb(255 248 241 / 34%);
+}
+
+.profile-menu-trigger {
+  display: grid;
+  width: 38px;
+  height: 42px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 0;
+  border-radius: 10px;
+  background: rgb(255 248 241 / 18%);
+  color: inherit;
+  cursor: pointer;
+  transition: background 140ms ease;
 }
 
 .profile-trigger-chevron {
@@ -238,8 +258,8 @@ button {
   transition: transform 160ms ease;
 }
 
-.profile-trigger[aria-expanded="true"] .profile-trigger-chevron {
-  transform: rotate(90deg);
+.profile-menu-trigger[aria-expanded="true"] .profile-trigger-chevron {
+  transform: rotate(180deg);
 }
 
 .profile-dialog {
@@ -3375,9 +3395,12 @@ button {
     padding-top: 9px;
   }
 
-  .profile-trigger {
+  .profile-footer-actions {
+    width: 100%;
+  }
+
+  .profile-home-link {
     min-width: 0;
-    flex: 1;
     padding: 8px;
   }
 

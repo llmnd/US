@@ -4,13 +4,20 @@ import Image from "next/image";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, ImagePlus, PackagePlus, Pencil, Plus, Sprout, X } from "lucide-react";
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
-import { apiRequest, getApiErrorMessage, type UserProfile } from "@/lib/api/client";
+import {
+  apiRequest,
+  formatUploadLimit,
+  getApiErrorMessage,
+  getUploadLimitBytes,
+  type UserProfile,
+} from "@/lib/api/client";
 import { formatFcfa } from "@/features/sales/sales-types";
 import type { StoreProduct } from "@/features/store/store-types";
 import { useProductPhoto } from "@/features/store/use-product-photo";
 import { MeasurementUnitSelect } from "@/features/shared/measurement-unit-select";
 
 const productsQueryKey = ["sales", "products"];
+const MAX_PRODUCT_PHOTO_BYTES = getUploadLimitBytes(5 * 1024 * 1024);
 
 function ProductThumbnail({
   product,
@@ -70,7 +77,7 @@ function ProductPhotoField({
   const previewUrl = selectedPhoto?.url ?? imageUrl;
   return (
     <div className="auth-field production-photo-field">
-      <span>Photo du produit <small>(facultatif, 5 Mo max.)</small></span>
+      <span>Photo du produit <small>(facultatif, {formatUploadLimit(MAX_PRODUCT_PHOTO_BYTES)} max.)</small></span>
       <label className="production-photo-input">
         {previewUrl ? (
           <Image
@@ -169,8 +176,11 @@ export function ProductionPage() {
     setFeedback(null);
     const formData = new FormData(event.currentTarget);
     const photo = formData.get("photo");
-    if (photo instanceof File && photo.size > 5 * 1024 * 1024) {
-      setFeedback({ kind: "error", text: "La photo ne doit pas dépasser 5 Mo." });
+    if (photo instanceof File && photo.size > MAX_PRODUCT_PHOTO_BYTES) {
+      setFeedback({
+        kind: "error",
+        text: `La photo ne doit pas dépasser ${formatUploadLimit(MAX_PRODUCT_PHOTO_BYTES)}.`,
+      });
       return;
     }
     if (!(photo instanceof File) || photo.size === 0) formData.delete("photo");

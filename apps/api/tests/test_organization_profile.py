@@ -1,12 +1,12 @@
 from httpx import AsyncClient
 
 
-async def login(client: AsyncClient, username: str = "mamari") -> str:
+async def login(client: AsyncClient, username: str = "oulumata") -> str:
     response = await client.post(
         "/api/v1/auth/login",
         json={
             "username": username,
-            "password": "passer123m" if username == "mamari" else "secret6",
+            "password": "passer123m" if username == "oulumata" else "secret6",
         },
     )
     assert response.status_code == 200, response.text
@@ -42,14 +42,15 @@ async def test_organization_profile_is_editable_by_admins_only(
 
     initial = await client.get("/api/v1/organizations/current", headers=headers)
     assert initial.status_code == 200, initial.text
-    assert initial.json()["name"] == "Mamari"
+    assert initial.json()["name"] == "Oulimata"
     assert initial.json()["description"] is None
+    assert initial.json()["hidden_modules"] == []
 
     updated = await client.patch(
         "/api/v1/organizations/current",
         headers=headers,
         json={
-            "name": "Mamari Agriculture",
+            "name": "Oulimata Agriculture",
             "description": "Exploitation agricole et élevage.",
             "legal_form": "Entreprise individuelle",
             "phone": "+235 66 12 34 56",
@@ -61,10 +62,31 @@ async def test_organization_profile_is_editable_by_admins_only(
         },
     )
     assert updated.status_code == 200, updated.text
-    assert updated.json()["name"] == "Mamari Agriculture"
+    assert updated.json()["name"] == "Oulimata Agriculture"
     assert updated.json()["legal_form"] == "Entreprise individuelle"
     assert updated.json()["email"] == "contact@mamari.example"
     assert updated.json()["tiktok_url"] == "https://www.tiktok.com/@hamid.mamari1"
+
+    hidden_modules = await client.patch(
+        "/api/v1/organizations/current",
+        headers=headers,
+        json={"hidden_modules": ["agriculture", "elevage"]},
+    )
+    assert hidden_modules.status_code == 200, hidden_modules.text
+    assert hidden_modules.json()["hidden_modules"] == ["agriculture", "elevage"]
+
+    invalid_hidden_module = await client.patch(
+        "/api/v1/organizations/current",
+        headers=headers,
+        json={"hidden_modules": ["agriculture", "unknown"]},
+    )
+    assert invalid_hidden_module.status_code == 422
+    null_hidden_modules = await client.patch(
+        "/api/v1/organizations/current",
+        headers=headers,
+        json={"hidden_modules": None},
+    )
+    assert null_hidden_modules.status_code == 422
 
     invalid_email = await client.patch(
         "/api/v1/organizations/current",
@@ -89,8 +111,9 @@ async def test_organization_profile_is_editable_by_admins_only(
         "/api/v1/organizations/current",
         headers=headers,
     )
-    assert updated_after_invalid.json()["name"] == "Mamari Agriculture"
+    assert updated_after_invalid.json()["name"] == "Oulimata Agriculture"
     assert updated_after_invalid.json()["email"] == "contact@mamari.example"
+    assert updated_after_invalid.json()["hidden_modules"] == ["agriculture", "elevage"]
 
     await login(client, "responsable-entreprise")
     manager_headers = {"X-Organization-ID": organization_id}

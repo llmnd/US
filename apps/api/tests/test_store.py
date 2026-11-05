@@ -8,7 +8,7 @@ from httpx import AsyncClient
 async def admin_session(client: AsyncClient) -> str:
     response = await client.post(
         "/api/v1/auth/login",
-        json={"username": "mamari", "password": "passer123m"},
+        json={"username": "oulumata", "password": "passer123m"},
     )
     assert response.status_code == 200
     return response.json()["memberships"][0]["organization_id"]
@@ -39,7 +39,7 @@ async def test_public_store_checkout_creates_order_and_reserves_stock(
     client.cookies.clear()
     catalog = await client.get("/api/v1/store/products")
     assert catalog.status_code == 200
-    assert catalog.json()["organization_name"] == "Mamari"
+    assert catalog.json()["organization_name"] == "Oulimata"
     assert [item["id"] for item in catalog.json()["items"]] == [product_id]
     for protected_path in (
         "/api/v1/store/my-profile",
@@ -332,7 +332,7 @@ async def test_product_photos_are_available_to_the_store_and_authorized_admins(
     monkeypatch.setattr(
         sales_router,
         "get_settings",
-        lambda: SimpleNamespace(upload_directory=tmp_path, public_store_slug="mamari"),
+        lambda: SimpleNamespace(upload_directory=tmp_path, public_store_slug="oulumata"),
     )
     organization_id = await admin_session(client)
     headers = {"X-Organization-ID": organization_id}

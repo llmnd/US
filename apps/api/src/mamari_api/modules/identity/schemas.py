@@ -131,6 +131,7 @@ class OrganizationResponse(BaseModel):
     website: str | None
     facebook_url: str | None
     tiktok_url: str | None
+    hidden_modules: list[Literal["agriculture", "elevage"]]
     role: Literal["owner", "admin", "manager", "operator", "reader"]
     created_at: datetime
 
@@ -155,6 +156,7 @@ class UpdateOrganizationRequest(BaseModel):
     website: HttpUrl | None = None
     facebook_url: HttpUrl | None = None
     tiktok_url: HttpUrl | None = None
+    hidden_modules: list[Literal["agriculture", "elevage"]] | None = None
 
     @model_validator(mode="after")
     def require_update_field(self) -> "UpdateOrganizationRequest":
@@ -162,6 +164,8 @@ class UpdateOrganizationRequest(BaseModel):
             raise ValueError("Renseignez au moins une information à modifier.")
         if "name" in self.model_fields_set and self.name is None:
             raise ValueError("Le nom de l’entreprise ne peut pas être vide.")
+        if "hidden_modules" in self.model_fields_set and self.hidden_modules is None:
+            raise ValueError("La liste des modules masqués ne peut pas être vide.")
         return self
 
 

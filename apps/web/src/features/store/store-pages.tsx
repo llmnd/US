@@ -12,6 +12,7 @@ import {
   ChevronRight,
   Leaf,
   LoaderCircle,
+  Menu,
   Minus,
   Plus,
   Search,
@@ -20,6 +21,7 @@ import {
   Sprout,
   Tractor,
   Trash2,
+  X,
   Wheat,
   Truck,
   Sun,
@@ -44,7 +46,7 @@ const storeProductsQueryKey = ["store", "products"];
 /* ------------------------------------------------------------------ */
 /*  HEADER                                                             */
 /* ------------------------------------------------------------------ */
-function PublicHeader() {
+export function PublicHeader() {
   const { cart } = useShopCart();
   const profile = useQuery({
     queryKey: ["auth", "me"],
@@ -54,6 +56,7 @@ function PublicHeader() {
   const cartCount = Object.values(cart).reduce((total, quantity) => total + quantity, 0);
   const [scrolled, setScrolled] = useState(false);
   const [showTop, setShowTop] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const lenisRef = useRef<Lenis | null>(null);
 
   useEffect(() => {
@@ -89,24 +92,37 @@ function PublicHeader() {
   return (
     <>
       <header className={`public-header${scrolled ? " is-scrolled" : ""}`}>
-        <Link className="public-brand" href="/" aria-label="Mamari, accueil">
-          <Image
-            alt=""
-            className="public-brand-logo"
-            height={76}
-            priority
-            src="/icon.png"
-            width={78}
-          />
+        <Link className="public-brand" href="/" aria-label="Oulimata, accueil">
+          <span className="public-brand-symbol"><Leaf size={22} aria-hidden="true" /></span>
+          <span className="public-brand-name">Oulimata</span>
         </Link>
-        <nav className="public-navigation" aria-label="Navigation principale">
+        <button
+          className="public-menu-toggle"
+          type="button"
+          aria-label={menuOpen ? "Fermer le menu" : "Ouvrir le menu"}
+          aria-controls="public-navigation"
+          aria-expanded={menuOpen}
+          onClick={() => setMenuOpen((open) => !open)}
+        >
+          {menuOpen ? <X size={20} aria-hidden="true" /> : <Menu size={20} aria-hidden="true" />}
+        </button>
+        <nav
+          id="public-navigation"
+          className={`public-navigation${menuOpen ? " is-open" : ""}`}
+          aria-label="Navigation principale"
+        >
           <span className="public-nav-links">
-            <Link href="/#activites">Nos activités</Link>
-            <Link href="/qui-sommes-nous">Qui sommes-nous ?</Link>
-            <Link href="/produits">La boutique</Link>
+            <Link href="/" onClick={() => setMenuOpen(false)}>Accueil</Link>
+            <Link href="/produits" onClick={() => setMenuOpen(false)}>Produits</Link>
+            <Link href="/qui-sommes-nous" onClick={() => setMenuOpen(false)}>À propos</Link>
           </span>
           <span className="public-nav-actions">
-            <Link className="public-cart-link" href="/panier" aria-label={`Panier${cartCount ? `, ${cartCount} article(s)` : ""}`}>
+            <Link
+              className="public-cart-link"
+              href="/panier"
+              aria-label={`Panier${cartCount ? `, ${cartCount} article(s)` : ""}`}
+              onClick={() => setMenuOpen(false)}
+            >
               <ShoppingBag size={17} />
               <span>Panier</span>
               {cartCount ? <span className="public-cart-count">{cartCount}</span> : null}
@@ -114,6 +130,7 @@ function PublicHeader() {
             <Link
               className="public-login-link"
               href={profile.data?.customer_account ? "/mon-compte" : "/login"}
+              onClick={() => setMenuOpen(false)}
             >
               {profile.data?.customer_account ? "Mon compte" : "Connexion"} <ArrowRight size={14} />
             </Link>
@@ -136,27 +153,22 @@ function PublicHeader() {
 /* ------------------------------------------------------------------ */
 /*  FOOTER                                                             */
 /* ------------------------------------------------------------------ */
-function PublicFooter() {
+export function PublicFooter() {
   return (
     <footer className="public-footer">
       <div className="public-footer-main">
         <div className="public-footer-about">
-          <Link className="public-brand" href="/" aria-label="Mamari, accueil">
-            <Image
-              alt=""
-              className="public-brand-logo"
-              height={66}
-              src="/icon.png"
-              width={68}
-            />
+          <Link className="public-brand" href="/" aria-label="Oulimata, accueil">
+            <span className="public-brand-symbol"><Leaf size={22} aria-hidden="true" /></span>
+            <span className="public-brand-name">Oulimata</span>
           </Link>
-          <p>Des activités agricoles durables et des produits choisis avec soin, au rythme des saisons.</p>
+          <p>Une sélection de produits Aloe vera pour prendre soin de vous au quotidien.</p>
         </div>
-        <nav className="public-footer-nav" aria-label="Découvrir Mamari">
+        <nav className="public-footer-nav" aria-label="Découvrir Oulimata">
           <h2>Découvrir</h2>
-          <Link href="/#activites">Nos activités</Link>
-          <Link href="/qui-sommes-nous">Qui sommes-nous ?</Link>
-          <Link href="/produits">La boutique</Link>
+          <Link href="/">Accueil</Link>
+          <Link href="/qui-sommes-nous">À propos</Link>
+          <Link href="/produits">Nos produits</Link>
           <Link href="/panier">Votre panier</Link>
         </nav>
         <div className="public-footer-team">
@@ -167,8 +179,8 @@ function PublicFooter() {
         </div>
       </div>
       <div className="public-footer-bottom">
-        <span>© {new Date().getFullYear()} Mamari. Tous droits réservés.</span>
-        <span>Du champ à votre table.</span>
+        <span>© {new Date().getFullYear()} Oulimata. Tous droits réservés.</span>
+        <span>La nature au cœur de votre routine.</span>
       </div>
     </footer>
   );
@@ -177,7 +189,7 @@ function PublicFooter() {
 /* ------------------------------------------------------------------ */
 /*  PRODUCT IMAGE                                                      */
 /* ------------------------------------------------------------------ */
-function ProductImage({
+export function ProductImage({
   product,
   className = "store-product-image",
 }: {
@@ -374,7 +386,7 @@ export function PublicHomePage() {
                   priority
                   quality={90}
                   sizes="(max-width: 600px) 100vw, (max-width: 1100px) 92vw, 36vw"
-                  src="/images/mamari-hero-horses.png"
+                  src="/icon.svg"
                 />
                 <figcaption>Au rythme des saisons</figcaption>
               </figure>
@@ -384,7 +396,7 @@ export function PublicHomePage() {
                   fill
                   quality={85}
                   sizes="(max-width: 600px) 33vw, (max-width: 820px) 30vw, 18vw"
-                  src="/images/mamari-hero-pasture.png"
+                  src="/icon.svg"
                 />
                 <figcaption>La vie au pré</figcaption>
               </figure>
@@ -394,7 +406,7 @@ export function PublicHomePage() {
                   fill
                   quality={85}
                   sizes="(max-width: 600px) 33vw, (max-width: 820px) 30vw, 20vw"
-                  src="/images/mamari-hero-cows.png"
+                  src="/icon.svg"
                 />
                 <figcaption>Au plus près du vivant</figcaption>
               </figure>
@@ -404,7 +416,7 @@ export function PublicHomePage() {
                   fill
                   quality={85}
                   sizes="(max-width: 600px) 33vw, (max-width: 820px) 30vw, 18vw"
-                  src="/images/mamari-hero-chickens.png"
+                  src="/icon.svg"
                 />
                 <figcaption>La ferme en mouvement</figcaption>
               </figure>
@@ -413,7 +425,7 @@ export function PublicHomePage() {
         </section>
 
         {/* ---------- STATS ---------- */}
-        <section className="public-values-strip" aria-label="Les valeurs Mamari">
+        <section className="public-values-strip" aria-label="Les valeurs de la boutique">
           <div>
             <span className="public-values-icon"><Sprout size={19} /></span>
             <p><strong>La terre</strong><small>Notre premier repère</small></p>
@@ -442,7 +454,7 @@ export function PublicHomePage() {
           </div>
           <div className="public-bento">
             <article className="public-bento-tile public-bento-agri">
-              <Image alt="" fill quality={85} sizes="(max-width: 900px) 100vw, 50vw" src="/images/mamari-survey.png" />
+              <Image alt="" fill quality={85} sizes="(max-width: 900px) 100vw, 50vw" src="/icon.svg" />
               <div className="public-bento-copy">
                 <span><Wheat size={21} /></span>
                 <h3>Agriculture</h3>
@@ -450,7 +462,7 @@ export function PublicHomePage() {
               </div>
             </article>
             <article className="public-bento-tile public-bento-livestock">
-              <Image alt="" fill quality={85} sizes="(max-width: 900px) 50vw, 25vw" src="/images/mamari-hero-cows.png" />
+              <Image alt="" fill quality={85} sizes="(max-width: 900px) 50vw, 25vw" src="/icon.svg" />
               <div className="public-bento-copy">
                 <span><Sprout size={21} /></span>
                 <h3>Élevage</h3>
@@ -476,7 +488,7 @@ export function PublicHomePage() {
             <p className="public-eyebrow">Qui sommes-nous ?</p>
             <h2>Une histoire qui se construit sur le terrain.</h2>
             <p>
-              Mamari grandit au fil du travail, des apprentissages et des rencontres.
+              Oulimata grandit au fil des découvertes et des rencontres.
               Au cœur de cette aventure : le respect de la terre, le goût du travail
               bien fait et l&apos;envie de bâtir quelque chose qui ait du sens.
             </p>
@@ -490,7 +502,7 @@ export function PublicHomePage() {
               fill
               quality={90}
               sizes="(max-width: 900px) 90vw, 45vw"
-              src="/images/mamari-field-work.png"
+              src="/icon.svg"
             />
             <div className="public-story-badge">
               <Leaf size={18} />
@@ -504,12 +516,11 @@ export function PublicHomePage() {
 
         <section className="public-section public-home-history">
           <div className="public-home-history-copy">
-            <p className="public-eyebrow">L&apos;aventure Mamari</p>
+            <p className="public-eyebrow">L&apos;aventure Oulimata</p>
             <h2>Une aventure qui a pris racine.</h2>
             <p>
-              Mamari cultive bien plus que des produits : un lien de confiance
-              avec la terre et celles et ceux qui la travaillent. Chaque saison
-              rappelle l&apos;importance du rythme juste et du travail bien fait.
+              Oulimata met à l’honneur une sélection de produits Aloe vera,
+              présentés avec leurs informations pour vous aider à choisir.
             </p>
             <ol className="public-home-history-timeline">
               <li>
@@ -530,7 +541,7 @@ export function PublicHomePage() {
                 <span>Le partage</span>
                 <div>
                   <strong>Des produits plus proches de vous</strong>
-                  <p>La boutique prolonge le lien entre Mamari et ses clients.</p>
+                  <p>La boutique accompagne chaque cliente dans ses choix.</p>
                 </div>
               </li>
             </ol>
@@ -544,7 +555,7 @@ export function PublicHomePage() {
         <section className="public-section public-featured">
           <div className="public-section-heading">
             <div>
-              <p className="public-eyebrow">La boutique Mamari</p>
+              <p className="public-eyebrow">La boutique Oulimata</p>
               <h2>Les produits du moment.</h2>
             </div>
             <Link className="public-text-link" href="/produits">
@@ -608,7 +619,7 @@ export function PublicHomePage() {
           </div>
         </section>
 
-        {/* ---------- VISAGES DE MAMARI ---------- */}
+        {/* ---------- DÉCOUVRIR OULIMATA ---------- */}
         <section className="public-section public-home-gallery">
           <div className="public-section-heading">
             <div>
@@ -616,20 +627,20 @@ export function PublicHomePage() {
               <h2>Le chemin se fait ensemble.</h2>
             </div>
             <Link className="public-text-link" href="/qui-sommes-nous">
-              Rencontrer Mamari <ArrowRight size={15} />
+              Découvrir Oulimata <ArrowRight size={15} />
             </Link>
           </div>
           <div className="public-home-gallery-grid">
             <figure className="public-home-gallery-card public-home-gallery-field">
-              <Image alt="Travail de suivi des cultures dans une parcelle." fill quality={90} sizes="(max-width: 700px) 100vw, 40vw" src="/images/mamari-survey.png" />
+              <Image alt="Illustration botanique de feuille d’aloe vera." fill quality={90} sizes="(max-width: 700px) 100vw, 40vw" src="/icon.svg" />
               <figcaption><span>01</span><strong>Être au contact du terrain</strong></figcaption>
             </figure>
             <figure className="public-home-gallery-card">
-              <Image alt="Remise d’un certificat de reconnaissance au dirigeant de Mamari." fill quality={90} sizes="(max-width: 700px) 100vw, 30vw" src="/images/mamari-certificate.png" />
+              <Image alt="Illustration botanique de feuille d’aloe vera." fill quality={90} sizes="(max-width: 700px) 100vw, 30vw" src="/icon.svg" />
               <figcaption><span>02</span><strong>Apprendre et faire ses preuves</strong></figcaption>
             </figure>
             <figure className="public-home-gallery-card">
-              <Image alt="Cérémonie de remise de distinctions." fill quality={90} sizes="(max-width: 700px) 100vw, 30vw" src="/images/mamari-recognition.png" />
+              <Image alt="Illustration botanique de feuille d’aloe vera." fill quality={90} sizes="(max-width: 700px) 100vw, 30vw" src="/icon.svg" />
               <figcaption><span>03</span><strong>Faire grandir une ambition</strong></figcaption>
             </figure>
           </div>
@@ -640,7 +651,7 @@ export function PublicHomePage() {
         {/* ---------- BANNIÈRE CONTACT ---------- */}
         <section className="public-contact-banner">
           <div>
-            <p className="public-eyebrow">L&apos;aventure Mamari</p>
+            <p className="public-eyebrow">L&apos;aventure Oulimata</p>
             <h2>Une question ou une envie de collaborer ?</h2>
           </div>
           <Link className="public-secondary-link" href="/qui-sommes-nous">
@@ -697,9 +708,8 @@ export function AboutPage() {
             <p className="public-eyebrow">Qui sommes-nous ?</p>
             <h1>Une histoire de terre, de travail et de liens humains.</h1>
             <p>
-              Mamari grandit au fil des saisons, des apprentissages et des
-              rencontres. Une aventure agricole portée par une conviction :
-              le travail de la terre peut nourrir bien plus que nos assiettes.
+              Oulimata vous accueille dans une boutique en ligne consacrée aux
+              produits Aloe vera, à découvrir selon vos envies.
             </p>
             <div className="public-about-hero-actions">
               <Link className="public-primary-link" href="/#activites">
@@ -713,12 +723,12 @@ export function AboutPage() {
           </div>
           <figure className="public-about-hero-visual">
             <Image
-              alt="Un technicien de Mamari observe une parcelle avec un instrument de mesure."
+              alt="Une illustration botanique de feuille d’aloe vera."
               fill
               priority
               quality={90}
               sizes="(max-width: 900px) 100vw, 48vw"
-              src="/images/mamari-survey.png"
+              src="/icon.svg"
             />
             <figcaption>
               <span>Notre histoire</span>
@@ -730,9 +740,8 @@ export function AboutPage() {
         <section className="public-about-opening">
           <span aria-hidden="true">“</span>
           <p>
-            Faire grandir Mamari, c&apos;est croire qu&apos;avec de la patience,
-            du courage et les bonnes personnes à ses côtés, une idée peut
-            prendre racine et devenir utile à beaucoup.
+            Faire grandir Oulimata, c&apos;est proposer une sélection attentive
+            et rendre la découverte des produits simple et agréable.
           </p>
           <small>La conviction qui nous accompagne</small>
         </section>
@@ -741,20 +750,20 @@ export function AboutPage() {
           <div className="public-about-human-visual">
             <figure className="public-about-human-portrait">
               <Image
-                alt="Portrait d’un membre de l’équipe Mamari."
+                alt="Illustration botanique de feuille d’aloe vera."
                 fill
                 quality={90}
                 sizes="(max-width: 800px) 88vw, 38vw"
-                src="/images/mamari-portrait.png"
+                src="/icon.svg"
               />
             </figure>
             <figure className="public-about-human-moment">
               <Image
-                alt="Un membre de Mamari face à l’horizon."
+                alt="Illustration botanique de feuille d’aloe vera."
                 fill
                 quality={90}
                 sizes="(max-width: 800px) 42vw, 18vw"
-                src="/images/mamari-team.png"
+                src="/icon.svg"
               />
               <figcaption>Regarder plus loin</figcaption>
             </figure>
@@ -768,9 +777,8 @@ export function AboutPage() {
               transmettent et qui donnent le meilleur d&apos;elles-mêmes.
             </p>
             <p>
-              Mamari, c&apos;est cette énergie humaine mise au service d&apos;un
-              projet agricole en mouvement, avec l&apos;envie de faire les choses
-              avec sérieux et avec cœur.
+              Oulimata, c&apos;est une boutique en ligne qui met en avant une
+              sélection de produits Aloe vera.
             </p>
           </div>
         </section>
@@ -805,7 +813,7 @@ export function AboutPage() {
         <section className="public-about-closing">
           <div className="public-about-closing-copy">
             <p className="public-eyebrow">Et la suite s&apos;écrit ensemble</p>
-            <h2>Merci de faire une place à Mamari dans votre histoire.</h2>
+            <h2>Merci de faire une place à Oulimata dans votre quotidien.</h2>
             <p>
               Chaque rencontre, chaque échange et chaque produit partagé
               prolongent cette aventure.
@@ -820,7 +828,7 @@ export function AboutPage() {
               fill
               quality={90}
               sizes="(max-width: 800px) 88vw, 34vw"
-              src="/images/mamari-event.png"
+              src="/icon.svg"
             />
           </div>
         </section>
@@ -918,7 +926,7 @@ export function StorePage() {
       <main className="public-section store-page">
         <div className="store-page-heading">
           <div>
-            <p className="public-eyebrow">La boutique Mamari</p>
+            <p className="public-eyebrow">La boutique Oulimata</p>
             <h1>Des produits choisis avec soin.</h1>
             <p>Parcourez notre sélection et ajoutez vos produits au panier.</p>
           </div>
@@ -1131,7 +1139,7 @@ export function CartPage() {
       <main className="public-section store-page cart-page">
         <div className="store-page-heading">
           <div>
-            <p className="public-eyebrow">Votre sélection Mamari</p>
+            <p className="public-eyebrow">Votre sélection Oulimata</p>
             <h1>{step === 2 ? "Merci pour votre commande." : "Votre panier."}</h1>
             <p>Votre commande en quelques étapes, sans paiement en ligne.</p>
           </div>

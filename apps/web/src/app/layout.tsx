@@ -11,11 +11,11 @@ import "./public.css";
 
 export const metadata: Metadata = {
   title: {
-    default: "Mamari — Pilotage d'entreprise",
-    template: "%s — Mamari",
+    default: "Oulimata — Boutique Aloe vera",
+    template: "%s — Oulimata",
   },
   description:
-    "La plateforme de pilotage des activités et des opérations de votre entreprise.",
+    "Découvrez et commandez les produits Aloe vera de la boutique Oulimata.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {

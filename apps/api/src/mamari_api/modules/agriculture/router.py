@@ -1,4 +1,3 @@
-import asyncio
 import uuid
 from datetime import UTC, date, datetime
 from decimal import ROUND_HALF_UP, Decimal
@@ -6,12 +5,18 @@ from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
-from fastapi.responses import FileResponse
+from fastapi.responses import Response
 from sqlalchemy import case, func, or_, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from mamari_api.core.config import get_settings
+from mamari_api.core.storage import (
+    delete_file,
+    store_file,
+    stored_file_response,
+    upload_limit,
+)
 from mamari_api.modules.agriculture.models import (
     Campaign,
     CampaignStatus,
@@ -109,8 +114,7 @@ async def _store_photo(
     content, extension = photo_data
     filename = f"{uuid.uuid4().hex}{extension}"
     path = _photo_path(organization_id, filename)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    await asyncio.to_thread(path.write_bytes, content)
+    await store_file(path, content)
     return filename, path
 
 
@@ -124,11 +128,15 @@ def _is_duplicate_name_error(
 
 
 async def _read_photo(photo: UploadFile) -> tuple[bytes, str]:
-    content = await photo.read(MAX_PHOTO_BYTES + 1)
+    max_photo_bytes = upload_limit(MAX_PHOTO_BYTES)
+    content = await photo.read(max_photo_bytes + 1)
     if not content:
         raise HTTPException(status_code=422, detail="Le fichier photo est vide.")
-    if len(content) > MAX_PHOTO_BYTES:
-        raise HTTPException(status_code=413, detail="La photo ne doit pas dépasser 5 Mo.")
+    if len(content) > max_photo_bytes:
+        raise HTTPException(
+            status_code=413,
+            detail=f"La photo ne doit pas dépasser {max_photo_bytes // (1024 * 1024)} Mo.",
+        )
     photo_type = PHOTO_TYPES.get(photo.content_type or "")
     if photo_type is None or not photo_type[1](content):
         raise HTTPException(
@@ -459,7 +467,7 @@ async def create_farm(
     except IntegrityError as error:
         await session.rollback()
         if photo_path is not None:
-            photo_path.unlink(missing_ok=True)
+            await delete_file(photo_path)
         if not _is_duplicate_name_error(
             error,
             "uq_agriculture_farms_org_name",
@@ -473,17 +481,17 @@ async def create_farm(
     except SQLAlchemyError:
         await session.rollback()
         if photo_path is not None:
-            photo_path.unlink(missing_ok=True)
+            await delete_file(photo_path)
         raise
     return await _farm_response(session, farm)
 
 
-@router.get("/farms/{farm_id}/photo", response_class=FileResponse, include_in_schema=False)
+@router.get("/farms/{farm_id}/photo", response_class=Response, include_in_schema=False)
 async def read_farm_photo(
     farm_id: uuid.UUID,
     session: SessionDep,
     context: CurrentOrganizationDep,
-) -> FileResponse:
+) -> Response:
     farm = await session.scalar(
         select(Farm).where(
             Farm.id == farm_id,
@@ -493,9 +501,11 @@ async def read_farm_photo(
     if farm is None or farm.photo_filename is None:
         raise HTTPException(status_code=404, detail="Photo de la ferme introuvable.")
     path = _photo_path(context.organization.id, farm.photo_filename)
-    if not path.is_file():
-        raise HTTPException(status_code=404, detail="Fichier photo introuvable sur le serveur.")
-    return FileResponse(path, headers={"Cache-Control": "private, max-age=3600"})
+    return await stored_file_response(
+        path,
+        headers={"Cache-Control": "private, max-age=3600"},
+        not_found_detail="Fichier photo introuvable sur le serveur.",
+    )
 
 
 @router.patch("/farms/{farm_id}", response_model=FarmResponse, summary="Modifier une ferme")
@@ -542,7 +552,7 @@ async def update_farm(
     except IntegrityError as error:
         await session.rollback()
         if new_photo_path is not None:
-            new_photo_path.unlink(missing_ok=True)
+            await delete_file(new_photo_path)
         if not _is_duplicate_name_error(
             error,
             "uq_agriculture_farms_org_name",
@@ -556,11 +566,11 @@ async def update_farm(
     except SQLAlchemyError:
         await session.rollback()
         if new_photo_path is not None:
-            new_photo_path.unlink(missing_ok=True)
+            await delete_file(new_photo_path)
         raise
 
     if previous_filename and farm.photo_filename != previous_filename:
-        _photo_path(context.organization.id, previous_filename).unlink(missing_ok=True)
+        await delete_file(_photo_path(context.organization.id, previous_filename))
     return await _farm_response(session, farm)
 
 
@@ -847,10 +857,10 @@ async def update_parcel_photo(
         await session.commit()
     except SQLAlchemyError:
         await session.rollback()
-        new_photo_path.unlink(missing_ok=True)
+        await delete_file(new_photo_path)
         raise
     if previous_filename:
-        _photo_path(context.organization.id, previous_filename).unlink(missing_ok=True)
+        await delete_file(_photo_path(context.organization.id, previous_filename))
     return await _parcel_response(session, parcel)
 
 
@@ -872,16 +882,16 @@ async def remove_parcel_photo(
     parcel.photo_filename = None
     await session.commit()
     if previous_filename:
-        _photo_path(context.organization.id, previous_filename).unlink(missing_ok=True)
+        await delete_file(_photo_path(context.organization.id, previous_filename))
     return await _parcel_response(session, parcel)
 
 
-@router.get("/parcels/{parcel_id}/photo", response_class=FileResponse, include_in_schema=False)
+@router.get("/parcels/{parcel_id}/photo", response_class=Response, include_in_schema=False)
 async def read_parcel_photo(
     parcel_id: uuid.UUID,
     session: SessionDep,
     context: CurrentOrganizationDep,
-) -> FileResponse:
+) -> Response:
     parcel = await session.scalar(
         select(Parcel).where(
             Parcel.id == parcel_id,
@@ -891,9 +901,11 @@ async def read_parcel_photo(
     if parcel is None or parcel.photo_filename is None:
         raise HTTPException(status_code=404, detail="Photo de la parcelle introuvable.")
     path = _photo_path(context.organization.id, parcel.photo_filename)
-    if not path.is_file():
-        raise HTTPException(status_code=404, detail="Fichier photo introuvable sur le serveur.")
-    return FileResponse(path, headers={"Cache-Control": "private, max-age=3600"})
+    return await stored_file_response(
+        path,
+        headers={"Cache-Control": "private, max-age=3600"},
+        not_found_detail="Fichier photo introuvable sur le serveur.",
+    )
 
 
 @router.patch("/parcels/{parcel_id}/archive", response_model=ParcelResponse)

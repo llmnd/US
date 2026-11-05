@@ -112,7 +112,7 @@ async def register_customer(
         )
     )
     if organization is None:
-        raise HTTPException(status_code=404, detail="La boutique Mamari est indisponible.")
+        raise HTTPException(status_code=404, detail="La boutique est indisponible.")
 
     email = str(data.email).casefold()
     existing_user = await session.scalar(

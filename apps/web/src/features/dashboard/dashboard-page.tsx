@@ -236,7 +236,7 @@ export function DashboardPage() {
         throw new ApiError(
           "Le format des indicateurs n’est pas compatible avec cette version.",
           502,
-          { detail: "Mettez à jour puis redémarrez le backend Mamari." },
+          { detail: "Mettez à jour puis redémarrez le serveur de l’application." },
         );
       }
       return response;

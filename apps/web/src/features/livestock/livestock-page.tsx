@@ -28,11 +28,17 @@ import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "re
 import {
   apiBlobRequest,
   apiRequest,
+  formatUploadLimit,
   getApiErrorMessage,
+  getUploadLimitBytes,
   type UserProfile,
 } from "@/lib/api/client";
 import { formatDate, formatFcfa } from "@/features/sales/sales-types";
 import { MeasurementUnitSelect } from "@/features/shared/measurement-unit-select";
+
+const MAX_PHOTO_UPLOAD_BYTES = getUploadLimitBytes(5 * 1024 * 1024);
+const PHOTO_SIZE_ERROR =
+  `La photo ne doit pas dépasser ${formatUploadLimit(MAX_PHOTO_UPLOAD_BYTES)}.`;
 
 type LivestockTab = "animals" | "groups" | "care" | "production" | "finance" | "reports";
 type FinanceFilter = "all" | "income" | "expense";
@@ -439,7 +445,9 @@ export function LivestockPage() {
     const photo = data.get("photo");
     try {
       if (!organizationId) throw new Error("Aucune organisation active n’est associée au compte.");
-      if (photo instanceof File && photo.size > 5 * 1024 * 1024) throw new Error("La photo ne doit pas dépasser 5 Mo.");
+      if (photo instanceof File && photo.size > MAX_PHOTO_UPLOAD_BYTES) {
+        throw new Error(PHOTO_SIZE_ERROR);
+      }
       const animal = await apiRequest<Animal>("/livestock/animals", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...organizationHeaders },
@@ -523,7 +531,9 @@ export function LivestockPage() {
     const data = new FormData(form);
     const photo = data.get("photo");
     try {
-      if (photo instanceof File && photo.size > 5 * 1024 * 1024) throw new Error("La photo ne doit pas dépasser 5 Mo.");
+      if (photo instanceof File && photo.size > MAX_PHOTO_UPLOAD_BYTES) {
+        throw new Error(PHOTO_SIZE_ERROR);
+      }
       const facility = await apiRequest<Facility>("/livestock/facilities", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...organizationHeaders },
@@ -814,7 +824,7 @@ export function LivestockPage() {
                 <Field label="Date de naissance"><input name="birth_date" type="date" /></Field>
                 <Field label="Date d’entrée"><input defaultValue={todayInput()} name="entry_date" required type="date" /></Field>
                 <Field label="Notes"><input maxLength={1000} name="notes" placeholder="Observations utiles" /></Field>
-                <label className="livestock-photo-upload"><ImagePlus size={18} /><span>Photo de l’animal</span><small>JPG, PNG ou WebP · 5 Mo max.</small><input accept="image/jpeg,image/png,image/webp" name="photo" type="file" /></label>
+                <label className="livestock-photo-upload"><ImagePlus size={18} /><span>Photo de l’animal</span><small>JPG, PNG ou WebP · {formatUploadLimit(MAX_PHOTO_UPLOAD_BYTES)} max.</small><input accept="image/jpeg,image/png,image/webp" name="photo" type="file" /></label>
                 <button className="button-primary" disabled={submitting === "animal"} type="submit">{submitting === "animal" ? "Ajout…" : "Ajouter l’animal"}</button>
               </form>
             </details>
@@ -869,7 +879,7 @@ export function LivestockPage() {
                   <Field label="Type"><select defaultValue="coop" name="facility_type">{Object.entries(facilityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></Field>
                   <Field label="Ferme liée (facultatif)"><select defaultValue="" name="farm_id"><option value="">Aucune ferme</option>{(farms.data?.items ?? []).map((farm) => <option key={farm.id} value={farm.id}>{farm.name}</option>)}</select></Field>
                   <Field label="Localisation"><input maxLength={180} name="location" placeholder="Région, village…" /></Field>
-                  <label className="livestock-photo-upload"><ImagePlus size={18} /><span>Photo du bâtiment</span><small>JPG, PNG ou WebP · 5 Mo max.</small><input accept="image/jpeg,image/png,image/webp" name="photo" type="file" /></label>
+                  <label className="livestock-photo-upload"><ImagePlus size={18} /><span>Photo du bâtiment</span><small>JPG, PNG ou WebP · {formatUploadLimit(MAX_PHOTO_UPLOAD_BYTES)} max.</small><input accept="image/jpeg,image/png,image/webp" name="photo" type="file" /></label>
                   <button className="button-primary" disabled={submitting === "facility"} type="submit">{submitting === "facility" ? "Ajout…" : "Ajouter le bâtiment"}</button>
                 </form>
               </details>

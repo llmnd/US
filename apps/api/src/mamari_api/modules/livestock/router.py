@@ -1,4 +1,3 @@
-import asyncio
 import uuid
 from datetime import date, timedelta
 from decimal import Decimal
@@ -6,12 +5,12 @@ from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
-from fastapi.responses import FileResponse
 from sqlalchemy import case, extract, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from mamari_api.core.config import get_settings
+from mamari_api.core.storage import delete_file, store_file, stored_file_response, upload_limit
 from mamari_api.modules.agriculture.models import Farm, FinanceTransaction
 from mamari_api.modules.identity.dependencies import (
     CurrentMembership,
@@ -99,11 +98,15 @@ async def _store_photo(
     organization_id: uuid.UUID,
     photo: UploadFile,
 ) -> tuple[str, Path]:
-    content = await photo.read(MAX_PHOTO_BYTES + 1)
+    max_photo_bytes = upload_limit(MAX_PHOTO_BYTES)
+    content = await photo.read(max_photo_bytes + 1)
     if not content:
         raise HTTPException(status_code=422, detail="Le fichier photo est vide.")
-    if len(content) > MAX_PHOTO_BYTES:
-        raise HTTPException(status_code=413, detail="La photo ne doit pas dépasser 5 Mo.")
+    if len(content) > max_photo_bytes:
+        raise HTTPException(
+            status_code=413,
+            detail=f"La photo ne doit pas dépasser {max_photo_bytes // (1024 * 1024)} Mo.",
+        )
     photo_type = PHOTO_TYPES.get(photo.content_type or "")
     if photo_type is None or not photo_type[1](content):
         raise HTTPException(
@@ -112,8 +115,7 @@ async def _store_photo(
         )
     filename = f"{uuid.uuid4().hex}{photo_type[0]}"
     path = _photo_path(organization_id, filename)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    await asyncio.to_thread(path.write_bytes, content)
+    await store_file(path, content, photo.content_type)
     return filename, path
 
 
@@ -612,10 +614,10 @@ async def upload_facility_photo(
         await session.commit()
     except Exception:
         await session.rollback()
-        path.unlink(missing_ok=True)
+        await delete_file(path)
         raise
     if old_filename:
-        _photo_path(context.organization.id, old_filename).unlink(missing_ok=True)
+        await delete_file(_photo_path(context.organization.id, old_filename))
     await session.refresh(facility)
     return await _facility_response(session, facility)
 
@@ -635,9 +637,7 @@ async def read_facility_photo(
     if filename is None:
         raise HTTPException(status_code=404, detail="Photo introuvable.")
     path = _photo_path(context.organization.id, filename)
-    if not path.is_file():
-        raise HTTPException(status_code=404, detail="Photo introuvable.")
-    return FileResponse(path)
+    return await stored_file_response(path, not_found_detail="Photo introuvable.")
 
 
 @router.get("/groups", response_model=list[GroupResponse])
@@ -861,10 +861,10 @@ async def upload_animal_photo(
         await session.commit()
     except Exception:
         await session.rollback()
-        path.unlink(missing_ok=True)
+        await delete_file(path)
         raise
     if old_filename:
-        _photo_path(context.organization.id, old_filename).unlink(missing_ok=True)
+        await delete_file(_photo_path(context.organization.id, old_filename))
     await session.refresh(animal)
     return await _animal_response(session, animal)
 
@@ -884,9 +884,7 @@ async def read_animal_photo(
     if filename is None:
         raise HTTPException(status_code=404, detail="Photo introuvable.")
     path = _photo_path(context.organization.id, filename)
-    if not path.is_file():
-        raise HTTPException(status_code=404, detail="Photo introuvable.")
-    return FileResponse(path)
+    return await stored_file_response(path, not_found_detail="Photo introuvable.")
 
 
 @router.post(

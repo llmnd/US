@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent, type ReactNode } from "react";
@@ -15,8 +14,9 @@ import { PasswordInput } from "@/features/auth/password-input";
 
 function AuthBrand() {
   return (
-    <Link className="auth-brand" href="/" aria-label="Mamari, accueil">
-      <Image alt="" className="auth-brand-logo" height={72} src="/icon.png" width={74} />
+    <Link className="auth-brand" href="/" aria-label="Oulimata, accueil">
+      <span className="auth-brand-mark"><Leaf size={25} aria-hidden="true" /></span>
+      <span className="auth-brand-name">Oulimata</span>
     </Link>
   );
 }
@@ -35,42 +35,17 @@ function AuthLayout({
   return (
     <main className="auth-page">
       <section className="auth-visual" aria-hidden="true">
-        <Image
-          className="auth-visual-main"
-          src="/images/login-corn.png"
-          alt=""
-          fill
-          priority
-          sizes="(max-width: 860px) 100vw, 55vw"
-        />
-
+        <div className="auth-visual-decoration"><Leaf size={190} strokeWidth={0.8} /></div>
         <div className="auth-visual-shade" />
 
         <div className="auth-visual-mark">
           <Leaf size={16} strokeWidth={1.8} />
-          <span>mamari</span>
-        </div>
-
-        <div className="auth-photo-card auth-photo-card-tractor">
-          <Image
-            src="/images/login-tractor.png"
-            alt=""
-            fill
-            sizes="(max-width: 860px) 24vw, 14vw"
-          />
-        </div>
-        <div className="auth-photo-card auth-photo-card-cows">
-          <Image
-            src="/images/login-cows.png"
-            alt=""
-            fill
-            sizes="(max-width: 860px) 24vw, 14vw"
-          />
+          <span>Oulimata</span>
         </div>
 
         <div className="auth-visual-copy">
-          <span>Au rythme de vos saisons</span>
-          <p>La sérénité de piloter votre activité, simplement.</p>
+          <span>Votre espace Oulimata</span>
+          <p>Une boutique en ligne, une gestion au quotidien.</p>
         </div>
       </section>
 
@@ -87,7 +62,7 @@ function AuthLayout({
           {children}
         </div>
         <p className="auth-footer">
-          Mamari · Le pilotage clair de votre entreprise.
+          Oulimata · Une boutique en ligne autour de l&apos;Aloe vera.
         </p>
       </section>
     </main>
@@ -135,7 +110,7 @@ export function LoginPage() {
   return (
     <AuthLayout
       eyebrow="Votre espace de travail"
-      title="Connectez-vous à Mamari"
+      title="Connectez-vous à Oulimata"
       description="Accédez à votre espace client ou à l’espace de travail de votre équipe."
     >
       <form className="auth-form" onSubmit={handleSubmit}>

@@ -1,14 +1,14 @@
-import asyncio
 import uuid
 from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
-from fastapi.responses import FileResponse
+from fastapi.responses import Response
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 from mamari_api.core.config import get_settings
+from mamari_api.core.storage import delete_file, store_file, stored_file_response, upload_limit
 from mamari_api.modules.identity.dependencies import (
     CurrentMembership,
     SessionDep,
@@ -88,6 +88,7 @@ async def read_current_organization(context: CurrentOrganizationDep) -> Organiza
         website=context.organization.website,
         facebook_url=context.organization.facebook_url,
         tiktok_url=context.organization.tiktok_url,
+        hidden_modules=context.organization.hidden_modules,
         role=context.membership.role,
         created_at=context.organization.created_at,
     )
@@ -120,6 +121,7 @@ async def update_current_organization(
         website=context.organization.website,
         facebook_url=context.organization.facebook_url,
         tiktok_url=context.organization.tiktok_url,
+        hidden_modules=context.organization.hidden_modules,
         role=context.membership.role,
         created_at=context.organization.created_at,
     )
@@ -235,11 +237,15 @@ async def upload_user_photo(
     if row is None:
         raise HTTPException(status_code=404, detail="Collaborateur introuvable.")
     user, membership = row
-    content = await photo.read(MAX_PROFILE_PHOTO_BYTES + 1)
+    max_photo_bytes = upload_limit(MAX_PROFILE_PHOTO_BYTES)
+    content = await photo.read(max_photo_bytes + 1)
     if not content:
         raise HTTPException(status_code=422, detail="Le fichier photo est vide.")
-    if len(content) > MAX_PROFILE_PHOTO_BYTES:
-        raise HTTPException(status_code=413, detail="La photo ne doit pas dépasser 5 Mo.")
+    if len(content) > max_photo_bytes:
+        raise HTTPException(
+            status_code=413,
+            detail=f"La photo ne doit pas dépasser {max_photo_bytes // (1024 * 1024)} Mo.",
+        )
     photo_type = PROFILE_PHOTO_TYPES.get(photo.content_type or "")
     if photo_type is None or not photo_type[1](content):
         raise HTTPException(
@@ -249,22 +255,21 @@ async def upload_user_photo(
 
     filename = f"member-{user.id.hex}-{uuid.uuid4().hex}{photo_type[0]}"
     path = _profile_photo_path(context.organization.id, filename)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    await asyncio.to_thread(path.write_bytes, content)
+    await store_file(path, content, photo.content_type)
     old_filename = membership.photo_filename
     membership.photo_filename = filename
     try:
         await session.commit()
     except IntegrityError:
         await session.rollback()
-        path.unlink(missing_ok=True)
+        await delete_file(path)
         raise HTTPException(
             status_code=409,
             detail="La photo n’a pas pu être enregistrée. Réessayez.",
         ) from None
     await session.refresh(membership)
     if old_filename:
-        _profile_photo_path(context.organization.id, old_filename).unlink(missing_ok=True)
+        await delete_file(_profile_photo_path(context.organization.id, old_filename))
     return _member_response(user, membership)
 
 
@@ -273,7 +278,7 @@ async def read_user_photo(
     user_id: uuid.UUID,
     session: SessionDep,
     context: CurrentOrganizationDep,
-) -> FileResponse:
+) -> Response:
     filename = await session.scalar(
         select(Membership.photo_filename).where(
             Membership.user_id == user_id,
@@ -292,6 +297,8 @@ async def read_user_photo(
             detail="Vous ne pouvez consulter que votre propre photo de profil.",
         )
     path = _profile_photo_path(context.organization.id, filename)
-    if not path.is_file():
-        raise HTTPException(status_code=404, detail="Fichier photo introuvable sur le serveur.")
-    return FileResponse(path, headers={"Cache-Control": "no-store"})
+    return await stored_file_response(
+        path,
+        headers={"Cache-Control": "no-store"},
+        not_found_detail="Fichier photo introuvable sur le serveur.",
+    )

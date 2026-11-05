@@ -1,1 +1,1 @@
-"""Mamari REST API."""
+"""Oulimata REST API."""

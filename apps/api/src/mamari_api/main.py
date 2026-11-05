@@ -2,19 +2,40 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from starlette.types import Receive, Scope, Send
 
 from mamari_api.api.v1.router import api_router
 from mamari_api.core.config import get_settings
 
 settings = get_settings()
 
-api_app = FastAPI(
-    title="Mamari API",
-    description="API REST de la plateforme de gestion d'entreprise Mamari.",
+
+class VercelFastAPI(FastAPI):
+    def __init__(self, *, cors_origins: list[str], **kwargs) -> None:
+        super().__init__(**kwargs)
+        self._cors_app = CORSMiddleware(
+            app=self._call_fastapi,
+            allow_origins=cors_origins,
+            allow_credentials=True,
+            allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+            allow_headers=["Content-Type", "X-Organization-ID"],
+        )
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        await self._cors_app(scope, receive, send)
+
+    async def _call_fastapi(self, scope: Scope, receive: Receive, send: Send) -> None:
+        await super().__call__(scope, receive, send)
+
+
+api_app = VercelFastAPI(
+    title="Oulimata API",
+    description="API REST de la boutique en ligne Oulimata.",
     version="0.1.0",
     docs_url="/docs" if settings.app_env != "production" else None,
     redoc_url="/redoc" if settings.app_env != "production" else None,
     openapi_url="/openapi.json" if settings.app_env != "production" else None,
+    cors_origins=settings.cors_origins,
 )
 
 @api_app.middleware("http")
@@ -47,10 +68,4 @@ async def sanitized_validation_error(
 
 api_app.include_router(api_router, prefix="/api/v1")
 
-app = CORSMiddleware(
-    app=api_app,
-    allow_origins=settings.cors_origins,
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
-    allow_headers=["Content-Type", "X-Organization-ID"],
-)
+app = api_app

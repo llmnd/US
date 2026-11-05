@@ -10,7 +10,7 @@ async def test_finances_consolidate_filter_and_paginate_activity_transactions(
 ) -> None:
     login = await client.post(
         "/api/v1/auth/login",
-        json={"username": "mamari", "password": "passer123m"},
+        json={"username": "oulumata", "password": "passer123m"},
     )
     assert login.status_code == 200
     organization_id = login.json()["memberships"][0]["organization_id"]

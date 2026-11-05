@@ -6,7 +6,7 @@ from httpx import AsyncClient
 async def admin_session(client: AsyncClient) -> str:
     response = await client.post(
         "/api/v1/auth/login",
-        json={"username": "mamari", "password": "passer123m"},
+        json={"username": "oulumata", "password": "passer123m"},
     )
     assert response.status_code == 200
     return response.json()["memberships"][0]["organization_id"]
@@ -38,7 +38,7 @@ async def login_as(client: AsyncClient, username: str) -> None:
         "/api/v1/auth/login",
         json={
             "username": username,
-            "password": "passer123m" if username == "mamari" else "secret6",
+            "password": "passer123m" if username == "oulumata" else "secret6",
         },
     )
     assert response.status_code == 200, response.text
@@ -100,7 +100,7 @@ async def test_human_resources_manage_employee_profiles_and_restrict_roles(
         await client.get("/api/v1/human-resources/employees", headers=headers)
     ).status_code == 403
 
-    await login_as(client, "mamari")
+    await login_as(client, "oulumata")
     missing = await client.get(
         "/api/v1/human-resources/employees",
         headers={"X-Organization-ID": "00000000-0000-0000-0000-000000000001"},
@@ -231,7 +231,7 @@ async def test_payroll_payment_flows_to_finances_and_absences_need_approval(
         )
     ).status_code == 409
 
-    await login_as(client, "mamari")
+    await login_as(client, "oulumata")
     paid = await client.post(
         f"/api/v1/human-resources/payroll/{payroll.json()['id']}/mark-paid",
         headers=headers,

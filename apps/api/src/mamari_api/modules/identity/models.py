@@ -3,6 +3,7 @@ from datetime import UTC, date, datetime
 from enum import StrEnum
 
 from sqlalchemy import (
+    JSON,
     Boolean,
     CheckConstraint,
     DateTime,
@@ -39,6 +40,7 @@ class Organization(Base):
     website: Mapped[str | None] = mapped_column(String(500), nullable=True)
     facebook_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     tiktok_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    hidden_modules: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False

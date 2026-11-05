@@ -38,7 +38,9 @@ import {
 import {
   apiBlobRequest,
   apiRequest,
+  formatUploadLimit,
   getApiErrorMessage,
+  getUploadLimitBytes,
   type UserProfile,
 } from "@/lib/api/client";
 import type {
@@ -58,6 +60,10 @@ import type {
 import { formatDate, formatFcfa } from "@/features/sales/sales-types";
 import { CustomerSelect } from "@/features/customers/customer-select";
 import type { Customer } from "@/features/customers/customer-types";
+
+const MAX_PHOTO_UPLOAD_BYTES = getUploadLimitBytes(5 * 1024 * 1024);
+const PHOTO_SIZE_ERROR =
+  `La photo ne doit pas dépasser ${formatUploadLimit(MAX_PHOTO_UPLOAD_BYTES)}.`;
 
 const pageSize = 100;
 const tabs = [
@@ -232,7 +238,7 @@ function PhotoPreviewField({
         <span className="photo-input-placeholder"><ImagePlus size={19} />{currentPhotoUrl ? "Chargement de la photo…" : "Aucune photo sélectionnée"}</span>
       )}
       <span className="photo-input-label">{label}</span>
-      <small>JPG, PNG ou WebP · 5 Mo max.</small>
+      <small>JPG, PNG ou WebP · {formatUploadLimit(MAX_PHOTO_UPLOAD_BYTES)} max.</small>
       <input
         accept="image/jpeg,image/png,image/webp"
         name={name}
@@ -461,8 +467,8 @@ export function AgriculturePage() {
     const form = event.currentTarget;
     const formData = new FormData(form);
     const photo = formData.get("photo");
-    if (photo instanceof File && photo.size > 5 * 1024 * 1024) {
-      setFarmFeedback({ kind: "error", message: "La photo ne doit pas dépasser 5 Mo." });
+    if (photo instanceof File && photo.size > MAX_PHOTO_UPLOAD_BYTES) {
+      setFarmFeedback({ kind: "error", message: PHOTO_SIZE_ERROR });
       setFarmSubmitting(false);
       return;
     }
@@ -497,8 +503,8 @@ export function AgriculturePage() {
     try {
       if (!organizationId) throw new Error("Aucune organisation active n’est associée au compte.");
       const photo = data.get("photo");
-      if (photo instanceof File && photo.size > 5 * 1024 * 1024) {
-        throw new Error("La photo ne doit pas dépasser 5 Mo.");
+      if (photo instanceof File && photo.size > MAX_PHOTO_UPLOAD_BYTES) {
+        throw new Error(PHOTO_SIZE_ERROR);
       }
       const parcel = await apiRequest<Parcel>("/agriculture/parcels", {
         method: "POST",
@@ -775,8 +781,8 @@ export function AgriculturePage() {
     const form = event.currentTarget;
     const data = new FormData(form);
     const photo = data.get("photo");
-    if (photo instanceof File && photo.size > 5 * 1024 * 1024) {
-      setFarmFeedback({ kind: "error", message: "La photo ne doit pas dépasser 5 Mo." });
+    if (photo instanceof File && photo.size > MAX_PHOTO_UPLOAD_BYTES) {
+      setFarmFeedback({ kind: "error", message: PHOTO_SIZE_ERROR });
       setActionPending(null);
       return;
     }
@@ -810,8 +816,8 @@ export function AgriculturePage() {
     const form = event.currentTarget;
     const data = new FormData(form);
     const photo = data.get("photo");
-    if (photo instanceof File && photo.size > 5 * 1024 * 1024) {
-      setParcelFeedback({ kind: "error", message: "La photo ne doit pas dépasser 5 Mo." });
+    if (photo instanceof File && photo.size > MAX_PHOTO_UPLOAD_BYTES) {
+      setParcelFeedback({ kind: "error", message: PHOTO_SIZE_ERROR });
       setActionPending(null);
       return;
     }

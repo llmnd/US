@@ -1,6 +1,7 @@
 # JavaScript
 node_modules/
 .next/
+.next-dev/
 out/
 coverage/
 npm-debug.log*
@@ -27,3 +28,4 @@ storage/
 .idea/
 .DS_Store
 Thumbs.db
+.neon
