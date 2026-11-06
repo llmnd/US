@@ -15,6 +15,7 @@ export interface StoreProduct {
 
 export interface StoreProductPage {
   organization_name: string;
+  contact_phone: string | null;
   items: StoreProduct[];
 }
 

@@ -651,6 +651,7 @@ async def list_store_products(session: SessionDep) -> StoreProductPageResponse:
     )
     return StoreProductPageResponse(
         organization_name=organization.name,
+        contact_phone=organization.phone,
         items=[_product_response(product, public_photo=True) for product in products.all()],
     )
 

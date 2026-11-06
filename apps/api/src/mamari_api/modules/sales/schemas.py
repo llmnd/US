@@ -154,6 +154,7 @@ class ProductResponse(BaseModel):
 
 class StoreProductPageResponse(BaseModel):
     organization_name: str
+    contact_phone: str | None
     items: list[ProductResponse]
 
 

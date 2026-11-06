@@ -13,6 +13,7 @@ import {
   Leaf,
   LoaderCircle,
   Menu,
+  MessageCircle,
   Minus,
   Plus,
   Search,
@@ -95,6 +96,14 @@ export function PublicHeader() {
         <Link className="public-brand" href="/" aria-label="Oulimata, accueil">
           <span className="public-brand-symbol"><Leaf size={22} aria-hidden="true" /></span>
           <span className="public-brand-name">Oulimata</span>
+        </Link>
+        <Link
+          className="public-header-cart"
+          href="/panier"
+          aria-label={`Panier${cartCount ? `, ${cartCount} article(s)` : ""}`}
+        >
+          <ShoppingBag size={19} aria-hidden="true" />
+          {cartCount ? <span className="public-header-cart-count">{cartCount}</span> : null}
         </Link>
         <button
           className="public-menu-toggle"
@@ -1057,6 +1066,40 @@ export function StorePage() {
 /* ------------------------------------------------------------------ */
 const checkoutSteps = ["Panier", "Coordonnées", "Confirmation"] as const;
 
+function whatsappOrderUrl(phone: string | null, order: StoreOrder): string | null {
+  const dialString = phone?.trim();
+  if (!dialString || (!dialString.startsWith("+") && !dialString.startsWith("00"))) {
+    return null;
+  }
+  const number = dialString.replace(/\D/g, "").replace(/^00/, "");
+  if (number.length < 8 || number.length > 15) return null;
+
+  const items = order.items
+    .map(
+      (item) =>
+        `• ${item.quantity} × ${item.product_name} — ${formatFcfa(item.unit_price_fcfa)} / ${item.unit} = ${formatFcfa(item.unit_price_fcfa * item.quantity)}`,
+    )
+    .join("\n");
+  const message = [
+    "Bonjour Oulimata 👋",
+    "Je souhaite confirmer ma commande sur votre boutique.",
+    "",
+    `🧾 Commande : ${order.reference}`,
+    `👤 Nom : ${order.customer_name}`,
+    `📞 Téléphone : ${order.customer_phone || "Non renseigné"}`,
+    `📍 Livraison : ${order.delivery_address || "À préciser"}`,
+    "",
+    "🛍️ Ma sélection :",
+    items,
+    "",
+    `Total estimé : ${formatFcfa(order.amount_fcfa)}`,
+    "",
+    "Merci de me confirmer la disponibilité et les modalités de livraison.",
+  ].join("\n");
+
+  return `https://wa.me/${number}?text=${encodeURIComponent(message)}`;
+}
+
 export function CartPage() {
   const queryClient = useQueryClient();
   const { cart, setCart } = useShopCart();
@@ -1112,6 +1155,9 @@ export function CartPage() {
     (sum, item) => sum + item.product.price_fcfa * item.quantity,
     0,
   );
+  const completedOrderWhatsappUrl = completedOrder
+    ? whatsappOrderUrl(products.data?.contact_phone ?? null, completedOrder)
+    : null;
 
   function changeQuantity(product: StoreProduct, adjustment: number) {
     setCart((current) => {
@@ -1203,6 +1249,22 @@ export function CartPage() {
               <span>{completedOrder.items.reduce((sum, item) => sum + item.quantity, 0)} article(s)</span>
               <strong>{formatFcfa(completedOrder.amount_fcfa)}</strong>
             </div>
+            {completedOrderWhatsappUrl ? (
+              <a
+                className="checkout-whatsapp-button"
+                href={completedOrderWhatsappUrl}
+                rel="noreferrer"
+                target="_blank"
+              >
+                <MessageCircle size={18} />
+                Envoyer la commande par WhatsApp
+              </a>
+            ) : (
+              <p className="checkout-whatsapp-unavailable">
+                Le numéro WhatsApp de la boutique doit être renseigné au format international
+                dans la fiche de l&apos;entreprise.
+              </p>
+            )}
             <Link className="button-primary checkout-home-link" href="/produits">
               Retour à la boutique <ArrowRight size={16} />
             </Link>

@@ -20,6 +20,12 @@ async def test_public_store_checkout_creates_order_and_reserves_stock(
 ) -> None:
     organization_id = await admin_session(client)
     headers = {"X-Organization-ID": organization_id}
+    profile = await client.patch(
+        "/api/v1/organizations/current",
+        headers=headers,
+        json={"phone": "+221 77 123 45 67"},
+    )
+    assert profile.status_code == 200
     product = await client.post(
         "/api/v1/sales/products",
         headers=headers,
@@ -40,6 +46,7 @@ async def test_public_store_checkout_creates_order_and_reserves_stock(
     catalog = await client.get("/api/v1/store/products")
     assert catalog.status_code == 200
     assert catalog.json()["organization_name"] == "Oulimata"
+    assert catalog.json()["contact_phone"] == "+221 77 123 45 67"
     assert [item["id"] for item in catalog.json()["items"]] == [product_id]
     for protected_path in (
         "/api/v1/store/my-profile",
